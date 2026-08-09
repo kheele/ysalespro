@@ -89,7 +89,7 @@
     "@types/nodemailer": "^6.4.15",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^5.0.0",
+    "@vitejs/plugin-react": "^5.1.4",
     "@vitejs/plugin-rsc": "^0.5.30",
     "genkit-cli": "^0.0.2",
     "jsdom": "^26.1.0",
