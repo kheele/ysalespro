@@ -110,14 +110,14 @@ export default function ReportsPage() {
                     <tbody className="divide-y divide-border/40 font-medium">
                       {companyData.map((row, i) => (
                         <tr key={i} className="hover:bg-muted/30 transition-colors">
-                          <td className="p-3 font-bold text-foreground">{row.company}</td>
+                          <td className="p-3 font-bold text-foreground">{row.company_name || (row as any).company}</td>
                           <td className="p-3 text-indigo-300">{row.industry}</td>
-                          <td className="p-3 text-muted-foreground">{row.country}</td>
-                          <td className="p-3 font-mono">{row.employees.toLocaleString()}</td>
+                          <td className="p-3 text-muted-foreground">{(row as any).country || "USA"}</td>
+                          <td className="p-3 font-mono">{(row.employee_count ?? (row as any).employees ?? 0).toLocaleString()}</td>
                           <td className="p-3 font-mono text-emerald-400">{row.revenue}</td>
-                          <td className="p-3 font-mono font-bold text-indigo-300">{row.leadCount}</td>
-                          <td className="p-3 font-mono text-purple-400">{row.dealsWon}</td>
-                          <td className="p-3 font-mono font-extrabold text-foreground">{row.pipelineValue}</td>
+                          <td className="p-3 font-mono font-bold text-indigo-300">{row.leads_count ?? (row as any).leadCount ?? 0}</td>
+                          <td className="p-3 font-mono text-purple-400">{row.deals_won ?? (row as any).dealsWon ?? 0}</td>
+                          <td className="p-3 font-mono font-extrabold text-foreground">{row.pipeline_value || (row as any).pipelineValue}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -144,12 +144,12 @@ export default function ReportsPage() {
                     <tbody className="divide-y divide-border/40 font-medium">
                       {industryData.map((row, i) => (
                         <tr key={i} className="hover:bg-muted/30 transition-colors">
-                          <td className="p-3 font-bold text-foreground">{row.industry}</td>
-                          <td className="p-3 font-mono">{row.companyCount}</td>
-                          <td className="p-3 font-mono text-indigo-300">{row.totalLeads}</td>
-                          <td className="p-3 font-mono text-emerald-400 font-bold">{row.conversionRate}</td>
-                          <td className="p-3 font-mono text-purple-400">{row.avgDealSize}</td>
-                          <td className="p-3 font-mono font-extrabold text-emerald-400">{row.growthRate}</td>
+                          <td className="p-3 font-bold text-foreground">{row.industry_name || (row as any).industry}</td>
+                          <td className="p-3 font-mono">{row.company_count ?? (row as any).companyCount ?? 0}</td>
+                          <td className="p-3 font-mono text-indigo-300">{row.total_leads ?? (row as any).totalLeads ?? 0}</td>
+                          <td className="p-3 font-mono text-emerald-400 font-bold">{row.conversion_rate || (row as any).conversionRate}</td>
+                          <td className="p-3 font-mono text-purple-400">{row.avg_deal_size || (row as any).avgDealSize}</td>
+                          <td className="p-3 font-mono font-extrabold text-emerald-400">{row.growth_rate || (row as any).growthRate}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -176,10 +176,10 @@ export default function ReportsPage() {
                       {conversionData.map((row, i) => (
                         <tr key={i} className="hover:bg-muted/30 transition-colors">
                           <td className="p-3 font-bold text-foreground">{row.stage}</td>
-                          <td className="p-3 font-mono font-bold text-indigo-300">{row.leadCount}</td>
-                          <td className="p-3 font-mono text-emerald-400 font-bold">{row.conversionPct}%</td>
-                          <td className="p-3 font-mono text-red-400">{row.dropoffRate}%</td>
-                          <td className="p-3 font-mono text-muted-foreground">{row.avgDaysInStage} days</td>
+                          <td className="p-3 font-mono font-bold text-indigo-300">{row.count ?? (row as any).leadCount ?? 0}</td>
+                          <td className="p-3 font-mono text-emerald-400 font-bold">{row.conversion_rate || (row as any).conversionPct}</td>
+                          <td className="p-3 font-mono text-red-400">{row.dropoff_rate || (row as any).dropoffRate}</td>
+                          <td className="p-3 font-mono text-muted-foreground">{row.avg_days_in_stage ?? (row as any).avgDaysInStage ?? 0} days</td>
                         </tr>
                       ))}
                     </tbody>
@@ -207,13 +207,13 @@ export default function ReportsPage() {
                     <tbody className="divide-y divide-border/40 font-medium">
                       {emailData.map((row, i) => (
                         <tr key={i} className="hover:bg-muted/30 transition-colors">
-                          <td className="p-3 font-bold text-foreground">{row.campaign}</td>
-                          <td className="p-3 font-mono">{row.sent.toLocaleString()}</td>
-                          <td className="p-3 font-mono text-cyan-400">{row.deliveredPct}%</td>
-                          <td className="p-3 font-mono text-indigo-300 font-bold">{row.openPct}%</td>
-                          <td className="p-3 font-mono text-purple-400">{row.clickPct}%</td>
-                          <td className="p-3 font-mono text-emerald-400 font-extrabold">{row.replyPct}%</td>
-                          <td className="p-3 font-mono text-red-400">{row.bouncePct}%</td>
+                          <td className="p-3 font-bold text-foreground">{row.campaign_name || (row as any).campaign}</td>
+                          <td className="p-3 font-mono">{(row.emails_sent ?? (row as any).sent ?? 0).toLocaleString()}</td>
+                          <td className="p-3 font-mono text-cyan-400">{row.delivered_percent || (row as any).deliveredPct}</td>
+                          <td className="p-3 font-mono text-indigo-300 font-bold">{row.open_rate || (row as any).openPct}</td>
+                          <td className="p-3 font-mono text-purple-400">{row.click_rate || (row as any).clickPct}</td>
+                          <td className="p-3 font-mono text-emerald-400 font-extrabold">{row.reply_rate || (row as any).replyPct}</td>
+                          <td className="p-3 font-mono text-red-400">{row.bounce_rate || (row as any).bouncePct}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -241,11 +241,11 @@ export default function ReportsPage() {
                       {outreachData.map((row, i) => (
                         <tr key={i} className="hover:bg-muted/30 transition-colors">
                           <td className="p-3 font-bold text-foreground">{row.channel}</td>
-                          <td className="p-3 font-mono">{row.totalAttempts.toLocaleString()}</td>
-                          <td className="p-3 font-mono text-indigo-300">{row.connectedCount.toLocaleString()}</td>
-                          <td className="p-3 font-mono text-cyan-400 font-bold">{row.connectRatePct}%</td>
-                          <td className="p-3 font-mono text-emerald-400 font-bold">{row.meetingsBooked}</td>
-                          <td className="p-3 font-mono text-purple-400 font-extrabold">{row.conversionRatePct}%</td>
+                          <td className="p-3 font-mono">{(row.total_attempts ?? (row as any).totalAttempts ?? 0).toLocaleString()}</td>
+                          <td className="p-3 font-mono text-indigo-300">{(row.connected_count ?? (row as any).connectedCount ?? 0).toLocaleString()}</td>
+                          <td className="p-3 font-mono text-cyan-400 font-bold">{row.connect_rate || (row as any).connectRatePct}</td>
+                          <td className="p-3 font-mono text-emerald-400 font-bold">{row.meetings_booked ?? (row as any).meetingsBooked ?? 0}</td>
+                          <td className="p-3 font-mono text-purple-400 font-extrabold">{row.conversion_rate || (row as any).conversionRatePct}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -273,13 +273,13 @@ export default function ReportsPage() {
                     <tbody className="divide-y divide-border/40 font-medium">
                       {activityData.map((row, i) => (
                         <tr key={i} className="hover:bg-muted/30 transition-colors">
-                          <td className="p-3 font-bold text-foreground">{row.repName}</td>
-                          <td className="p-3 font-mono">{row.emailsSent.toLocaleString()}</td>
-                          <td className="p-3 font-mono">{row.callsMade}</td>
-                          <td className="p-3 font-mono">{row.linkedInMessages}</td>
-                          <td className="p-3 font-mono text-indigo-300 font-bold">{row.meetingsHeld}</td>
-                          <td className="p-3 font-mono text-purple-400 font-bold">{row.dealsClosed}</td>
-                          <td className="p-3 font-mono text-emerald-400 font-extrabold text-sm">{row.revenueGenerated}</td>
+                          <td className="p-3 font-bold text-foreground">{row.rep_name || (row as any).repName}</td>
+                          <td className="p-3 font-mono">{(row.emails_sent ?? (row as any).emailsSent ?? 0).toLocaleString()}</td>
+                          <td className="p-3 font-mono">{row.calls_made ?? (row as any).callsMade ?? 0}</td>
+                          <td className="p-3 font-mono">{row.linkedin_messages ?? (row as any).linkedInMessages ?? 0}</td>
+                          <td className="p-3 font-mono text-indigo-300 font-bold">{row.meetings_held ?? (row as any).meetingsHeld ?? 0}</td>
+                          <td className="p-3 font-mono text-purple-400 font-bold">{row.deals_closed ?? (row as any).dealsClosed ?? 0}</td>
+                          <td className="p-3 font-mono text-emerald-400 font-extrabold text-sm">{row.revenue_generated || (row as any).revenueGenerated}</td>
                         </tr>
                       ))}
                     </tbody>
