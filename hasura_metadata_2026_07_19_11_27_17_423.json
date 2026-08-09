@@ -1,0 +1,230 @@
+{
+  "resource_version": 9975,
+  "metadata": {
+    "version": 3,
+    "sources": [
+      {
+        "name": "automate_agents",
+        "kind": "postgres",
+        "tables": [
+          {
+            "table": {
+              "name": "aa_s_industries",
+              "schema": "public"
+            },
+            "array_relationships": [
+              {
+                "name": "organization_list",
+                "using": {
+                  "foreign_key_constraint_on": {
+                    "column": "industry_id",
+                    "table": {
+                      "name": "aa_s_organization_industries",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "aa_s_keywords",
+              "schema": "public"
+            },
+            "array_relationships": [
+              {
+                "name": "organization_list",
+                "using": {
+                  "foreign_key_constraint_on": {
+                    "column": "keyword_id",
+                    "table": {
+                      "name": "aa_s_organization_keywords",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "aa_s_languages",
+              "schema": "public"
+            },
+            "array_relationships": [
+              {
+                "name": "organization_list",
+                "using": {
+                  "foreign_key_constraint_on": {
+                    "column": "language_id",
+                    "table": {
+                      "name": "aa_s_organization_languages",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "aa_s_organization_industries",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "industry",
+                "using": {
+                  "foreign_key_constraint_on": "industry_id"
+                }
+              },
+              {
+                "name": "organization",
+                "using": {
+                  "foreign_key_constraint_on": "organization_id"
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "aa_s_organization_keywords",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "keyword",
+                "using": {
+                  "foreign_key_constraint_on": "keyword_id"
+                }
+              },
+              {
+                "name": "organization",
+                "using": {
+                  "foreign_key_constraint_on": "organization_id"
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "aa_s_organization_languages",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "language",
+                "using": {
+                  "foreign_key_constraint_on": "language_id"
+                }
+              },
+              {
+                "name": "organization",
+                "using": {
+                  "foreign_key_constraint_on": "organization_id"
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "aa_s_organization_naics_codes",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "organization",
+                "using": {
+                  "foreign_key_constraint_on": "organization_id"
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "aa_s_organization_sic_codes",
+              "schema": "public"
+            },
+            "object_relationships": [
+              {
+                "name": "organization",
+                "using": {
+                  "foreign_key_constraint_on": "organization_id"
+                }
+              }
+            ]
+          },
+          {
+            "table": {
+              "name": "aa_s_organizations",
+              "schema": "public"
+            },
+            "array_relationships": [
+              {
+                "name": "industry_list",
+                "using": {
+                  "foreign_key_constraint_on": {
+                    "column": "organization_id",
+                    "table": {
+                      "name": "aa_s_organization_industries",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "keywords_list",
+                "using": {
+                  "foreign_key_constraint_on": {
+                    "column": "organization_id",
+                    "table": {
+                      "name": "aa_s_organization_keywords",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "language_list",
+                "using": {
+                  "foreign_key_constraint_on": {
+                    "column": "organization_id",
+                    "table": {
+                      "name": "aa_s_organization_languages",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "naics_code_list",
+                "using": {
+                  "foreign_key_constraint_on": {
+                    "column": "organization_id",
+                    "table": {
+                      "name": "aa_s_organization_naics_codes",
+                      "schema": "public"
+                    }
+                  }
+                }
+              },
+              {
+                "name": "sic_code_list",
+                "using": {
+                  "foreign_key_constraint_on": {
+                    "column": "organization_id",
+                    "table": {
+                      "name": "aa_s_organization_sic_codes",
+                      "schema": "public"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
