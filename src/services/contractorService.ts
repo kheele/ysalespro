@@ -24,7 +24,7 @@ export async function validateContractorInviteAction(token: string): Promise<Con
         }
       }
     `;
-    const invite = await getGraphQLOne<any>({
+    const invite: any = await getGraphQLOne({
       query,
       operationName: 'GetContractorInvite',
       variables: { token },
