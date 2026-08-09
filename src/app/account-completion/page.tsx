@@ -40,7 +40,7 @@ const formSchema = z.object({
   organization: z.string().min(2, { message: "Company name must be at least 2 characters." }),
 });
 
-export default function AccountCompletionPage() {
+function AccountCompletionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
@@ -248,3 +248,12 @@ export default function AccountCompletionPage() {
     </div>
   );
 }
+
+export default function AccountCompletionPage() {
+  return (
+    <React.Suspense fallback={<div className="flex min-h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+      <AccountCompletionContent />
+    </React.Suspense>
+  );
+}
+

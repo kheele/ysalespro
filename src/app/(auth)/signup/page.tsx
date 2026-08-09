@@ -45,7 +45,7 @@ const formSchema = z.object({
   invitation_token: z.string().optional(),
 });
 
-export default function SignupPage() {
+function SignupContent() {
   const router = useRouter();
   const { toast } = useToast();
   const searchParams = useSearchParams();
@@ -261,3 +261,12 @@ export default function SignupPage() {
     </Card>
   );
 }
+
+export default function SignupPage() {
+  return (
+    <React.Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+      <SignupContent />
+    </React.Suspense>
+  );
+}
+
