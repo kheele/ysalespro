@@ -113,10 +113,10 @@ export default function ReportsPage() {
           onOpenCommandPalette={() => setCommandOpen(true)}
         />
 
-        <main className="flex-1 p-6 space-y-5 max-w-7xl mx-auto overflow-y-auto w-full">
+        <main className="flex-1 p-6 space-y-5 mx-auto overflow-y-auto w-full">
 
           {/* Controls & Export Header Bar */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card/60 p-4 rounded-xl border border-border/40 backdrop-blur-md">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card p-4 rounded-xl border border-border/40 backdrop-blur-md">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
                 <FileText className="h-5 w-5" />
@@ -146,7 +146,7 @@ export default function ReportsPage() {
 
           {/* 6 Core Report Category Tabs */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ReportCategory)} className="w-full space-y-5">
-            <TabsList className="bg-card p-1 rounded-xl h-auto flex flex-wrap gap-1">
+            <TabsList className="bg-card p-1 rounded-xl h-auto flex flex-wrap justify-start items-center gap-1">
               <TabsTrigger value="company" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-xs py-2 px-3 gap-2">
                 <Building2 className="h-3.5 w-3.5" /> Company Analytics
               </TabsTrigger>
@@ -169,7 +169,7 @@ export default function ReportsPage() {
 
             {/* TAB 1: Company Analytics */}
             <TabsContent value="company">
-              <Card className="border-border/50 bg-card/60 overflow-hidden">
+              <Card className="border-border/50 bg-card overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left">
                     <thead className="bg-muted/40 text-muted-foreground uppercase font-mono text-[10px] border-b border-border/50">
@@ -205,7 +205,7 @@ export default function ReportsPage() {
 
             {/* TAB 2: Industry Analytics */}
             <TabsContent value="industry">
-              <Card className="border-border/50 bg-card/60 overflow-hidden">
+              <Card className="border-border/50 bg-card overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left">
                     <thead className="bg-muted/40 text-muted-foreground uppercase font-mono text-[10px] border-b border-border/50">
@@ -237,7 +237,7 @@ export default function ReportsPage() {
 
             {/* TAB 3: Lead Conversion */}
             <TabsContent value="conversion">
-              <Card className="border-border/50 bg-card/60 overflow-hidden">
+              <Card className="border-border/50 bg-card overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left">
                     <thead className="bg-muted/40 text-muted-foreground uppercase font-mono text-[10px] border-b border-border/50">
@@ -267,7 +267,7 @@ export default function ReportsPage() {
 
             {/* TAB 4: Email Performance */}
             <TabsContent value="email">
-              <Card className="border-border/50 bg-card/60 overflow-hidden">
+              <Card className="border-border/50 bg-card overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left">
                     <thead className="bg-muted/40 text-muted-foreground uppercase font-mono text-[10px] border-b border-border/50">
@@ -301,7 +301,7 @@ export default function ReportsPage() {
 
             {/* TAB 5: Outreach Performance */}
             <TabsContent value="outreach">
-              <Card className="border-border/50 bg-card/60 overflow-hidden">
+              <Card className="border-border/50 bg-card overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left">
                     <thead className="bg-muted/40 text-muted-foreground uppercase font-mono text-[10px] border-b border-border/50">
@@ -333,7 +333,7 @@ export default function ReportsPage() {
 
             {/* TAB 6: Sales Activity */}
             <TabsContent value="activity">
-              <Card className="border-border/50 bg-card/60 overflow-hidden">
+              <Card className="border-border/50 bg-card overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left">
                     <thead className="bg-muted/40 text-muted-foreground uppercase font-mono text-[10px] border-b border-border/50">

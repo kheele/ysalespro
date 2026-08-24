@@ -74,7 +74,7 @@ export async function getIndustryById(id: string | number): Promise<Industry | n
     if (isNaN(numId)) return null;
 
     const query = `
-      query GetIndustryById($id: bigint!) {
+      query GetIndustryById($id: Int!) {
         aa_s_industries_by_pk(id: $id) {
           id
           name

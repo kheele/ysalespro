@@ -97,7 +97,7 @@ export default function PeoplePage() {
     const { people } = await peopleServices.getDecisionMakers({
       search,
       industry: filterIndustry,
-      organization_name: filterCompany,
+      company_name: filterCompany,
       department: filterDepartment,
       seniority: filterSeniority,
       location: filterLocation || undefined,
@@ -278,8 +278,8 @@ export default function PeoplePage() {
 
                         {/* Company */}
                         <td className="p-3.5">
-                          <Link href={`/companies/${person.organization_id}`} className="text-indigo-400 hover:text-indigo-300 whitespace-nowrap font-medium">
-                            {person.organization_name}
+                          <Link href={`/companies/${person.company_id || person.company?.id}`} className="text-indigo-400 hover:text-indigo-300 whitespace-nowrap font-medium">
+                            {person.company_name || person.company?.name || "Company"}
                           </Link>
                         </td>
 

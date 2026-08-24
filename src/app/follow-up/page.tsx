@@ -196,7 +196,7 @@ export default function FollowUpPage() {
 
           {/* KPI Dashboard */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Card className="border-border/50 bg-card/60 p-4 flex items-center gap-3">
+            <Card className="border-border/50 bg-card p-4 flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
                 <AlertTriangle className="h-5 w-5" />
               </div>
@@ -206,7 +206,7 @@ export default function FollowUpPage() {
               </div>
             </Card>
 
-            <Card className="border-border/50 bg-card/60 p-4 flex items-center gap-3">
+            <Card className="border-border/50 bg-card p-4 flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0">
                 <Flame className="h-5 w-5" />
               </div>
@@ -216,7 +216,7 @@ export default function FollowUpPage() {
               </div>
             </Card>
 
-            <Card className="border-border/50 bg-card/60 p-4 flex items-center gap-3">
+            <Card className="border-border/50 bg-card p-4 flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
                 <Clock className="h-5 w-5" />
               </div>
@@ -226,7 +226,7 @@ export default function FollowUpPage() {
               </div>
             </Card>
 
-            <Card className="border-border/50 bg-card/60 p-4 flex items-center gap-3">
+            <Card className="border-border/50 bg-card p-4 flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
                 <CheckCircle2 className="h-5 w-5" />
               </div>
@@ -308,7 +308,7 @@ export default function FollowUpPage() {
               items.map(item => {
                 const sm = STATUS_META[item.status] || STATUS_META.Scheduled;
                 return (
-                  <Card key={item.id} className="border-border/50 bg-card/60 p-4 space-y-3 hover:border-indigo-500/30 transition-all">
+                  <Card key={item.id} className="border-border/50 bg-card p-4 space-y-3 hover:border-indigo-500/30 transition-all">
                     {/* Top Row */}
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="space-y-1">

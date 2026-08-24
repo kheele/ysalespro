@@ -214,7 +214,7 @@ export default function AiMessagingPage() {
         />
 
         <main className="flex-1 p-6 overflow-y-auto">
-          <div className="max-w-7xl mx-auto">
+          <div className="w-full mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6">
 
               {/* ─── LEFT: Context Form ──────────────────────────────────── */}

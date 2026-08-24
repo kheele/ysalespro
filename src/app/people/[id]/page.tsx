@@ -103,11 +103,11 @@ export default function PersonProfilePage() {
       <div className="flex-1 flex flex-col min-w-0">
         <SalesProHeader
           title={person.name}
-          subtitle={`${person.title} · ${person.organization_name} · Decision Maker Intelligence`}
+          subtitle={`${person.title} · ${person.company_name || person.company?.name || "Company"} · Decision Maker Intelligence`}
           onOpenCommandPalette={() => setCommandOpen(true)}
         />
 
-        <main className="flex-1 p-6 space-y-6 max-w-5xl mx-auto overflow-y-auto">
+        <main className="flex-1 p-6 space-y-6 w-full mx-auto overflow-y-auto">
           {/* Back Button */}
           <Button variant="ghost" size="sm"
             onClick={() => router.push("/people")}
@@ -116,7 +116,7 @@ export default function PersonProfilePage() {
           </Button>
 
           {/* ========================= PROFILE HEADER BANNER ========================= */}
-          <Card className="border-border/50 bg-card/60 backdrop-blur-xl p-6">
+          <Card className="border-border/50 bg-card backdrop-blur-xl p-6">
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
               {/* Avatar */}
               <div className="relative shrink-0">
@@ -142,8 +142,8 @@ export default function PersonProfilePage() {
                   <Badge
                     className={
                       person.seniority === "C-Suite" ? "bg-red-500/10 text-red-400 border-red-500/20" :
-                      person.seniority === "VP" ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
-                      "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                        person.seniority === "VP" ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
+                          "bg-amber-500/10 text-amber-400 border-amber-500/20"
                     }
                   >
                     {person.seniority}
@@ -158,8 +158,8 @@ export default function PersonProfilePage() {
                 <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground font-mono">
                   <span className="flex items-center gap-1.5">
                     <Building2 className="h-3.5 w-3.5 text-indigo-400" />
-                    <Link href={`/companies/${person.organization_id}`} className="text-indigo-400 hover:text-indigo-300">
-                      {person.organization_name}
+                    <Link href={`/companies/${person.company_id || person.company?.id}`} className="text-indigo-400 hover:text-indigo-300">
+                      {person.company_name || person.company?.name || "Company"}
                     </Link>
                   </span>
                   <span className="flex items-center gap-1.5">
@@ -193,7 +193,7 @@ export default function PersonProfilePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
             {/* COLUMN 1: Personal Info */}
-            <Card className="border-border/50 bg-card/60 p-5 space-y-4">
+            <Card className="border-border/50 bg-card p-5 space-y-4">
               <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2">
                 <Mail className="h-3.5 w-3.5 text-indigo-400" /> Personal
               </CardTitle>
@@ -235,15 +235,15 @@ export default function PersonProfilePage() {
             </Card>
 
             {/* COLUMN 2: Professional Info */}
-            <Card className="border-border/50 bg-card/60 p-5 space-y-4">
+            <Card className="border-border/50 bg-card p-5 space-y-4">
               <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2">
                 <Briefcase className="h-3.5 w-3.5 text-purple-400" /> Professional
               </CardTitle>
               <div className="space-y-3 text-xs">
                 <div className="space-y-0.5">
                   <p className="text-[10px] uppercase text-muted-foreground">Company</p>
-                  <Link href={`/companies/${person.organization_id}`} className="text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1">
-                    <Building2 className="h-3 w-3 shrink-0" /> {person.organization_name}
+                  <Link href={`/companies/${person.company_id || person.company?.id}`} className="text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-1">
+                    <Building2 className="h-3 w-3 shrink-0" /> {person.company_name || person.company?.name || "Company"}
                   </Link>
                 </div>
                 <div className="space-y-0.5">
@@ -259,8 +259,8 @@ export default function PersonProfilePage() {
                   <Badge
                     className={
                       person.seniority === "C-Suite" ? "bg-red-500/10 text-red-400 border-red-500/20" :
-                      person.seniority === "VP" ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
-                      "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                        person.seniority === "VP" ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
+                          "bg-amber-500/10 text-amber-400 border-amber-500/20"
                     }
                   >
                     {person.seniority}
@@ -280,7 +280,7 @@ export default function PersonProfilePage() {
             </Card>
 
             {/* COLUMN 3: Decision Maker Score */}
-            <Card className={`border-border/50 bg-card/60 p-5 space-y-4 border ${scoreBorderColor} shadow-lg`}>
+            <Card className={`border-border/50 bg-card p-5 space-y-4 border ${scoreBorderColor} shadow-lg`}>
               <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2">
                 <TrendingUp className="h-3.5 w-3.5 text-emerald-400" /> Decision Maker Intelligence
               </CardTitle>
@@ -310,7 +310,7 @@ export default function PersonProfilePage() {
           </div>
 
           {/* ========================= TIMELINE ========================= */}
-          <Card className="border-border/50 bg-card/60 p-5 space-y-4">
+          <Card className="border-border/50 bg-card p-5 space-y-4">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
               <Send className="h-4 w-4 text-indigo-400" /> Engagement Timeline
             </CardTitle>

@@ -548,7 +548,10 @@ export async function handlePayPalSubscriptionSuccessActionByToken(
   const plan = await getBillingPlanByIdAction(planId);
   const newTier = plan ? plan.name : 'Pro';
 
-  const companyId = account_company_id || user.account_company_id || 1;
+  const companyId = account_company_id || user.account_company_id;
+  if (!companyId) {
+    throw new Error('Unauthorized: No account company associated with this user');
+  }
 
   await updateAccountCompany(companyId, {
     subscription_tier: newTier,

@@ -7,7 +7,7 @@ const DECISION_MAKER_FIELDS = `
   id
   name
   job_title
-  account_company_id
+  company_id
   company_name
   industry
   department
@@ -30,7 +30,7 @@ const DECISION_MAKER_FIELDS = `
   company {
     id
     name
-    domain
+    primary_domain
     logo_url
   }
   lead_list {
@@ -49,7 +49,7 @@ function mapDbDecisionMaker(p: any): DecisionMaker {
   if (!p) return null as any;
 
   const orgName = p.company_name || p.company?.name || "";
-  const orgId = p.account_company_id || p.company_id || p.company?.id;
+  const orgId = p.company_id || p.company?.id;
   const title = p.job_title || "Executive";
   const computedLocation = p.location || [p.city, p.state, p.country].filter(Boolean).join(", ") || "";
 
@@ -59,12 +59,9 @@ function mapDbDecisionMaker(p: any): DecisionMaker {
     name: p.name || "",
     job_title: p.job_title || title,
     title,
-    account_company_id: orgId ? Number(orgId) : null,
     company_id: orgId ? Number(orgId) : null,
     company_name: orgName,
-    organization: orgName,
-    organization_id: orgId ? String(orgId) : undefined,
-    organization_name: orgName,
+    company: p.company,
     industry: p.industry || "",
     department: p.department || "",
     seniority: p.seniority || "",
@@ -80,7 +77,6 @@ function mapDbDecisionMaker(p: any): DecisionMaker {
     has_email: !!p.has_email,
     has_phone: !!p.has_phone,
     email_status: p.email_status || null,
-    company: p.company,
     lead_list: p.lead_list || [],
     timeline_event_list: p.timeline_event_list || [],
     created_at: p.created_at,
@@ -95,10 +91,8 @@ export async function getDecisionMakers(params?: {
   seniority?: string;
   country?: string;
   location?: string;
-  account_company_id?: number | string;
   company_id?: number | string;
   company_name?: string;
-  organization_name?: string;
   has_email?: boolean;
   has_phone?: boolean;
   sortBy?: string;
@@ -141,16 +135,14 @@ export async function getDecisionMakers(params?: {
 
     if (params?.company_name && params.company_name !== "all") {
       whereConditions.push({ company_name: { _ilike: `%${params.company_name}%` } });
-    } else if (params?.organization_name && params.organization_name !== "all") {
-      whereConditions.push({ company_name: { _ilike: `%${params.organization_name}%` } });
     }
 
     if (params?.location && params.location !== "all") {
       whereConditions.push({ location: { _ilike: `%${params.location}%` } });
     }
 
-    if (params?.account_company_id || params?.company_id) {
-      whereConditions.push({ account_company_id: { _eq: Number(params.account_company_id || params.company_id) } });
+    if (params?.company_id) {
+      whereConditions.push({ company_id: { _eq: Number(params.company_id) } });
     }
 
     if (params?.has_email !== undefined) {
@@ -214,7 +206,7 @@ export async function getDecisionMakerById(id: string | number): Promise<Decisio
     if (isNaN(numId)) return null;
 
     const query = `
-      query GetDecisionMakerById($id: bigint!) {
+      query GetDecisionMakerById($id: Int!) {
         aa_s_people_by_pk(id: $id) {
           ${DECISION_MAKER_FIELDS}
         }
@@ -245,7 +237,6 @@ export async function getDecisionMakersAction(params?: {
   location?: string;
   company_id?: number | string;
   company_name?: string;
-  organization_name?: string;
   has_email?: boolean;
   has_phone?: boolean;
   sortBy?: string;

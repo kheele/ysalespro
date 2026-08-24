@@ -160,6 +160,10 @@ export async function createUserAction(input: CreateUserInput): Promise<User | n
       }
     }
 
+    if (!accountCompanyId) {
+      throw new Error("Cannot create user: account_company_id or account_company is required.");
+    }
+
     const firstName = input.fname || (input as any).first_name || '';
     const lastName = input.lname || (input as any).last_name || '';
 
@@ -172,7 +176,7 @@ export async function createUserAction(input: CreateUserInput): Promise<User | n
     `;
 
     const object = {
-      account_company_id: Number(accountCompanyId || 1),
+      account_company_id: Number(accountCompanyId),
       auth_id: input.auth_id,
       email: input.email,
       first_name: firstName,
@@ -208,8 +212,8 @@ export async function updateUserAction(id: number | string, updates: UpdateUserI
     `;
 
     const _set: Record<string, any> = {};
-    const firstName = updates.fname || (updates as any).first_name;
-    const lastName = updates.lname || (updates as any).last_name;
+    const firstName = updates.fname;
+    const lastName = updates.lname;
 
     if (firstName) _set.first_name = firstName;
     if (lastName) _set.last_name = lastName;

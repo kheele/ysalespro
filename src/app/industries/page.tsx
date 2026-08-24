@@ -89,7 +89,7 @@ export default function IndustriesPage() {
           onOpenCommandPalette={() => setCommandOpen(true)}
         />
 
-        <main className="flex-1 p-6 space-y-6 max-w-7xl mx-auto overflow-y-auto">
+        <main className="flex-1 p-6 space-y-6 w-full mx-auto overflow-y-auto">
           {/* Top Analytics Summary Section */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {/* KPI Overview */}

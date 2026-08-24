@@ -32,9 +32,7 @@ export interface DecisionMaker {
   title?: string | null;
   company_id?: number | null;
   company_name?: string | null;
-  organization?: string | null;
-  organization_id?: string | number | null;
-  organization_name?: string | null;
+  company?: any;
   industry?: string | null;
   department?: string | null;
   seniority?: string | null;
@@ -50,13 +48,12 @@ export interface DecisionMaker {
   has_email?: boolean | null;
   has_phone?: boolean | null;
   email_status?: string | null;
-  company?: any;
   lead_list?: any[];
   timeline_event_list?: any[];
   avatar_url?: string;
   verified?: boolean;
   decision_power?: string;
-  score_factors?: { fit_score?: number; intent_score?: number; activity_score?: number; timing_score?: number; [key: string]: any };
+  score_factors?: { fit_score?: number; intent_score?: number; activity_score?: number; timing_score?: number;[key: string]: any };
   timeline?: any;
   created_at?: string;
   updated_at?: string;
@@ -159,7 +156,6 @@ export interface Organization {
   id: string | number;
   apollo_id?: string | null;
   name: string;
-  domain?: string | null;
   website_url?: string | null;
   angellist_url?: string | null;
   linkedin_url?: string | null;

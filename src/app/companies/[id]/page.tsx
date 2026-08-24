@@ -123,7 +123,7 @@ export default function CompanyProfilePage() {
           onOpenCommandPalette={() => setCommandOpen(true)}
         />
 
-        <main className="flex-1 p-6 space-y-6 max-w-7xl mx-auto overflow-y-auto">
+        <main className="flex-1 p-6 space-y-6 w-full mx-auto overflow-y-auto">
           {/* Back Button & Top Banner Header */}
           <div className="space-y-4">
             <Button
@@ -135,7 +135,7 @@ export default function CompanyProfilePage() {
               <ChevronLeft className="h-4 w-4" /> Back to Organizations Table
             </Button>
 
-            <Card className="border-border/50 bg-card/60 backdrop-blur-xl p-6 relative overflow-hidden">
+            <Card className="border-border/50 bg-card backdrop-blur-xl p-6 relative overflow-hidden">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 border border-indigo-500/30 flex items-center justify-center font-bold text-2xl text-white font-mono shadow-lg shadow-indigo-500/20 shrink-0">
@@ -158,9 +158,9 @@ export default function CompanyProfilePage() {
                       </Badge>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1.5 font-mono">
-                      {org.domain && (
-                        <a href={`https://${org.domain}`} target="_blank" rel="noreferrer" className="hover:text-indigo-400 flex items-center gap-1">
-                          <Globe className="h-3.5 w-3.5 text-indigo-400" /> {org.domain} <ExternalLink className="h-2.5 w-2.5" />
+                      {(org.primary_domain || org.website_url) && (
+                        <a href={org.website_url || `https://${org.primary_domain}`} target="_blank" rel="noreferrer" className="hover:text-indigo-400 flex items-center gap-1">
+                          <Globe className="h-3.5 w-3.5 text-indigo-400" /> {org.primary_domain || org.website_url?.replace(/^https?:\/\//, '')} <ExternalLink className="h-2.5 w-2.5" />
                         </a>
                       )}
                       <span>·</span>
@@ -206,7 +206,7 @@ export default function CompanyProfilePage() {
             {/* TAB 1: OVERVIEW */}
             <TabsContent value="overview" className="mt-4 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="border-border/50 bg-card/60">
+                <Card className="border-border/50 bg-card">
                   <CardHeader className="p-4 pb-2">
                     <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">Employee Count</CardTitle>
                   </CardHeader>
@@ -216,7 +216,7 @@ export default function CompanyProfilePage() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-border/50 bg-card/60">
+                <Card className="border-border/50 bg-card">
                   <CardHeader className="p-4 pb-2">
                     <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">Annual Revenue</CardTitle>
                   </CardHeader>
@@ -226,7 +226,7 @@ export default function CompanyProfilePage() {
                   </CardContent>
                 </Card>
 
-                <Card className="border-border/50 bg-card/60">
+                <Card className="border-border/50 bg-card">
                   <CardHeader className="p-4 pb-2">
                     <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">Founded Year</CardTitle>
                   </CardHeader>
@@ -237,7 +237,7 @@ export default function CompanyProfilePage() {
                 </Card>
               </div>
 
-              <Card className="border-border/50 bg-card/60">
+              <Card className="border-border/50 bg-card">
                 <CardHeader className="p-5 pb-3">
                   <CardTitle className="text-base font-bold">AI Business Intelligence Overview</CardTitle>
                   <CardDescription className="text-xs">Enriched metadata synthesized from Hasura GraphQL telemetry</CardDescription>
@@ -256,7 +256,7 @@ export default function CompanyProfilePage() {
 
             {/* TAB 2: INDUSTRIES */}
             <TabsContent value="industries" className="mt-4 space-y-4">
-              <Card className="border-border/50 bg-card/60 p-5 space-y-4">
+              <Card className="border-border/50 bg-card p-5 space-y-4">
                 <h3 className="text-sm font-bold">Related Industries (aa_s_organization_industries)</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {org.industry_list && org.industry_list.length > 0 ? (
@@ -280,7 +280,7 @@ export default function CompanyProfilePage() {
 
             {/* TAB 3: KEYWORDS */}
             <TabsContent value="keywords" className="mt-4 space-y-4">
-              <Card className="border-border/50 bg-card/60 p-5 space-y-4">
+              <Card className="border-border/50 bg-card p-5 space-y-4">
                 <h3 className="text-sm font-bold">Tagged Keywords & Tech Stack (aa_s_organization_keywords)</h3>
                 <div className="flex flex-wrap gap-2">
                   {org.keywords_list?.map((k) => (
@@ -294,7 +294,7 @@ export default function CompanyProfilePage() {
 
             {/* TAB 4: LANGUAGES */}
             <TabsContent value="languages" className="mt-4 space-y-4">
-              <Card className="border-border/50 bg-card/60 p-5 space-y-4">
+              <Card className="border-border/50 bg-card p-5 space-y-4">
                 <h3 className="text-sm font-bold">Supported Languages (aa_s_organization_languages)</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {org.language_list?.map((l) => (
@@ -310,7 +310,7 @@ export default function CompanyProfilePage() {
             {/* TAB 5: CLASSIFICATIONS */}
             <TabsContent value="classifications" className="mt-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="border-border/50 bg-card/60 p-5 space-y-3">
+                <Card className="border-border/50 bg-card p-5 space-y-3">
                   <h3 className="text-xs font-bold uppercase text-indigo-400 flex items-center gap-2">
                     <Layers className="h-4 w-4" /> NAICS Industry Codes
                   </h3>
@@ -324,7 +324,7 @@ export default function CompanyProfilePage() {
                   )) || <p className="text-xs text-muted-foreground">NAICS 518210 - Data Processing & Hosting</p>}
                 </Card>
 
-                <Card className="border-border/50 bg-card/60 p-5 space-y-3">
+                <Card className="border-border/50 bg-card p-5 space-y-3">
                   <h3 className="text-xs font-bold uppercase text-purple-400 flex items-center gap-2">
                     <FileCode2 className="h-4 w-4" /> SIC Industry Codes
                   </h3>
@@ -345,7 +345,7 @@ export default function CompanyProfilePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {people.length > 0 ? (
                   people.map((person) => (
-                    <Card key={person.id} className="border-border/50 bg-card/60 p-4 flex items-center justify-between">
+                    <Card key={person.id} className="border-border/50 bg-card p-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <img src={person.avatar_url} alt={person.name} className="h-10 w-10 rounded-full border border-indigo-500/30" />
                         <div>
@@ -370,7 +370,7 @@ export default function CompanyProfilePage() {
               <div className="space-y-3">
                 {leads.length > 0 ? (
                   leads.map((lead) => (
-                    <Card key={lead.id} className="border-border/50 bg-card/60 p-4 flex items-center justify-between text-xs">
+                    <Card key={lead.id} className="border-border/50 bg-card p-4 flex items-center justify-between text-xs">
                       <div>
                         <span className="font-bold text-foreground">{lead.pipeline_stage} Stage</span>
                         <p className="text-muted-foreground text-[11px]">Contact: {lead.contact_name} ({lead.contact_title})</p>
@@ -389,7 +389,7 @@ export default function CompanyProfilePage() {
 
             {/* TAB 8: NOTES */}
             <TabsContent value="notes" className="mt-4 space-y-4">
-              <Card className="border-border/50 bg-card/60 p-5 space-y-4">
+              <Card className="border-border/50 bg-card p-5 space-y-4">
                 <form onSubmit={handleAddNote} className="space-y-3">
                   <Textarea
                     placeholder="Add an internal sales note or meeting recap..."
@@ -421,7 +421,7 @@ export default function CompanyProfilePage() {
               <div className="space-y-3">
                 {tasks.length > 0 ? (
                   tasks.map((t) => (
-                    <Card key={t.id} className="border-border/50 bg-card/60 p-4 flex items-center justify-between text-xs">
+                    <Card key={t.id} className="border-border/50 bg-card p-4 flex items-center justify-between text-xs">
                       <div>
                         <h4 className="font-bold">{t.title}</h4>
                         <p className="text-[10px] text-muted-foreground">Due: {t.due_date}</p>

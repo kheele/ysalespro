@@ -65,7 +65,7 @@ export async function getLanguageById(id: string | number): Promise<Language | n
     if (isNaN(numId)) return null;
 
     const query = `
-      query GetLanguageById($id: bigint!) {
+      query GetLanguageById($id: Int!) {
         aa_s_languages_by_pk(id: $id) {
           id
           name

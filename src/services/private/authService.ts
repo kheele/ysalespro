@@ -21,10 +21,13 @@ export async function initializeUserClaimsAction(token: string): Promise<void> {
     throw new Error('User not found in database');
   }
 
-  const account_company_id = dbUser.account_company_id ?? 1;
+  const account_company_id = dbUser.account_company_id;
+  if (!account_company_id) {
+    throw new Error('User has no account_company_id assigned in database');
+  }
 
   // Clean up legacy claims (projectId, viewMode, organization_id)
-  const { projectId: _, viewMode: __, organization_id: ___, ...cleanedClaims } = currentClaims;
+  const { ...cleanedClaims } = currentClaims;
 
   const updatedClaims = {
     ...cleanedClaims,

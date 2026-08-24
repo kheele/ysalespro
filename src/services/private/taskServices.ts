@@ -35,7 +35,7 @@ export async function getTasksActionByToken(
 
   try {
     const whereConditions: Record<string, any>[] = [
-      { account_company_id: { _eq: companyId } }
+      { related_lead: { account_company_id: { _eq: companyId } } }
     ];
 
     if (params?.type && params.type !== "all") {

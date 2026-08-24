@@ -57,7 +57,7 @@ export default function CompaniesPage() {
 
   const handleExportCSV = () => {
     const headers = "ID,Company Name,Website,Industry,Country,City,Employees,Revenue,Status\n";
-    const rows = companies.map(c => `"${c.id}","${c.name}","${c.domain || ''}","${c.primary_industry || c.industry || ''}","${c.country || ''}","${c.city || ''}","${c.estimated_num_employees || c.employee_count || 0}","${c.annual_revenue || ''}"`).join("\n");
+    const rows = companies.map(c => `"${c.id}","${c.name}","${c.primary_domain || ''}","${c.primary_industry || c.industry || ''}","${c.country || ''}","${c.city || ''}","${c.estimated_num_employees || c.employee_count || 0}","${c.annual_revenue || ''}"`).join("\n");
     const blob = new Blob([headers + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -78,7 +78,7 @@ export default function CompaniesPage() {
           onOpenCommandPalette={() => setCommandOpen(true)}
         />
 
-        <main className="flex-1 p-6 space-y-5 max-w-7xl mx-auto overflow-y-auto">
+        <main className="flex-1 p-6 space-y-5 w-full mx-auto overflow-y-auto">
 
           {/* Scale Summary Banner */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-2xl backdrop-blur-xl">
@@ -166,7 +166,7 @@ export default function CompaniesPage() {
                           <Link href={`/companies/${c.id}`} className="font-bold text-foreground hover:text-indigo-400 transition-colors">
                             {c.name}
                           </Link>
-                          <p className="text-[10px] text-muted-foreground font-mono">{c.domain || ''}</p>
+                          <p className="text-[10px] text-muted-foreground font-mono">{c.primary_domain || ''}</p>
                         </td>
                         <td className="p-3">
                           <span className="text-indigo-300 font-semibold">{c.primary_industry || c.industry || 'N/A'}</span>

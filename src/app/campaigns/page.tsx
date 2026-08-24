@@ -262,7 +262,7 @@ function CampaignBuilderModal({ open, onClose, onSave }: {
                       </div>
 
                       {/* Card */}
-                      <div className={`flex-1 rounded-xl border ${step_item.enabled ? "border-border/50 bg-card/60" : "border-border/20 bg-muted/10 opacity-50"} p-3 space-y-2`}>
+                      <div className={`flex-1 rounded-xl border ${step_item.enabled ? "border-border/50 bg-card" : "border-border/20 bg-muted/10 opacity-50"} p-3 space-y-2`}>
                         {/* Top row */}
                         <div className="flex items-center gap-2 flex-wrap">
                           <select value={step_item.type}
@@ -647,7 +647,7 @@ export default function CampaignsPage() {
           subtitle="Build multi-step sequences with audience targeting, day-based scheduling, and automation rules"
           onOpenCommandPalette={() => setCommandOpen(true)}
         />
-        <main className="flex-1 p-6 space-y-5 max-w-5xl mx-auto overflow-y-auto">
+        <main className="flex-1 p-6 space-y-5 w-full mx-auto overflow-y-auto">
 
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

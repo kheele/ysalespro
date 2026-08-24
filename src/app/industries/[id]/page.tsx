@@ -132,7 +132,7 @@ export default function IndustryDetailPage() {
           onOpenCommandPalette={() => setCommandOpen(true)}
         />
 
-        <main className="flex-1 p-6 space-y-6 max-w-7xl mx-auto overflow-y-auto">
+        <main className="flex-1 p-6 space-y-6 w-full mx-auto overflow-y-auto">
           {/* Back Link */}
           <Button
             variant="ghost"

@@ -137,7 +137,7 @@ export default function TasksPage() {
           onOpenCommandPalette={() => setCommandOpen(true)}
         />
 
-        <main className="flex-1 p-6 space-y-5 max-w-7xl mx-auto overflow-y-auto">
+        <main className="flex-1 p-6 space-y-5 w-full mx-auto overflow-y-auto">
 
           {/* Top Control Bar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-2xl backdrop-blur-xl">

@@ -9,20 +9,21 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/hooks/use-auth";
 import {
-  User, Shield, Bell, Database, Palette, Users, Key,
+  User, Shield, Bell, Palette, Users,
   Globe, Mail, Plug, ChevronRight, Save, CheckCircle2, Zap,
   ToggleLeft, ToggleRight,
 } from "lucide-react";
 
 const NAV_ITEMS = [
-  { id: "profile", label: "Profile", icon: <User className="h-4 w-4" /> },
-  { id: "team", label: "Team & Permissions", icon: <Users className="h-4 w-4" /> },
-  { id: "notifications", label: "Notifications", icon: <Bell className="h-4 w-4" /> },
-  { id: "integrations", label: "Integrations", icon: <Plug className="h-4 w-4" /> },
-  { id: "data", label: "Data & Hasura", icon: <Database className="h-4 w-4" /> },
-  { id: "security", label: "Security & API Keys", icon: <Shield className="h-4 w-4" /> },
-  { id: "appearance", label: "Appearance", icon: <Palette className="h-4 w-4" /> },
+  { id: "profile", label: "Profile", icon: <User className="h-3.5 w-3.5" /> },
+  { id: "team", label: "Team & Permissions", icon: <Users className="h-3.5 w-3.5" /> },
+  { id: "notifications", label: "Notifications", icon: <Bell className="h-3.5 w-3.5" /> },
+  { id: "integrations", label: "Integrations", icon: <Plug className="h-3.5 w-3.5" /> },
+  { id: "security", label: "Security", icon: <Shield className="h-3.5 w-3.5" /> },
+  { id: "appearance", label: "Appearance", icon: <Palette className="h-3.5 w-3.5" /> },
 ];
 
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -48,6 +49,7 @@ function SettingRow({ label, description, children }: { label: string; descripti
 }
 
 export default function SettingsPage() {
+  const { user, dbUser } = useAuth();
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [activeSection, setActiveSection] = React.useState("profile");
   const [saved, setSaved] = React.useState(false);
@@ -60,6 +62,29 @@ export default function SettingsPage() {
     company: "YSalesPro Enterprise", timezone: "UTC-5 (Eastern)", language: "English",
   });
 
+  React.useEffect(() => {
+    if (dbUser || user) {
+      const fullName = dbUser?.fname || dbUser?.lname
+        ? `${dbUser?.fname || ""} ${dbUser?.lname || ""}`.trim()
+        : user?.displayName || "";
+      const companyName = dbUser?.account_company?.name || "";
+      const userRole = dbUser?.role || "";
+      const userEmail = dbUser?.email || user?.email || "";
+
+      setProfile(p => ({
+        ...p,
+        name: fullName || p.name,
+        email: userEmail || p.email,
+        title: userRole || p.title,
+        company: companyName || p.company,
+      }));
+    }
+  }, [user, dbUser]);
+
+  const initials = profile.name
+    ? profile.name.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase()
+    : "SP";
+
   // Notifications state
   const [notifs, setNotifs] = React.useState({
     email_new_lead: true, email_followup: true, email_won: true,
@@ -67,19 +92,16 @@ export default function SettingsPage() {
     slack_hot_leads: true, slack_daily_digest: false,
   });
 
-  // Security state
-  const [apiKey] = React.useState("sp_live_xk9mQ7tN2bF3pL8rZ4wY6vH1cJ0dA5sE");
-
   const handleSave = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
 
   const INTEGRATIONS = [
-    { name: "Hasura GraphQL", desc: "Primary data source for organization and lead data", color: "text-indigo-400", status: "Connected", statusColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
     { name: "Gmail / Google Workspace", desc: "Email sync for outreach tracking and thread history", color: "text-red-400", status: "Connected", statusColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
     { name: "LinkedIn Sales Navigator", desc: "Contact enrichment and LinkedIn outreach sequences", color: "text-blue-400", status: "Connected", statusColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
     { name: "Slack", desc: "Pipeline alerts, deal notifications, and daily digest bot", color: "text-purple-400", status: "Not Connected", statusColor: "bg-muted/40 text-muted-foreground border-border/40" },
+    { name: "Microsoft Teams", desc: "Real-time deal alerts, scheduled call sync, and channel notifications", color: "text-indigo-400", status: "Not Connected", statusColor: "bg-muted/40 text-muted-foreground border-border/40" },
     { name: "Zoom", desc: "Auto-schedule meetings and record call outcomes", color: "text-blue-400", status: "Not Connected", statusColor: "bg-muted/40 text-muted-foreground border-border/40" },
     { name: "HubSpot CRM", desc: "Bidirectional sync with HubSpot contacts and deals", color: "text-orange-400", status: "Not Connected", statusColor: "bg-muted/40 text-muted-foreground border-border/40" },
   ];
@@ -101,7 +123,9 @@ export default function SettingsPage() {
               <p className="text-xs text-muted-foreground mt-0.5">Manage your personal account information and preferences.</p>
             </div>
             <div className="flex items-center gap-4 p-4 bg-muted/20 border border-border/40 rounded-xl">
-              <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold text-lg shrink-0">AR</div>
+              <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold text-lg shrink-0">
+                {initials}
+              </div>
               <div>
                 <p className="font-bold text-sm">{profile.name}</p>
                 <p className="text-xs text-muted-foreground">{profile.title} · {profile.company}</p>
@@ -244,79 +268,22 @@ export default function SettingsPage() {
           </div>
         );
 
-      case "data":
-        return (
-          <div className="space-y-5">
-            <div>
-              <h2 className="text-base font-bold">Data & Hasura Configuration</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Manage your GraphQL data source connection settings.</p>
-            </div>
-            <div className="space-y-4 text-xs">
-              <div className="space-y-1.5">
-                <Label>Hasura GraphQL Endpoint</Label>
-                <Input defaultValue="https://your-hasura-instance.hasura.app/v1/graphql" className="bg-muted/40 border-border/60 h-9 text-xs font-mono" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Hasura Admin Secret</Label>
-                <Input type="password" defaultValue="your-admin-secret-here" className="bg-muted/40 border-border/60 h-9 text-xs font-mono" />
-                <p className="text-[10px] text-muted-foreground">Stored securely as environment variable HASURA_ADMIN_SECRET</p>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
-                <div className="flex items-center gap-2 text-emerald-400 text-xs font-semibold">
-                  <CheckCircle2 className="h-4 w-4" /> Connection Status: Active
-                </div>
-                <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]">Latency: 42ms</Badge>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground">Data Sources</p>
-                {[
-                  { table: "aa_s_organizations", records: "1,247 organizations", status: "Synced" },
-                  { table: "aa_s_industries", records: "89 industries", status: "Synced" },
-                  { table: "aa_s_decision_makers", records: "5,892 contacts", status: "Synced" },
-                  { table: "aa_s_leads", records: "342 leads", status: "Synced" },
-                ].map(s => (
-                  <div key={s.table} className="flex items-center justify-between p-3 bg-card/40 border border-border/40 rounded-lg">
-                    <div>
-                      <span className="font-mono text-[11px] text-indigo-400">{s.table}</span>
-                      <span className="text-[11px] text-muted-foreground ml-2">· {s.records}</span>
-                    </div>
-                    <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]">{s.status}</Badge>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-
       case "security":
         return (
           <div className="space-y-5">
             <div>
-              <h2 className="text-base font-bold">Security & API Keys</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Manage API access tokens, 2FA, and session settings.</p>
+              <h2 className="text-base font-bold">Security</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Manage authentication, two-factor verification, and session preferences.</p>
             </div>
-            <div className="space-y-4 text-xs">
-              <div className="space-y-1.5">
-                <Label>Your API Key</Label>
-                <div className="flex gap-2">
-                  <Input value={apiKey} readOnly className="bg-muted/40 border-border/60 h-9 text-xs font-mono" />
-                  <Button variant="outline" size="sm" className="h-9 shrink-0 text-xs border-border/60">Copy</Button>
-                </div>
-                <p className="text-[10px] text-muted-foreground">Use this key to authenticate YSalesPro API requests from external systems.</p>
-              </div>
-              <div className="bg-card/40 border border-border/40 rounded-xl px-4 divide-y divide-border/30">
-                <SettingRow label="Two-Factor Authentication" description="Add an extra layer of security to your account">
-                  <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]">Enabled</Badge>
-                </SettingRow>
-                <SettingRow label="Session Timeout" description="Auto-logout after inactivity">
-                  <select className="bg-muted/40 border border-border/60 rounded-md px-2 py-1 text-xs outline-none">
-                    <option>30 minutes</option><option>1 hour</option><option>4 hours</option><option>Never</option>
-                  </select>
-                </SettingRow>
-                <SettingRow label="IP Allowlisting" description="Restrict access to trusted IP ranges only">
-                  <ToggleSwitch checked={false} onChange={() => { }} />
-                </SettingRow>
-              </div>
+            <div className="bg-card/40 border border-border/40 rounded-xl px-4 divide-y divide-border/30">
+              <SettingRow label="Two-Factor Authentication" description="Add an extra layer of security to your account">
+                <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]">Enabled</Badge>
+              </SettingRow>
+              <SettingRow label="Session Timeout" description="Auto-logout after inactivity">
+                <select className="bg-muted/40 border border-border/60 rounded-md px-2 py-1 text-xs outline-none text-foreground">
+                  <option>30 minutes</option><option>1 hour</option><option>4 hours</option><option>Never</option>
+                </select>
+              </SettingRow>
             </div>
           </div>
         );
@@ -336,13 +303,6 @@ export default function SettingsPage() {
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${t === "Dark" ? "bg-indigo-600 text-white border-indigo-600" : "bg-muted/30 text-muted-foreground border-border/40"}`}>
                       {t}
                     </button>
-                  ))}
-                </div>
-              </SettingRow>
-              <SettingRow label="Accent Color" description="Primary color used across the interface">
-                <div className="flex gap-2">
-                  {["bg-indigo-500", "bg-purple-500", "bg-emerald-500", "bg-blue-500", "bg-pink-500", "bg-amber-500"].map(c => (
-                    <button key={c} className={`h-5 w-5 rounded-full ${c} ${c === "bg-indigo-500" ? "ring-2 ring-offset-1 ring-offset-background ring-indigo-400" : ""}`} />
                   ))}
                 </div>
               </SettingRow>
@@ -369,36 +329,35 @@ export default function SettingsPage() {
       <SalesProSidebar onOpenCommandPalette={() => setCommandOpen(true)} />
       <div className="flex-1 flex flex-col min-w-0">
         <SalesProHeader title="Settings" subtitle="Account, security, integrations, and platform configuration" onOpenCommandPalette={() => setCommandOpen(true)} />
-        <main className="flex-1 p-6 max-w-5xl mx-auto overflow-y-auto">
-          <div className="flex gap-6">
-            {/* Settings Nav */}
-            <div className="w-52 shrink-0 space-y-1">
-              {NAV_ITEMS.map(item => (
-                <button key={item.id}
-                  onClick={() => setActiveSection(item.id)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all text-left ${activeSection === item.id
-                    ? "bg-indigo-600/15 text-indigo-400 border border-indigo-500/20"
-                    : "text-muted-foreground hover:bg-muted/40 hover:text-foreground border border-transparent"
-                    }`}>
-                  {item.icon} {item.label}
-                </button>
-              ))}
+        <main className="flex-1 p-6 w-full mx-auto overflow-y-auto space-y-6">
+          <Tabs value={activeSection} onValueChange={setActiveSection} className="w-full space-y-5">
+            {/* Horizontal Tabs List aligned left */}
+            <div className="flex justify-start w-full overflow-x-auto pb-1 scrollbar-none">
+              <TabsList className="bg-card p-1 rounded-xl h-auto flex flex-wrap justify-start items-center gap-1 border border-border/40 w-full">
+                {NAV_ITEMS.map(item => (
+                  <TabsTrigger
+                    key={item.id}
+                    value={item.id}
+                    className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-xs py-2 px-3.5 gap-2 rounded-lg font-semibold whitespace-nowrap transition-all"
+                  >
+                    {item.icon} {item.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
             </div>
 
-            {/* Settings Content */}
-            <div className="flex-1 min-w-0">
-              <Card className="border-border/50 bg-card/60 p-6">
-                {renderSection()}
-                <div className="mt-6 pt-4 border-t border-border/30 flex items-center justify-between">
-                  <p className="text-[11px] text-muted-foreground">Changes are saved immediately after clicking Save.</p>
-                  <Button size="sm" onClick={handleSave}
-                    className={`text-xs gap-1.5 font-semibold h-9 transition-colors ${saved ? "bg-emerald-600 hover:bg-emerald-600 text-white" : "bg-indigo-600 hover:bg-indigo-500 text-white"}`}>
-                    {saved ? <><CheckCircle2 className="h-3.5 w-3.5" /> Saved!</> : <><Save className="h-3.5 w-3.5" /> Save Changes</>}
-                  </Button>
-                </div>
-              </Card>
-            </div>
-          </div>
+            {/* Settings Content Card */}
+            <Card className="border-border/50 bg-card p-6">
+              {renderSection()}
+              <div className="mt-6 pt-4 border-t border-border/30 flex items-center justify-between">
+                <p className="text-[11px] text-muted-foreground">Changes are saved immediately after clicking Save.</p>
+                <Button size="sm" onClick={handleSave}
+                  className={`text-xs gap-1.5 font-semibold h-9 transition-colors ${saved ? "bg-emerald-600 hover:bg-emerald-600 text-white" : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20"}`}>
+                  {saved ? <><CheckCircle2 className="h-3.5 w-3.5" /> Saved!</> : <><Save className="h-3.5 w-3.5" /> Save Changes</>}
+                </Button>
+              </div>
+            </Card>
+          </Tabs>
         </main>
       </div>
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />

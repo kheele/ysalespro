@@ -144,7 +144,7 @@ export function ExecutiveDashboard() {
       </div>
 
       {/* Module 1 KPI Cards Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4">
         {/* Card 1: Companies */}
         <Card className="border-border/50 bg-card backdrop-blur-md shadow-sm hover:shadow-indigo-500/5 transition-all">
           <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
@@ -189,7 +189,7 @@ export function ExecutiveDashboard() {
         </Card>
 
         {/* Card 3: Decision Makers */}
-        <Card className="border-border/50 bg-card backdrop-blur-md shadow-sm hover:shadow-cyan-500/5 transition-all">
+        {/* <Card className="border-border/50 bg-card backdrop-blur-md shadow-sm hover:shadow-cyan-500/5 transition-all">
           <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               People
@@ -206,7 +206,7 @@ export function ExecutiveDashboard() {
               <span className="text-emerald-400 font-semibold">98.4%</span> verified emails
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Card 4: Lead Pipeline */}

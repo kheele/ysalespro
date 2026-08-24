@@ -65,7 +65,7 @@ export async function getKeywordById(id: string | number): Promise<Keyword | nul
     if (isNaN(numId)) return null;
 
     const query = `
-      query GetKeywordById($id: bigint!) {
+      query GetKeywordById($id: Int!) {
         aa_s_keywords_by_pk(id: $id) {
           id
           name

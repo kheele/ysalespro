@@ -48,10 +48,37 @@ export function SalesProHeader({
   onAddCompanyClick,
   onNewCampaignClick,
 }: SalesProHeaderProps) {
-  const { user } = useAuth();
+  const { user, dbUser, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = React.useState(0);
+
+  const displayName = React.useMemo(() => {
+    if (dbUser?.fname) {
+      return `${dbUser.fname} ${dbUser.lname || ""}`.trim();
+    }
+    if (user?.displayName) return user.displayName;
+    if (user?.email) return user.email.split("@")[0];
+    return "User";
+  }, [dbUser, user]);
+
+  const userRoleOrCompany = React.useMemo(() => {
+    return dbUser?.account_company?.name || dbUser?.role || "Enterprise Member";
+  }, [dbUser]);
+
+  const initials = React.useMemo(() => {
+    if (dbUser?.fname) {
+      return `${dbUser.fname[0] || ""}${dbUser.lname?.[0] || ""}`.toUpperCase();
+    }
+    if (user?.displayName) {
+      const parts = user.displayName.split(" ");
+      return `${parts[0]?.[0] || ""}${parts[1]?.[0] || ""}`.toUpperCase();
+    }
+    if (user?.email) {
+      return user.email.substring(0, 2).toUpperCase();
+    }
+    return "SP";
+  }, [dbUser, user]);
 
   React.useEffect(() => {
     async function loadNotifications() {
@@ -108,18 +135,6 @@ export function SalesProHeader({
 
       {/* Header Controls & Quick Actions */}
       <div className="flex items-center gap-3">
-        {/* Quick Search Shortcut */}
-        {/* <Button
-          variant="outline"
-          size="sm"
-          onClick={onOpenCommandPalette}
-          className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground border-border/60 bg-muted/30 hover:bg-muted/70"
-        >
-          <Search className="h-3.5 w-3.5" />
-          <span>Quick Find</span>
-          <kbd className="text-[10px] font-mono border border-border/60 rounded px-1 bg-background">⌘K</kbd>
-        </Button> */}
-
         {/* Action Buttons */}
         {onAddCompanyClick && (
           <Button
@@ -188,21 +203,23 @@ export function SalesProHeader({
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-9 gap-2 px-2 text-xs font-medium border border-border/40">
               <div className="h-6 w-6 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-[10px]">
-                AR
+                {initials}
               </div>
-              <span className="hidden md:inline font-semibold">Alex Rivers</span>
+              <span className="hidden md:inline font-semibold">{displayName}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuLabel className="text-xs">
-              <p className="font-bold">Alex Rivers</p>
-              <p className="text-[10px] text-muted-foreground font-normal">VP of Sales Operations</p>
+              <p className="font-bold">{displayName}</p>
+              <p className="text-[10px] text-muted-foreground font-normal">{userRoleOrCompany}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-xs gap-2">
-              <User className="h-3.5 w-3.5" /> Profile Settings
+            <DropdownMenuItem asChild className="text-xs gap-2 cursor-pointer">
+              <a href="/settings">
+                <User className="h-3.5 w-3.5" /> Profile Settings
+              </a>
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-xs gap-2 text-red-400">
+            <DropdownMenuItem onClick={() => signOut()} className="text-xs gap-2 text-red-400 cursor-pointer">
               <LogOut className="h-3.5 w-3.5" /> Sign Out
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -211,3 +228,4 @@ export function SalesProHeader({
     </header>
   );
 }
+
