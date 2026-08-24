@@ -38,9 +38,11 @@ const DECISION_MAKER_FIELDS = `
   }
   timeline_event_list {
     id
-    event_type
+    person_id
+    type
     title
-    description
+    date
+    details
     created_at
   }
 `;
@@ -52,6 +54,17 @@ function mapDbDecisionMaker(p: any): DecisionMaker {
   const orgId = p.company_id || p.company?.id;
   const title = p.job_title || "Executive";
   const computedLocation = p.location || [p.city, p.state, p.country].filter(Boolean).join(", ") || "";
+
+  const timeline = (p.timeline_event_list || []).map((e: any) => ({
+    id: e.id,
+    type: e.type || "note",
+    title: e.title || "Activity",
+    timestamp: e.date ? new Date(e.date).toLocaleDateString() : (e.created_at ? new Date(e.created_at).toLocaleDateString() : "Recent"),
+    description: e.details || "",
+    date: e.date,
+    details: e.details,
+    created_at: e.created_at,
+  }));
 
   return {
     id: p.id,
@@ -78,6 +91,7 @@ function mapDbDecisionMaker(p: any): DecisionMaker {
     has_phone: !!p.has_phone,
     email_status: p.email_status || null,
     lead_list: p.lead_list || [],
+    timeline,
     timeline_event_list: p.timeline_event_list || [],
     created_at: p.created_at,
     updated_at: p.updated_at,
