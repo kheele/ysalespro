@@ -6,7 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
 import { CommandPalette } from "@/components/layout/command-palette";
-import { peopleServices, DecisionMaker } from "@/services/peopleServices";
+import * as peopleServices from "@/services/public/peopleServices";
+import type { DecisionMaker } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -319,7 +320,7 @@ export default function PersonProfilePage() {
                 {/* Vertical line */}
                 <div className="absolute left-[15px] top-0 bottom-0 w-px bg-border/50 ml-px" />
 
-                {person.timeline.map((item) => (
+                {person.timeline.map((item: any) => (
                   <div key={item.id} className="relative flex items-start gap-3 pl-9">
                     {/* Icon node */}
                     <div className={`absolute left-0 h-8 w-8 rounded-full border ${TIMELINE_COLORS[item.type]} flex items-center justify-center shrink-0`}>

@@ -6,9 +6,11 @@ import { useParams, useRouter } from "next/navigation";
 import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
 import { CommandPalette } from "@/components/layout/command-palette";
-import { industryServices, Industry } from "@/services/industryServices";
-import { organizationServices, Organization } from "@/services/organizationServices";
-import { leadServices, Lead } from "@/services/leadServices";
+import * as industryServices from "@/services/public/industryServices";
+import * as organizationServices from "@/services/public/organizationServices";
+import { getLeadsActionByToken } from "@/services/private/leadServices";
+import type { Industry, Organization, Lead } from "@/lib/types";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,7 +47,8 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-export default function IndustryProfilePage() {
+export default function IndustryDetailPage() {
+  const { user } = useAuth();
   const params = useParams();
   const router = useRouter();
   const indId = (params?.id as string) || "ind-1";
@@ -57,38 +60,45 @@ export default function IndustryProfilePage() {
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
+    if (!user) return;
     (async () => {
       setLoading(true);
-      const [indData, orgData, leadData] = await Promise.all([
-        industryServices.getIndustryById(indId),
-        organizationServices.getOrganizations(),
-        leadServices.getLeads(),
-      ]);
-      setIndustry(indData);
+      try {
+        const token = await user.getIdToken(true);
+        const [indData, orgData, leadData] = await Promise.all([
+          industryServices.getIndustryById(indId),
+          organizationServices.getOrganizations({ limit: 50 }),
+          getLeadsActionByToken(token),
+        ]);
+        setIndustry(indData);
 
-      // Filter organizations that match this industry
-      if (indData) {
-        const industryWord = indData.name.split(" ")[0].toLowerCase();
-        const relatedOrgs = orgData.organizations.filter(
-          (o) =>
-            o.industry?.toLowerCase().includes(industryWord) ||
-            o.industry_list?.some((il) =>
-              il.industry?.name.toLowerCase().includes(industryWord)
-            )
-        );
-        // If no exact match, show a representative sample
-        setOrganizations(relatedOrgs.length > 0 ? relatedOrgs : orgData.organizations.slice(0, 3));
+        const orgsList = orgData?.organizations || [];
+        const leadsList = Array.isArray(leadData) ? leadData : [];
 
-        const relatedLeads = leadData.filter(
-          (l) =>
-            l.tags?.some((t) => t.toLowerCase().includes(industryWord)) ||
-            relatedOrgs.some((o) => o.name === l.organization_name)
-        );
-        setLeads(relatedLeads.length > 0 ? relatedLeads : leadData.slice(0, 3));
+        // Filter organizations that match this industry
+        if (indData) {
+          const industryWord = indData.name.split(" ")[0].toLowerCase();
+          const relatedOrgs = orgsList.filter(
+            (o) =>
+              o.industry?.toLowerCase().includes(industryWord) ||
+              (o as any).primary_industry?.toLowerCase().includes(industryWord)
+          );
+          setOrganizations(relatedOrgs.length > 0 ? relatedOrgs : orgsList.slice(0, 3));
+
+          const relatedLeads = leadsList.filter(
+            (l) =>
+              l.industry?.toLowerCase().includes(industryWord) ||
+              relatedOrgs.some((o) => o.name === (l.company_name || l.organization_name))
+          );
+          setLeads(relatedLeads.length > 0 ? relatedLeads : leadsList.slice(0, 3));
+        }
+      } catch (err) {
+        console.error("Failed to load industry details:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     })();
-  }, [indId]);
+  }, [indId, user]);
 
   if (loading || !industry) {
     return (
@@ -106,7 +116,7 @@ export default function IndustryProfilePage() {
   const hotLeads = leads.filter((l) => l.temperature === "Hot" || l.pipeline_stage === "Hot");
   const warmLeads = leads.filter((l) => l.temperature === "Warm" || l.pipeline_stage === "Warm");
   const coldLeads = leads.filter((l) => l.temperature === "Cold" || l.pipeline_stage === "Cold");
-  const totalPipeline = leads.reduce((sum, l) => sum + (l.deal_value || 0), 0);
+  const totalPipeline = leads.reduce((sum, l) => sum + (Number(l.deal_value) || 0), 0);
   const avgProbability = leads.length
     ? Math.round(leads.reduce((s, l) => s + (l.probability || 0), 0) / leads.length)
     : 0;
@@ -349,7 +359,7 @@ export default function IndustryProfilePage() {
               </h3>
               <div className="h-44 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={leads.length > 0 ? leads.map(l => ({ name: l.organization_name.split(" ")[0], value: l.deal_value })) : [{ name: "Sample", value: 50000 }]}>
+                  <BarChart data={leads.length > 0 ? leads.map(l => ({ name: (l.organization_name || l.company_name || "Lead").split(" ")[0], value: Number(l.deal_value || 0) })) : [{ name: "Sample", value: 50000 }]}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                     <XAxis dataKey="name" stroke="#71717a" fontSize={10} tickLine={false} />
                     <YAxis stroke="#71717a" fontSize={10} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />

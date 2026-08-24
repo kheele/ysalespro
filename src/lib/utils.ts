@@ -11,3 +11,9 @@ export async function authFetch(endpoint: string, idToken?: string): Promise<Res
     headers: idToken ? { 'Authorization': `Bearer ${idToken}` } : {}
   });
 }
+
+export function toTitleCase(str?: string | null): string {
+  if (!str) return '';
+  return str.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substring(1).toLowerCase());
+}
+

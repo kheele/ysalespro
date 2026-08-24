@@ -29,15 +29,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/icons/logo";
-import { validateContractorInviteAction } from "@/services/contractorService";
-import { completionAccountByToken } from "@/services/userService";
+import { completionAccountActionByToken } from "@/services/private/userService";
 
 const formSchema = z.object({
   fname: z.string().min(1, { message: "First name is required." }),
   lname: z.string().min(1, { message: "Last name is required." }),
   email: z.string().email(),
   phone: z.string().optional(),
-  organization: z.string().min(2, { message: "Company name must be at least 2 characters." }),
+  account_company: z.string().min(2, { message: "Company name must be at least 2 characters." }),
 });
 
 function AccountCompletionContent() {
@@ -47,7 +46,6 @@ function AccountCompletionContent() {
   const { toast } = useToast();
   const { user, loading, dbUser, setDbUser } = useAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [invitationData, setInvitationData] = React.useState<{ companyName: string } | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -56,23 +54,9 @@ function AccountCompletionContent() {
       lname: "",
       email: "",
       phone: "",
-      organization: "",
+      account_company: "",
     },
   });
-
-  React.useEffect(() => {
-    async function fetchInvitation() {
-      if (!token) return;
-      try {
-        const data = await validateContractorInviteAction(token);
-        setInvitationData(data);
-        form.setValue('organization', data.companyName);
-      } catch (e) {
-        console.error('Error fetching invitation for pre-fill:', e);
-      }
-    }
-    fetchInvitation();
-  }, [token, form]);
 
   React.useEffect(() => {
     if (user) {
@@ -82,17 +66,16 @@ function AccountCompletionContent() {
         lname: lnameParts.join(' ') || dbUser?.lname || '',
         email: user.email || dbUser?.email || '',
         phone: dbUser?.phone || '',
-        organization: dbUser?.organization?.name || '',
+        account_company: dbUser?.account_company?.name || '',
       });
     }
   }, [user, dbUser, form]);
 
   React.useEffect(() => {
-    if (!loading && dbUser?.organization?.name) {
+    if (!loading && dbUser?.account_company?.name) {
       router.push('/');
     }
   }, [loading, dbUser, router]);
-
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user) {
@@ -100,15 +83,11 @@ function AccountCompletionContent() {
       return;
     }
     setIsSubmitting(true);
-    const updates = {
-      ...values,
-      organization: { name: values.organization },
-    }
     try {
       const idToken = await user.getIdToken(true);
-      const updatedUser = await completionAccountByToken(idToken, {
+      const updatedUser = await completionAccountActionByToken(idToken, {
         ...values,
-        organization: { name: values.organization } as any,
+        account_company: { name: values.account_company } as any,
         invitation_token: token || undefined,
       });
 
@@ -117,14 +96,13 @@ function AccountCompletionContent() {
         if (!prevDbUser) return null;
         return {
           ...prevDbUser,
-          ...updates,
+          ...values,
           id: updatedUser.userId || prevDbUser.id,
-          organization: { ...prevDbUser.organization, name: values.organization } as any,
-        } as User;
+          account_company: { name: values.account_company } as any,
+        };
       });
 
       toast({ title: "Account Updated", description: "Your profile has been successfully updated." });
-      // The useEffect will now trigger the redirect to "/" because dbUser.organization.name is set
     } catch (error: any) {
       console.error(error);
       toast({
@@ -221,7 +199,7 @@ function AccountCompletionContent() {
                 />
                 <FormField
                   control={form.control}
-                  name="organization"
+                  name="account_company"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Company</FormLabel>
@@ -229,7 +207,6 @@ function AccountCompletionContent() {
                         <Input
                           placeholder="Acme Inc."
                           {...field}
-                          disabled={!!invitationData}
                         />
                       </FormControl>
                       <FormMessage />

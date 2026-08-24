@@ -34,14 +34,12 @@ import { Logo } from "@/components/icons/logo";
 import { Separator } from "../ui/separator";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
-import { useViewMode } from "@/hooks/use-view-mode";
 import { Switch } from "@/components/ui/switch";
 import Link from "next/link";
-import { ContractorUpgradeDialog } from "../forms/contractor-upgrade-dialog";
+import { UpgradeDialog } from "../forms/upgrade-dialog";
 import { type BillingPlan } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card";
-import { getActiveBillingPlans } from "@/services/billingService";
-import { setViewModeClaimByToken } from "@/services/authService";
+import { getActiveBillingPlansAction } from "@/services/private/billingService";
 
 export function MainSidebar() {
   const pathname = usePathname();
@@ -77,7 +75,7 @@ export function MainSidebar() {
     { name: "AI Assistant", icon: Sparkles, path: "/ai-assistant" },
   ];
 
-  const { viewMode, setViewMode } = useViewMode();
+  const [viewMode, setViewMode] = React.useState<string>("organization");
 
   const adminMenuItems = [
     { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
@@ -110,19 +108,6 @@ export function MainSidebar() {
 
   const handleToggle = async (checked: boolean) => {
     const newMode = checked ? 'contractor' : 'company';
-    if (dbUser && typeof window !== 'undefined') {
-      try {
-        const { getAuth } = await import('firebase/auth');
-        const user = getAuth().currentUser;
-        if (user) {
-          const token = await user.getIdToken(true);
-          await setViewModeClaimByToken(token, newMode as any);
-          await user.getIdToken(true);
-        }
-      } catch (error) {
-        console.error('Failed to sync viewMode to claims', error);
-      }
-    }
 
     // Redirect logic: if the user toggled and the active path doesn't exist in the new mode's nav list...
     const isAllowedInNewMode = newMode === 'contractor'
@@ -134,16 +119,16 @@ export function MainSidebar() {
     }
 
     setViewMode(newMode);
-  }
+  };
 
-  const isContractorOnly = dbUser?.organization?.is_contractor && !dbUser?.organization?.subscription;
+  const isContractorOnly = (dbUser as any)?.organization?.is_contractor && !(dbUser as any)?.organization?.subscription;
 
   // Fetch plans for upgrade CTA
   React.useEffect(() => {
     async function fetchPlans() {
       if (!user) return;
       try {
-        const data = await getActiveBillingPlans();
+        const data = await getActiveBillingPlansAction();
         setPlans(data);
       } catch (error) {
         console.error('Failed to fetch plans', error);
@@ -241,7 +226,7 @@ export function MainSidebar() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 pt-4">
-                <ContractorUpgradeDialog allPlans={plans} />
+                <UpgradeDialog allPlans={plans} />
               </CardContent>
             </Card>
           </div>

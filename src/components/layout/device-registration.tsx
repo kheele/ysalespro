@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { requestNotificationPermission } from '@/lib/firebase-messaging';
 import { useToast } from '@/hooks/use-toast';
-import { registerDeviceTokenAction } from '@/services/deviceService';
+import { registerDeviceTokenAction } from '@/services/private/deviceService';
 
 async function saveDeviceToken(userToken: string, fcmToken: string): Promise<void> {
   try {

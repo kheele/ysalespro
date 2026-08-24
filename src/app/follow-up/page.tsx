@@ -5,8 +5,17 @@ import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
 import { CommandPalette } from "@/components/layout/command-palette";
 import {
-  followUpServices, FollowUpItem, DailyAutomationRule, AutomationExecutionResult,
-} from "@/services/followUpServices";
+  getFollowUpsActionByToken,
+  getDailyAutomationRulesAction,
+  runDailyAutomationActionByToken,
+  markAsRespondedActionByToken,
+} from "@/services/private/followUpServices";
+import type {
+  FollowUpItem,
+  DailyAutomationRule,
+  AutomationExecutionResult,
+} from "@/lib/types";
+import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -108,8 +117,10 @@ function AutomationConsoleModal({ open, onClose, result }: {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function FollowUpPage() {
+  const { user } = useAuth();
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [items, setItems] = React.useState<FollowUpItem[]>([]);
+  const [rules, setRules] = React.useState<DailyAutomationRule[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
@@ -119,29 +130,51 @@ export default function FollowUpPage() {
   const [execResult, setExecResult] = React.useState<AutomationExecutionResult | null>(null);
   const [running, setRunning] = React.useState(false);
 
-  const rules = followUpServices.getAutomationRules();
+  React.useEffect(() => {
+    getDailyAutomationRulesAction().then(res => setRules(res || []));
+  }, []);
 
   const load = React.useCallback(async () => {
+    if (!user) return;
     setLoading(true);
-    const data = await followUpServices.getFollowUps({ search, status: statusFilter, rep: repFilter });
-    setItems(data);
-    setLoading(false);
-  }, [search, statusFilter, repFilter]);
+    try {
+      const token = await user.getIdToken(true);
+      const data = await getFollowUpsActionByToken(token, { search, status: statusFilter, rep: repFilter });
+      setItems(data || []);
+    } catch (e) {
+      console.error("Failed to load follow-ups:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, search, statusFilter, repFilter]);
 
   React.useEffect(() => { load(); }, [load]);
 
   const handleRunDailyAutomation = async () => {
+    if (!user) return;
     setRunning(true);
-    const res = await followUpServices.runDailyAutomation();
-    setExecResult(res);
-    setRunning(false);
-    setConsoleOpen(true);
-    load();
+    try {
+      const token = await user.getIdToken(true);
+      const res = await runDailyAutomationActionByToken(token);
+      setExecResult(res);
+      setConsoleOpen(true);
+      load();
+    } catch (e) {
+      console.error("Failed to run daily automation:", e);
+    } finally {
+      setRunning(false);
+    }
   };
 
-  const handleMarkResponded = async (id: string) => {
-    await followUpServices.markAsResponded(id);
-    load();
+  const handleMarkResponded = async (id: string | number) => {
+    if (!user) return;
+    try {
+      const token = await user.getIdToken(true);
+      await markAsRespondedActionByToken(token, id);
+      load();
+    } catch (e) {
+      console.error("Failed to mark as responded:", e);
+    }
   };
 
   const overdueCount = items.filter(i => i.is_overdue && i.status === "Scheduled").length;
@@ -292,7 +325,7 @@ export default function FollowUpPage() {
                           )}
                         </div>
                         <p className="text-xs font-semibold text-foreground/90 flex items-center gap-1.5">
-                          {CHANNEL_ICON[item.channel]} {item.subject}
+                          {(item.channel && CHANNEL_ICON[item.channel]) || <Mail className="h-3.5 w-3.5 text-indigo-400" />} {item.subject}
                         </p>
                       </div>
 

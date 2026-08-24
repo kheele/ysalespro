@@ -1,68 +1,78 @@
-
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { adminAuth } from '@/lib/firebase-admin';
-import { getUserByAuthId } from '@/services/userService';
+import { getUserByAuthIdAction } from '@/services/private/userService';
 import type { User } from '@/lib/types';
 
-type Role = 'SuperAdmin' | 'Admin' | 'Editor' | 'Viewer' | 'Approver' | 'any';
+export type Role = 'SuperAdmin' | 'Admin' | 'Manager' | 'SalesRep' | 'Member' | 'User' | 'any';
 
-type AuthResult = { user: User; projectId: string | null; viewMode: 'company' | 'contractor' | null; error: null } | { user: null; projectId: null; viewMode: null; error: NextResponse };
+export type AuthResult =
+  | { user: User; account_company_id: number | null; error: null }
+  | { user: null; account_company_id: null; error: NextResponse };
 
-export async function getCustomClaimsByAuth(token: string, roleCheck: Role | Role[] | 'any' = 'any'): Promise<AuthResult> {
+export async function getCustomClaimsByAuth(
+  token: string,
+  roleCheck: Role | Role[] | 'any' = 'any'
+): Promise<AuthResult> {
   if (!token) {
     return {
       user: null,
-      projectId: null,
-      viewMode: null,
-      error: NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+      account_company_id: null,
+      error: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }),
     };
   }
 
   try {
     const decodedClaims = await adminAuth().verifyIdToken(token, true);
 
-    const projectId = decodedClaims.projectId || null;
-    const viewMode = (decodedClaims.viewMode as 'company' | 'contractor') || null;
+    const claimAccountCompanyId = decodedClaims.account_company_id
+      ? Number(decodedClaims.account_company_id)
+      : null;
 
     // Fetch full user profile from DB for other details
-    const user = await getUserByAuthId(decodedClaims.uid);
+    const user = await getUserByAuthIdAction(decodedClaims.uid);
     if (!user) {
       return {
         user: null,
-        projectId: null,
-        viewMode: null,
-        error: NextResponse.json({ error: 'Forbidden: User not found in DB' }, { status: 403 })
+        account_company_id: null,
+        error: NextResponse.json({ error: 'Forbidden: User not found in DB' }, { status: 403 }),
       };
     }
+
+    const account_company_id = claimAccountCompanyId ?? user.account_company_id ?? null;
 
     if (Array.isArray(roleCheck)) {
-      if (!roleCheck.includes(user.role)) {
+      if (!roleCheck.includes(user.role as Role)) {
         return {
           user: null,
-          projectId: null,
-          viewMode: null,
-          error: NextResponse.json({ error: `Forbidden: Insufficient permissions. Requires ${roleCheck} role.` }, { status: 403 })
+          account_company_id: null,
+          error: NextResponse.json(
+            { error: `Forbidden: Insufficient permissions. Requires ${roleCheck.join(', ')} role.` },
+            { status: 403 }
+          ),
         };
       }
-    }
-    if (roleCheck !== 'any' && user.role !== roleCheck) {
+    } else if (roleCheck !== 'any' && user.role !== roleCheck) {
       return {
         user: null,
-        projectId: null,
-        viewMode: null,
-        error: NextResponse.json({ error: `Forbidden: Insufficient permissions. Requires ${roleCheck} role.` }, { status: 403 })
+        account_company_id: null,
+        error: NextResponse.json(
+          { error: `Forbidden: Insufficient permissions. Requires ${roleCheck} role.` },
+          { status: 403 }
+        ),
       };
     }
 
-    return { user, projectId, viewMode, error: null };
+    return { user, account_company_id, error: null };
   } catch (error: any) {
     console.error('Auth check failed:', error.message);
     return {
       user: null,
-      projectId: null,
-      viewMode: null,
-      error: NextResponse.json({ error: 'Authentication token is invalid or has expired.' }, { status: 401 })
+      account_company_id: null,
+      error: NextResponse.json(
+        { error: 'Authentication token is invalid or has expired.' },
+        { status: 401 }
+      ),
     };
   }
 }
@@ -73,20 +83,25 @@ export async function checkAuth(roleCheck: Role | Role[] | 'any' = 'any'): Promi
   if (!authorization?.startsWith('Bearer ')) {
     return {
       user: null,
-      projectId: null,
-      viewMode: null,
-      error: NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    };
-  }
-  const token = authorization.split('Bearer ')[1];
-  if (!token) {
-    return {
-      user: null,
-      projectId: null,
-      viewMode: null,
-      error: NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+      account_company_id: null,
+      error: NextResponse.json({ error: 'Not authenticated' }, { status: 401 }),
     };
   }
 
-  return await getCustomClaimsByAuth(token, roleCheck);
+  const token = authorization.split('Bearer ')[1];
+  return getCustomClaimsByAuth(token, roleCheck);
+}
+
+/**
+ * Resolves account_company_id ONLY from CustomClaims of the passed ID token.
+ */
+export async function getAccountCompanyIdFromClaims(token?: string | null): Promise<number | null> {
+  if (!token) return null;
+  try {
+    const res = await getCustomClaimsByAuth(token);
+    return res.account_company_id ?? null;
+  } catch (e) {
+    console.error("Failed to extract account_company_id from token claims:", e);
+    return null;
+  }
 }

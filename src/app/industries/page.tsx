@@ -5,7 +5,8 @@ import Link from "next/link";
 import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
 import { CommandPalette } from "@/components/layout/command-palette";
-import { industryServices, Industry } from "@/services/industryServices";
+import * as industryServices from "@/services/public/industryServices";
+import type { Industry } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -48,10 +49,15 @@ export default function IndustriesPage() {
 
   const loadIndustries = React.useCallback(async () => {
     setLoading(true);
-    const data = await industryServices.getIndustries({ search, category: selectedCategory });
-    setIndustries(data);
-    setLoading(false);
-  }, [search, selectedCategory]);
+    try {
+      const data = await industryServices.getIndustries({ search });
+      setIndustries(data?.industries || []);
+    } catch (e) {
+      console.error("Failed to load industries:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [search]);
 
   React.useEffect(() => {
     loadIndustries();
@@ -60,7 +66,7 @@ export default function IndustriesPage() {
   // Recharts Analytics data preparation
   const sectorPieData = React.useMemo(() => {
     return industries.map((ind) => ({
-      name: ind.name.split(" ")[0],
+      name: (ind.name || "Industry").split(" ")[0],
       value: ind.organization_count || 50,
     }));
   }, [industries]);

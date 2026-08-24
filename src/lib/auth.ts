@@ -1,5 +1,3 @@
-
-
 import {
   getAuth,
   createUserWithEmailAndPassword,
@@ -7,6 +5,8 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   sendPasswordResetEmail,
+  confirmPasswordReset,
+  verifyPasswordResetCode,
   signOut as firebaseSignOut,
   updateProfile,
   updateEmail,
@@ -16,16 +16,24 @@ import {
   type UserCredential
 } from "firebase/auth";
 import { app, auth as firebaseAuth } from "./firebase";
-import { createUser, getUserByAuthId } from "@/services/userService";
+import { createUserAction, getUserByAuthIdAction } from "@/services/private/userService";
 import type { User } from "./types";
 
 export const auth: Auth = firebaseAuth();
 
+export const confirmPasswordResetWithCode = (code: string, newPassword: string): Promise<void> => {
+  return confirmPasswordReset(auth, code, newPassword);
+};
+
+export const verifyResetCode = (code: string): Promise<string> => {
+  return verifyPasswordResetCode(auth, code);
+};
+
 // Sign Up with Email and Password
 export const signUpWithEmail = async (userData: {
-  email: any; password: any; fname: any; lname: any; phone?: any; organization: any; role?: User['role']; invitation_token?: string;
+  email: any; password: any; fname: any; lname: any; phone?: any; account_company: any; role?: User['role']; invitation_token?: string;
 }): Promise<UserCredential> => {
-  const { email, password, fname, lname, phone, organization, role, invitation_token } = userData;
+  const { email, password, fname, lname, phone, account_company, role, invitation_token } = userData;
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   const fullName = `${fname} ${lname}`;
 
@@ -34,13 +42,13 @@ export const signUpWithEmail = async (userData: {
       displayName: fullName,
     });
 
-    await createUser({
+    await createUserAction({
       auth_id: userCredential.user.uid,
       fname,
       lname,
       email,
       phone,
-      organization: { name: organization },
+      account_company: typeof account_company === 'string' ? { name: account_company } : account_company,
       role: role || 'Admin',
       invitation_token: invitation_token
     } as any);
@@ -61,18 +69,18 @@ export const signInWithGoogle = async (): Promise<UserCredential> => {
   const { user } = userCredential;
 
   if (user) {
-    const existingDbUser = await getUserByAuthId(user.uid);
+    const existingDbUser = await getUserByAuthIdAction(user.uid);
     if (!existingDbUser) {
       const [fname, ...lnameParts] = user.displayName?.split(' ') || ['', ''];
 
-      await createUser({
+      await createUserAction({
         auth_id: user.uid,
         fname,
         lname: lnameParts.join(' '),
         email: user.email!,
         phone: user.phoneNumber || '',
-        organization: { name: '' } // Company is initially empty
-      });
+        account_company: { name: '' }
+      } as any);
     }
   }
 
@@ -92,11 +100,9 @@ export const signOut = (): Promise<void> => {
 // Update Email
 export const updateUserEmail = (user: FirebaseAuthUser, newEmail: string): Promise<void> => {
   return updateEmail(user, newEmail);
-}
+};
 
 // Update Password
 export const updateUserPassword = (user: FirebaseAuthUser, newPassword: string): Promise<void> => {
   return updatePassword(user, newPassword);
-}
-
-
+};

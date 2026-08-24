@@ -5,9 +5,25 @@ import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
 import { CommandPalette } from "@/components/layout/command-palette";
 import {
-  campaignServices, Campaign, CampaignStatus, SequenceStep, SequenceStepType,
-  CampaignRules, CampaignAudience, CampaignSchedule,
-} from "@/services/campaignServices";
+  getCampaignsActionByToken,
+  createCampaignActionByToken,
+  updateCampaignStatusActionByToken,
+} from "@/services/private/campaignServices";
+import {
+  DEFAULT_SEQUENCE,
+  DEFAULT_RULES,
+  DEFAULT_SCHEDULE,
+} from "@/lib/constants";
+import type {
+  Campaign,
+  CampaignStatus,
+  SequenceStep,
+  SequenceStepType,
+  CampaignRules,
+  CampaignAudience,
+  CampaignSchedule,
+} from "@/lib/types";
+import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -38,18 +54,18 @@ const STEP_COLORS: Record<SequenceStepType, string> = {
 };
 
 const STATUS_META: Record<CampaignStatus, { color: string; bg: string; border: string; icon: React.ReactNode }> = {
-  Active: { color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20", icon: <Play className="h-3 w-3" /> },
-  Draft: { color: "text-slate-400", bg: "bg-slate-500/10", border: "border-slate-500/20", icon: <FileEdit className="h-3 w-3" /> },
-  Paused: { color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", icon: <Pause className="h-3 w-3" /> },
-  Completed: { color: "text-indigo-400", bg: "bg-indigo-500/10", border: "border-indigo-500/20", icon: <CheckCircle2 className="h-3 w-3" /> },
-  Cancelled: { color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20", icon: <XCircle className="h-3 w-3" /> },
+  Draft: { color: "text-slate-400", bg: "bg-slate-500/10", border: "border-slate-500/30", icon: <FileEdit className="h-3 w-3" /> },
+  Active: { color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/30", icon: <Play className="h-3 w-3" /> },
+  Paused: { color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/30", icon: <Pause className="h-3 w-3" /> },
+  Completed: { color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/30", icon: <CheckCircle2 className="h-3 w-3" /> },
+  Cancelled: { color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/30", icon: <XCircle className="h-3 w-3" /> },
 };
 
 const WIZARD_STEPS = [
-  { id: 1, label: "Audience", icon: <Users className="h-4 w-4" /> },
-  { id: 2, label: "Sequence", icon: <Mail className="h-4 w-4" /> },
-  { id: 3, label: "Rules", icon: <Settings2 className="h-4 w-4" /> },
-  { id: 4, label: "Schedule", icon: <CalendarDays className="h-4 w-4" /> },
+  { id: 1, label: "Audience", icon: <Users className="h-3.5 w-3.5" /> },
+  { id: 2, label: "Sequence", icon: <ListChecks className="h-3.5 w-3.5" /> },
+  { id: 3, label: "Rules", icon: <Settings2 className="h-3.5 w-3.5" /> },
+  { id: 4, label: "Schedule", icon: <CalendarDays className="h-3.5 w-3.5" /> },
 ];
 
 // ─── Toggle Switch ────────────────────────────────────────────────────────────
@@ -101,9 +117,9 @@ function CampaignBuilderModal({ open, onClose, onSave }: {
     setAudience(a => ({ ...a, estimated_contacts: est }));
   }, [audience.industries, audience.companies, audience.people]);
 
-  const [sequence, setSequence] = React.useState<SequenceStep[]>(campaignServices.getDefaultSequence());
-  const [rules, setRules] = React.useState<CampaignRules>(campaignServices.getDefaultRules());
-  const [schedule, setSchedule] = React.useState<CampaignSchedule>(campaignServices.getDefaultSchedule());
+  const [sequence, setSequence] = React.useState<SequenceStep[]>(DEFAULT_SEQUENCE);
+  const [rules, setRules] = React.useState<CampaignRules>(DEFAULT_RULES);
+  const [schedule, setSchedule] = React.useState<CampaignSchedule>(DEFAULT_SCHEDULE);
 
   const updateStep = (id: string, field: keyof SequenceStep, val: any) =>
     setSequence(s => s.map(st => st.id === id ? { ...st, [field]: val } : st));
@@ -450,7 +466,7 @@ function CampaignBuilderModal({ open, onClose, onSave }: {
 }
 
 // ─── Campaign List Card ────────────────────────────────────────────────────────
-function CampaignCard({ campaign, onStatusChange }: { campaign: Campaign; onStatusChange: () => void }) {
+function CampaignCard({ campaign, onStatusChange }: { campaign: Campaign; onStatusChange: (id: string | number, status: CampaignStatus) => Promise<void> }) {
   const sm = STATUS_META[campaign.status] || STATUS_META.Draft;
   const totalSteps = campaign.sequence?.length || 0;
   const enabledSteps = campaign.sequence?.filter(s => s?.enabled).length || 0;
@@ -476,19 +492,19 @@ function CampaignCard({ campaign, onStatusChange }: { campaign: Campaign; onStat
         {/* Actions */}
         <div className="flex items-center gap-2 shrink-0">
           {campaign.status === "Active" && (
-            <Button size="sm" variant="outline" onClick={async () => { await campaignServices.updateCampaignStatus(campaign.id, "Paused"); onStatusChange(); }}
+            <Button size="sm" variant="outline" onClick={() => onStatusChange(campaign.id, "Paused")}
               className="text-xs h-8 gap-1.5 border-border/60 text-amber-400 hover:text-amber-300">
               <Pause className="h-3 w-3" /> Pause
             </Button>
           )}
           {campaign.status === "Paused" && (
-            <Button size="sm" onClick={async () => { await campaignServices.updateCampaignStatus(campaign.id, "Active"); onStatusChange(); }}
+            <Button size="sm" onClick={() => onStatusChange(campaign.id, "Active")}
               className="text-xs h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white">
               <Play className="h-3 w-3" /> Resume
             </Button>
           )}
           {campaign.status === "Draft" && (
-            <Button size="sm" onClick={async () => { await campaignServices.updateCampaignStatus(campaign.id, "Active"); onStatusChange(); }}
+            <Button size="sm" onClick={() => onStatusChange(campaign.id, "Active")}
               className="text-xs h-8 gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white">
               <Rocket className="h-3 w-3" /> Launch
             </Button>
@@ -499,12 +515,12 @@ function CampaignCard({ campaign, onStatusChange }: { campaign: Campaign; onStat
       {/* Stats Grid */}
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
         {[
-          { label: "Contacts", value: campaign.total_contacts, color: "text-foreground" },
-          { label: "Sent", value: campaign.emails_sent, color: "text-foreground" },
-          { label: "Open %", value: `${campaign.open_rate}%`, color: campaign.open_rate >= 30 ? "text-emerald-400" : "text-amber-400" },
-          { label: "Reply %", value: `${campaign.reply_rate}%`, color: campaign.reply_rate >= 10 ? "text-emerald-400" : "text-amber-400" },
-          { label: "Meetings", value: campaign.meetings_booked, color: "text-purple-400" },
-          { label: "Unsubs", value: campaign.unsubscribes, color: campaign.unsubscribes > 5 ? "text-red-400" : "text-muted-foreground" },
+          { label: "Contacts", value: campaign.total_contacts || 0, color: "text-foreground" },
+          { label: "Sent", value: campaign.emails_sent || 0, color: "text-foreground" },
+          { label: "Open %", value: `${campaign.open_rate ?? 0}%`, color: (campaign.open_rate ?? 0) >= 30 ? "text-emerald-400" : "text-amber-400" },
+          { label: "Reply %", value: `${campaign.reply_rate ?? 0}%`, color: (campaign.reply_rate ?? 0) >= 10 ? "text-emerald-400" : "text-amber-400" },
+          { label: "Meetings", value: campaign.meetings_booked || 0, color: "text-purple-400" },
+          { label: "Unsubs", value: campaign.unsubscribes || 0, color: (campaign.unsubscribes ?? 0) > 5 ? "text-red-400" : "text-muted-foreground" },
         ].map(s => (
           <div key={s.label} className="text-center p-2 rounded-lg bg-muted/30 border border-border/30">
             <div className={`font-extrabold font-mono text-sm ${s.color}`}>{s.value}</div>
@@ -531,13 +547,14 @@ function CampaignCard({ campaign, onStatusChange }: { campaign: Campaign; onStat
           <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
             {campaign.sequence.map((s, i) => {
               const sc = STEP_COLORS[s.type] || STEP_COLORS.Custom;
+              const seqLen = campaign.sequence?.length || 0;
               return (
                 <React.Fragment key={s.id}>
                   <div className={`flex flex-col items-center gap-0.5 shrink-0 px-2 py-1 rounded-lg border text-[9px] ${sc} ${!s.enabled ? "opacity-40" : ""}`}>
                     <span className="font-bold font-mono">D{s.day}</span>
                     <span>{s.type}</span>
                   </div>
-                  {i < campaign.sequence.length - 1 && (
+                  {i < seqLen - 1 && (
                     <ChevronRight className="h-3 w-3 text-muted-foreground/30 shrink-0" />
                   )}
                 </React.Fragment>
@@ -570,6 +587,7 @@ function CampaignCard({ campaign, onStatusChange }: { campaign: Campaign; onStat
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CampaignsPage() {
+  const { user } = useAuth();
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [campaigns, setCampaigns] = React.useState<Campaign[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -578,23 +596,47 @@ export default function CampaignsPage() {
   const [builderOpen, setBuilderOpen] = React.useState(false);
 
   const load = React.useCallback(async () => {
+    if (!user) return;
     setLoading(true);
-    const data = await campaignServices.getCampaigns({ search, status: statusFilter });
-    setCampaigns(data);
-    setLoading(false);
-  }, [search, statusFilter]);
+    try {
+      const token = await user.getIdToken(true);
+      const data = await getCampaignsActionByToken(token, { search, status: statusFilter });
+      setCampaigns(data || []);
+    } catch (e) {
+      console.error("Failed to load campaigns:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, search, statusFilter]);
 
   React.useEffect(() => { load(); }, [load]);
 
   const handleSave = async (input: Partial<Campaign>) => {
-    await campaignServices.createCampaign(input);
-    load();
+    if (!user) return;
+    try {
+      const token = await user.getIdToken(true);
+      await createCampaignActionByToken(token, input);
+      load();
+    } catch (e) {
+      console.error("Failed to create campaign:", e);
+    }
   };
 
-  const totalContacts = campaigns.reduce((s, c) => s + c.total_contacts, 0);
-  const totalMeetings = campaigns.reduce((s, c) => s + c.meetings_booked, 0);
-  const avgOpenRate = campaigns.length ? Math.round(campaigns.reduce((s, c) => s + c.open_rate, 0) / campaigns.length) : 0;
-  const avgReplyRate = campaigns.length ? Math.round(campaigns.reduce((s, c) => s + c.reply_rate, 0) / campaigns.length) : 0;
+  const handleStatusChange = async (id: string | number, status: CampaignStatus) => {
+    if (!user) return;
+    try {
+      const token = await user.getIdToken(true);
+      await updateCampaignStatusActionByToken(token, id, status);
+      load();
+    } catch (e) {
+      console.error("Failed to update campaign status:", e);
+    }
+  };
+
+  const totalContacts = campaigns.reduce((s, c) => s + (c.total_contacts || 0), 0);
+  const totalMeetings = campaigns.reduce((s, c) => s + (c.meetings_booked || 0), 0);
+  const avgOpenRate = campaigns.length ? Math.round(campaigns.reduce((s, c) => s + (c.open_rate || 0), 0) / campaigns.length) : 0;
+  const avgReplyRate = campaigns.length ? Math.round(campaigns.reduce((s, c) => s + (c.reply_rate || 0), 0) / campaigns.length) : 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
@@ -648,7 +690,7 @@ export default function CampaignsPage() {
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-48 bg-card/40 border border-border/40 rounded-xl animate-pulse" />)
             ) : campaigns.length > 0 ? (
-              campaigns.map(c => <CampaignCard key={c.id} campaign={c} onStatusChange={load} />)
+              campaigns.map(c => <CampaignCard key={c.id} campaign={c} onStatusChange={handleStatusChange} />)
             ) : (
               <div className="p-16 text-center border border-dashed border-border/40 rounded-xl space-y-3">
                 <Rocket className="h-8 w-8 mx-auto text-muted-foreground/30" />

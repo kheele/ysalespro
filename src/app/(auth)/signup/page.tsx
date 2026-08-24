@@ -32,14 +32,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { validateContractorInviteAction } from "@/services/contractorService";
-
 
 const formSchema = z.object({
   fname: z.string().min(2, { message: "First name must be at least 2 characters." }),
   lname: z.string().min(2, { message: "Last name must be at least 2 characters." }),
   phone: z.string().optional(),
-  organization: z.string().min(2, { message: "Company name must be at least 2 characters." }),
+  account_company: z.string().min(2, { message: "Company name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   invitation_token: z.string().optional(),
@@ -53,7 +51,6 @@ function SignupContent() {
   const { signUpWithEmail, signInWithGoogle } = useAuth();
   
   const [isLoading, setIsLoading] = React.useState(false);
-  const [isFetchingDetails, setIsFetchingDetails] = React.useState(!!token);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -61,39 +58,17 @@ function SignupContent() {
       fname: "",
       lname: "",
       phone: "",
-      organization: "",
+      account_company: "",
       email: "",
       password: "",
       invitation_token: token || undefined,
     },
   });
 
-  React.useEffect(() => {
-    async function fetchInvitationDetails() {
-      if (!token) return;
-      setIsFetchingDetails(true);
-      try {
-        const data = await validateContractorInviteAction(token);
-        form.setValue('organization', data.companyName);
-        form.setValue('invitation_token', token);
-      } catch (error) {
-        console.error("Error fetching invitation details:", error);
-        toast({ variant: "destructive", title: "Invitation Error", description: "This invitation link is invalid or has expired." });
-      } finally {
-        setIsFetchingDetails(false);
-      }
-    }
-
-    fetchInvitationDetails();
-  }, [token, form, toast]);
-
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      await signUpWithEmail({
-        ...values,
-        organization: values.organization || form.getValues('organization')
-      });
+      await signUpWithEmail(values);
       toast({ title: "Account Created", description: "You have been successfully signed up." });
       router.push("/");
     } catch (error: any) {
@@ -186,8 +161,7 @@ function SignupContent() {
             />
             <FormField
               control={form.control}
-              name="organization"
-              disabled={!!token || isFetchingDetails}
+              name="account_company"
               render={({ field }) => (
                 <FormItem>
                   <FormControl>
@@ -195,7 +169,6 @@ function SignupContent() {
                         label="Company" 
                         placeholder="Acme Inc." 
                         {...field} 
-                        className={cn(field.disabled && "bg-slate-100 cursor-not-allowed opacity-80")}
                     />
                   </FormControl>
                   <FormMessage />

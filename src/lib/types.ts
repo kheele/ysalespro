@@ -1,7 +1,66 @@
-// Centralized Domain Data Models & TypeScript Interfaces for YSalesPro Enterprise SaaS
-
-// ─── User & Organization Management Models ──────────────────────────────────
 export type UserRole = 'SuperAdmin' | 'Admin' | 'Editor' | 'Viewer';
+
+export interface SouthernAfricanCountry {
+  code: string;
+  name: string;
+  currency: string;
+  currency_symbol: string;
+}
+
+export interface BillingPlan {
+  id: string;
+  name: string;
+  price: string | number;
+  currency?: string;
+  currency_symbol?: string;
+  country_code?: string;
+  country_name?: string;
+  interval?: 'month' | 'year';
+  description?: string;
+  paypal_plan_id?: string;
+  features?: any[];
+  active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DecisionMaker {
+  id: string | number;
+  apollo_id?: string | null;
+  name: string;
+  job_title?: string | null;
+  title?: string | null;
+  company_id?: number | null;
+  company_name?: string | null;
+  organization?: string | null;
+  organization_id?: string | number | null;
+  organization_name?: string | null;
+  industry?: string | null;
+  department?: string | null;
+  seniority?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  score?: number | null;
+  linkedin_url?: string | null;
+  country?: string | null;
+  state?: string | null;
+  city?: string | null;
+  apollo_enriched?: boolean | null;
+  has_email?: boolean | null;
+  has_phone?: boolean | null;
+  email_status?: string | null;
+  company?: any;
+  lead_list?: any[];
+  timeline_event_list?: any[];
+  avatar_url?: string;
+  verified?: boolean;
+  decision_power?: string;
+  score_factors?: { fit_score?: number; intent_score?: number; activity_score?: number; timing_score?: number; [key: string]: any };
+  timeline?: any;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export interface UserOrganization {
   id: string;
@@ -20,6 +79,31 @@ export interface Subscription {
   };
 }
 
+export interface AccountCompany {
+  id: number;
+  name: string;
+  domain?: string | null;
+  logo_url?: string | null;
+  subscription_tier?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AaUser {
+  id: number;
+  account_company_id: number;
+  auth_id: string;
+  email: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  role?: string | null;
+  avatar_url?: string | null;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  account_company?: AccountCompany | null;
+}
+
 export interface UserPermission {
   id?: string;
   organization_id: string;
@@ -30,6 +114,8 @@ export interface UserPermission {
 
 export interface User {
   id: string;
+  account_company_id?: number;
+  account_company?: AccountCompany | null;
   fname: string;
   lname: string;
   name?: string;
@@ -38,8 +124,6 @@ export interface User {
   avatar_url?: string;
   phone?: string | null;
   auth_id?: string;
-  organization_id?: string;
-  organization?: UserOrganization | null;
   subscription?: Subscription | null;
   permissions?: Record<string, boolean>;
   unreadNotificationCount?: number;
@@ -53,11 +137,29 @@ export interface UserDevice {
   created_at?: string;
 }
 
+export interface OrganizationNote {
+  id: string;
+  organization_id: string;
+  author: string;
+  content: string;
+  created_at: string;
+}
+
+export interface OrganizationActivity {
+  id: string;
+  organization_id: string;
+  title: string;
+  description: string;
+  timestamp: string;
+  type: 'Email' | 'Call' | 'Meeting' | 'StatusChange' | 'Note';
+}
+
 // Organization Model matching public.aa_s_organizations PostgreSQL table
 export interface Organization {
-  id: number;
+  id: string | number;
   apollo_id?: string | null;
-  name?: string | null;
+  name: string;
+  domain?: string | null;
   website_url?: string | null;
   angellist_url?: string | null;
   linkedin_url?: string | null;
@@ -78,12 +180,18 @@ export interface Organization {
   publicly_traded_exchange?: string | null;
   market_cap?: string | null;
   estimated_num_employees?: number | null;
+  employee_count?: number | null;
+  revenue?: string | null;
+  annual_revenue?: string | number | null;
   organization_revenue_str?: string | null;
   organization_revenue?: number | null;
   primary_industry?: string | null;
+  industry?: string | null;
   industry_tag_id?: string | null;
   raw_address?: string | null;
   street_address?: string | null;
+  headquarters_location?: string | null;
+  location?: string | null;
   city?: string | null;
   state?: string | null;
   country?: string | null;
@@ -94,23 +202,76 @@ export interface Organization {
   intent_strength?: string | null;
   has_intent_signal_account?: boolean;
   intent_signal_account?: string | null;
+  status?: 'Active' | 'Prospect' | 'Customer' | 'Churned' | string;
+  lead_status?: 'Cold' | 'Warm' | 'Hot' | string;
+  score?: number;
+  last_activity?: string;
   created_at?: string;
   updated_at?: string;
+  industry_list?: Array<{ id: string | number; name?: string; industry?: { id?: string | number; name: string } }>;
+  keywords_list?: Array<{ id: string | number; keyword?: { name: string } }>;
+  language_list?: Array<{ id: string | number; language?: { name: string } }>;
+  naics_code_list?: Array<{ id: string | number; organization_id?: number | null; naics_code?: string | null; code?: string; title?: string }>;
+  sic_code_list?: Array<{ id: string | number; organization_id?: number | null; sic_code?: string | null; code?: string; title?: string }>;
+  notes?: OrganizationNote[];
+  activities?: OrganizationActivity[];
 }
 
 export interface Industry {
-  id: number;
-  name?: string | null;
+  id: string | number;
+  name: string;
+  active?: boolean;
+  category?: string;
+  organization_count?: number;
+  campaign_target_count?: number;
+  campaign_target_list?: any[];
+  organization_list?: any[];
+  market_growth?: string;
+  market_size?: string;
+  avg_deal_size?: string;
+  total_pipeline_value?: string;
+  risk_level?: 'Low' | 'Medium' | 'High';
+  naics_code?: string;
+  sic_code?: string;
+  description?: string;
+  historical_growth?: Array<{ year: string; rate: number; marketSize: number }>;
 }
 
 export interface Keyword {
-  id: number;
-  name?: string | null;
+  id: string | number;
+  name: string;
+  organization_list?: any[];
+  usage_count?: number;
+  organization_count?: number;
 }
 
 export interface Language {
-  id: number;
-  name?: string | null;
+  id: string | number;
+  name: string;
+  code?: string;
+  organization_list?: any[];
+  organization_count?: number;
+  org_count?: number;
+}
+
+export interface NAICSCode {
+  id: string | number;
+  organization_id?: number | null;
+  naics_code?: string;
+  code?: string;
+  title?: string;
+  organization_count?: number;
+  organization?: Organization | null;
+}
+
+export interface SICCode {
+  id: string | number;
+  organization_id?: number | null;
+  sic_code?: string;
+  code?: string;
+  title?: string;
+  organization_count?: number;
+  organization?: Organization | null;
 }
 
 export interface OrganizationIndustry {
@@ -176,42 +337,85 @@ export interface PersonTimelineEvent {
 }
 
 // ─── Lead Management Models ──────────────────────────────────────────────────
-export type LeadTemperature = 'COLD' | 'WARM' | 'HOT';
-export type LeadStage = 'Cold' | 'Contacted' | 'Warm Engaged' | 'Hot Qualified' | 'Demo Scheduled' | 'Closed Won' | 'Lost';
+export type LeadTemperature = 'COLD' | 'WARM' | 'HOT' | 'Cold' | 'Warm' | 'Hot';
+export type LeadStage = 'New' | 'Cold' | 'Contacted' | 'Warm Engaged' | 'Hot Qualified' | 'Demo Scheduled' | 'Closed Won' | 'Lost' | 'Engaged' | 'Qualified' | 'Unresponsive' | 'Warm' | 'Hot' | 'Customer';
 
 export interface Lead {
-  id: number;
+  id: number | string;
+  account_company_id?: number;
   person_id?: number | null;
-  person_name: string;
-  company_name: string;
-  industry: string;
-  lead_temperature: LeadTemperature;
-  lead_score: number;
-  stage: LeadStage | string;
-  last_contact: string;
-  next_followup: string;
-  assigned_user: string;
-  followup_count?: number;
-  created_at?: string;
-  updated_at?: string;
+  person_name?: string | null;
+  company_name?: string | null;
+  industry?: string | null;
+  lead_temperature?: LeadTemperature | string | null;
+  lead_score?: number | null;
+  stage?: LeadStage | string | null;
+  status?: string;
+  last_contact?: string | null;
+  next_followup?: string | null;
+  assigned_user?: string | null;
+  followup_count?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  // Relationships
+  account_company?: AccountCompany | null;
+  person?: DecisionMaker | null;
+  followup_item_list?: any[];
+  outreach_activity_list?: any[];
+  task_list?: any[];
+  // UI & compatibility aliases
+  contact_name?: string;
+  contact_title?: string;
+  contact_email?: string;
+  contact_avatar?: string;
+  organization_name?: string;
+  organization_id?: number | string;
+  temperature?: string;
+  score?: number;
+  deal_value?: number | string;
+  probability?: number;
+  pipeline_stage?: LeadStage;
+  assigned_to?: string;
+  tags?: string[];
 }
 
 // ─── Outreach & Campaign Models ──────────────────────────────────────────────
 export type OutreachChannel = 'Email' | 'Phone' | 'LinkedIn' | 'Meeting';
-export type OutreachStatus = 'Sent' | 'Delivered' | 'Opened' | 'Clicked' | 'Replied' | 'Bounced';
+export type OutreachStatus = 'Sent' | 'Delivered' | 'Opened' | 'Clicked' | 'Replied' | 'Bounced' | 'Connected' | 'Completed' | 'Meeting Set' | 'Scheduled' | string;
 
 export interface OutreachActivity {
-  id: number;
+  id: number | string;
+  account_company_id: number;
   lead_id?: number | null;
+  campaign_id?: number | null;
   date: string;
   channel: OutreachChannel;
-  lead_name: string;
-  company_name: string;
-  subject_or_type: string;
+  lead_name?: string | null;
+  company_name?: string | null;
+  subject_or_type?: string | null;
   status: OutreachStatus;
-  response_preview?: string;
-  next_followup: string;
+  response_preview?: string | null;
+  next_followup?: string | null;
   created_at?: string;
+  // Relationships
+  account_company?: AccountCompany | null;
+  campaign?: Campaign | null;
+  lead?: Lead | null;
+  // UI & compatibility aliases
+  timestamp?: string;
+  type?: string;
+  recipient_name?: string;
+  recipient_title?: string;
+  recipient_email?: string;
+  recipient_org?: string;
+  subject?: string;
+  message?: string;
+  response?: string;
+  outcome?: string;
+  followup_days?: number;
+  campaign_name?: string;
+  assigned_to?: string;
+  tags?: string[];
 }
 
 export interface CampaignSequenceStep {
@@ -223,23 +427,124 @@ export interface CampaignSequenceStep {
   preview: string;
 }
 
+export type CampaignStatus = 'Draft' | 'Active' | 'Paused' | 'Completed' | 'Cancelled';
+export type SequenceStepType = 'Introduction' | 'Follow-up' | 'Case Study' | 'Final Message' | 'Custom';
+
+export interface SequenceStep {
+  id: string;
+  day: number;
+  step_number?: number;
+  type: SequenceStepType;
+  subject: string;
+  body: string;
+  enabled: boolean;
+}
+
+export interface CampaignAudience {
+  industries: string[];
+  companies: string[];
+  people: string[];
+  estimated_contacts: number;
+}
+
+export interface CampaignRules {
+  stop_on_reply: boolean;
+  stop_on_meeting_booked: boolean;
+  update_lead_status: boolean;
+  create_follow_up_task: boolean;
+  exclude_customers: boolean;
+  exclude_competitors: boolean;
+  track_opens?: boolean;
+}
+
+export interface CampaignSchedule {
+  send_days: ('Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun')[];
+  send_time_from: string;
+  send_time_to: string;
+  send_time?: string;
+  timezone: string;
+  start_date: string;
+}
+
 export interface Campaign {
-  id: number;
+  id: string | number;
+  account_company_id?: number;
   name: string;
-  status: 'Active' | 'Draft' | 'Completed' | 'Paused';
-  target_companies_count: number;
-  target_people_count: number;
+  description?: string;
+  status: CampaignStatus;
+  target_companies_count?: number;
+  target_people_count?: number;
+  audience?: CampaignAudience;
+  sequence?: SequenceStep[];
   sequence_steps?: CampaignSequenceStep[];
-  schedule?: string;
+  target_industry_list?: any[];
+  outreach_activity_list?: any[];
+  rules?: CampaignRules;
+  schedule?: CampaignSchedule | string;
   stop_on_reply?: boolean;
   stop_on_meeting?: boolean;
   update_lead_status?: boolean;
   create_followup_task?: boolean;
+  total_contacts?: number;
+  emails_sent?: number;
+  sent_count?: number;
+  open_rate?: number;
+  reply_rate?: number;
+  meetings_booked?: number;
+  unsubscribes?: number;
+  start_date?: string;
+  end_date?: string;
+  created_by?: string;
+  tags?: string[];
   created_at?: string;
   updated_at?: string;
 }
 
 // ─── AI Personalized Messaging Models ───────────────────────────────────────
+export type MessageType =
+  | 'email_subject'
+  | 'initial_email'
+  | 'followup_1'
+  | 'followup_2'
+  | 'final'
+  | 'linkedin'
+  | 'call_script';
+
+export interface PersonContext {
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  title: string;
+  department: string;
+  seniority: 'C-Suite' | 'VP' | 'Director' | 'Manager' | 'Individual Contributor' | string;
+}
+
+export interface CompanyContext {
+  name: string;
+  industry: string;
+  size: 'Startup (<50)' | 'SMB (50-250)' | 'Mid-Market (250-1000)' | 'Enterprise (1000+)' | string;
+  location: string;
+  country?: string;
+  recent_news?: string;
+  challenges?: string[];
+}
+
+export interface GeneratedMessage {
+  type: MessageType;
+  label: string;
+  subject?: string;
+  content: string;
+  personalization_score: number;
+  hooks_used: string[];
+}
+
+export interface MessageGenerationResult {
+  person: PersonContext;
+  company: CompanyContext;
+  messages: GeneratedMessage[];
+  avg_score: number;
+}
+
 export type AIMessageType =
   | 'Email Subject'
   | 'Initial Outreach'
@@ -275,24 +580,40 @@ export interface AIMessageResponse {
 
 // ─── Follow-Up System Models ────────────────────────────────────────────────
 export interface FollowUpItem {
-  id: number;
+  id: number | string;
   lead_id?: number | null;
   lead_name: string;
+  person_name?: string;
+  person_title?: string;
   company_name: string;
+  organization_name?: string;
+  industry?: string;
   lead_temperature: LeadTemperature;
   sequence_step: number;
   total_sequence_steps: number;
   last_contact_date: string;
   next_followup_date: string;
   followup_count: number;
-  status: 'Scheduled' | 'Pending Today' | 'Sent' | 'Response Received' | 'Escalated to HOT';
+  status: 'Scheduled' | 'Pending Today' | 'Sent' | 'Response Received' | 'Escalated to HOT' | 'Escalated' | string;
   assigned_user: string;
+  assigned_to?: string;
+  assigned_rep?: string;
+  sequence_name?: string;
+  step_number?: number;
+  total_steps?: number;
+  follow_up_count?: number;
+  next_follow_up_date?: string;
+  days_since_last_contact?: number;
+  is_overdue?: boolean;
+  subject?: string;
+  channel?: string;
+  message_preview?: string;
   created_at?: string;
 }
 
 export interface DailyFollowUpRule {
   id: number;
-  rule_name: string;
+  name: string;
   condition: string;
   action: string;
   active: boolean;
@@ -413,3 +734,100 @@ export interface PaginatedResult<T> {
   totalPages: number;
   hasMore: boolean;
 }
+
+// ─── Dashboard & Analytics Point Models ──────────────────────────────────────
+export interface DashboardKPIs {
+  companies: {
+    total: number;
+    newToday: number;
+    newThisMonth: number;
+  };
+  industries: {
+    total: number;
+    topIndustries: Array<{ name: string; count: number }>;
+  };
+  people: {
+    totalDecisionMakers: number;
+  };
+  leads: {
+    total: number;
+    cold: number;
+    warm: number;
+    hot: number;
+  };
+  outreach: {
+    emailsSent: number;
+    callsMade: number;
+    followupsPending: number;
+    meetingsScheduled: number;
+  };
+}
+
+export interface ActivityFeedItem {
+  id: string | number;
+  type: string;
+  title: string;
+  description: string;
+  timestamp: string;
+  user: string;
+  badgeColor?: string;
+}
+
+export interface GrowthTrendPoint {
+  month: string;
+  organizations: number;
+  leads: number;
+  revenue: number;
+}
+
+export interface IndustryDistributionPoint {
+  name: string;
+  value: number;
+  color: string;
+}
+
+export interface LocationDistributionPoint {
+  country: string;
+  count: number;
+}
+
+export interface SizeDistributionPoint {
+  range: string;
+  count: number;
+}
+
+export interface PipelineStagePoint {
+  stage: string;
+  count: number;
+  value: number;
+}
+
+export interface OutreachPerfPoint {
+  day: string;
+  sent: number;
+  opened: number;
+  clicked: number;
+}
+
+export interface DailyAutomationRule {
+  id: string | number;
+  name: string;
+  description?: string;
+  condition?: string;
+  action?: string;
+  active: boolean;
+}
+
+export interface AutomationExecutionResult {
+  executed_at: string;
+  emails_sent: number;
+  sequences_stopped: number;
+  leads_escalated: number;
+  tasks_created: number;
+  log_entries: Array<{
+    timestamp: string;
+    type: 'info' | 'success' | 'warning' | 'escalation' | string;
+    message: string;
+  }>;
+}
+

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
 import { CommandPalette } from "@/components/layout/command-palette";
-import { peopleServices, DecisionMaker } from "@/services/peopleServices";
+import * as peopleServices from "@/services/public/peopleServices";
+import type { DecisionMaker } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -263,7 +264,7 @@ export default function PeoplePage() {
                               {person.name}
                             </Link>
                             {person.verified ? (
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" title="Verified" />
+                              <span title="Verified"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" /></span>
                             ) : (
                               <XCircle className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
                             )}

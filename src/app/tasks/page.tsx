@@ -4,7 +4,14 @@ import * as React from "react";
 import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
 import { CommandPalette } from "@/components/layout/command-palette";
-import { taskServices, TaskItem, TaskType, TaskStatus, TaskPriority } from "@/services/taskServices";
+import {
+  getTasksActionByToken,
+  updateTaskStatusActionByToken,
+  createTaskActionByToken,
+  deleteTaskActionByToken,
+} from "@/services/private/taskServices";
+import type { TaskItem, TaskType, TaskStatus, TaskPriority } from "@/lib/types";
+import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -28,13 +35,14 @@ const TYPE_ICON: Record<TaskType, React.ReactNode> = {
 const PRIORITY_BADGE: Record<TaskPriority, string> = {
   Urgent: "bg-red-500/10 text-red-400 border-red-500/20 font-bold animate-pulse",
   High: "bg-amber-500/10 text-amber-400 border-amber-500/20 font-semibold",
-  Medium: "bg-indigo-500/10 text-indigo-300 border-indigo-500/20",
-  Low: "bg-slate-500/10 text-slate-400 border-slate-500/20",
+  Medium: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  Low: "bg-muted/40 text-muted-foreground border-border/40",
 };
 
 const KANBAN_STAGES: TaskStatus[] = ["To Do", "In Progress", "Completed", "Cancelled"];
 
 export default function TasksPage() {
+  const { user } = useAuth();
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<"list" | "kanban" | "calendar">("list");
   const [tasks, setTasks] = React.useState<TaskItem[]>([]);
@@ -56,43 +64,67 @@ export default function TasksPage() {
   const [newNotes, setNewNotes] = React.useState("");
 
   const loadTasks = React.useCallback(async () => {
+    if (!user) return;
     setLoading(true);
-    const data = await taskServices.getTasks({ type: typeFilter, status: statusFilter, search });
-    setTasks(data);
-    setLoading(false);
-  }, [typeFilter, statusFilter, search]);
+    try {
+      const token = await user.getIdToken(true);
+      const data = await getTasksActionByToken(token, { type: typeFilter, status: statusFilter, search });
+      setTasks(data || []);
+    } catch (e) {
+      console.error("Failed to load tasks:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, typeFilter, statusFilter, search]);
 
   React.useEffect(() => { loadTasks(); }, [loadTasks]);
 
-  const handleStatusChange = async (id: string, newStatus: TaskStatus) => {
-    await taskServices.updateTaskStatus(id, newStatus);
-    loadTasks();
+  const handleStatusChange = async (id: string | number, newStatus: TaskStatus) => {
+    if (!user) return;
+    try {
+      const token = await user.getIdToken(true);
+      await updateTaskStatusActionByToken(token, id, newStatus);
+      loadTasks();
+    } catch (e) {
+      console.error("Failed to update task status:", e);
+    }
   };
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle) return;
-    await taskServices.createTask({
-      title: newTitle,
-      type: newType,
-      priority: newPriority,
-      status: "To Do",
-      due_date: newDate,
-      due_time: newTime,
-      assigned_to: "Alex Rivers",
-      related_lead_name: newLead || undefined,
-      related_company: newCompany || undefined,
-      notes: newNotes || undefined,
-    });
-    setCreateOpen(false);
-    setNewTitle("");
-    setNewNotes("");
-    loadTasks();
+    if (!newTitle || !user) return;
+    try {
+      const token = await user.getIdToken(true);
+      await createTaskActionByToken(token, {
+        title: newTitle,
+        type: newType,
+        priority: newPriority,
+        status: "To Do",
+        due_date: newDate,
+        due_time: newTime,
+        assigned_to: "Alex Rivers",
+        related_lead_name: newLead || undefined,
+        related_company: newCompany || undefined,
+        notes: newNotes || undefined,
+      });
+      setCreateOpen(false);
+      setNewTitle("");
+      setNewNotes("");
+      loadTasks();
+    } catch (e) {
+      console.error("Failed to create task:", e);
+    }
   };
 
-  const handleDeleteTask = async (id: string) => {
-    await taskServices.deleteTask(id);
-    loadTasks();
+  const handleDeleteTask = async (id: string | number) => {
+    if (!user) return;
+    try {
+      const token = await user.getIdToken(true);
+      await deleteTaskActionByToken(token, id);
+      loadTasks();
+    } catch (e) {
+      console.error("Failed to delete task:", e);
+    }
   };
 
   return (

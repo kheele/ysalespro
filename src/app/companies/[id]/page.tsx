@@ -6,10 +6,12 @@ import { useParams, useRouter } from "next/navigation";
 import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
 import { CommandPalette } from "@/components/layout/command-palette";
-import { organizationServices, Organization, OrganizationNote } from "@/services/organizationServices";
-import { peopleServices, DecisionMaker } from "@/services/peopleServices";
-import { leadServices, Lead } from "@/services/leadServices";
-import { taskServices, SalesTask } from "@/services/taskServices";
+import * as organizationServices from "@/services/public/organizationServices";
+import * as peopleServices from "@/services/public/peopleServices";
+import * as leadServices from "@/services/private/leadServices";
+import * as taskServices from "@/services/private/taskServices";
+import type { Organization, OrganizationNote, DecisionMaker, Lead, TaskItem } from "@/lib/types";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +45,7 @@ import {
 } from "lucide-react";
 
 export default function CompanyProfilePage() {
+  const { user } = useAuth();
   const params = useParams();
   const router = useRouter();
   const orgId = (params?.id as string) || "org-1";
@@ -51,27 +54,39 @@ export default function CompanyProfilePage() {
   const [org, setOrg] = React.useState<Organization | null>(null);
   const [people, setPeople] = React.useState<DecisionMaker[]>([]);
   const [leads, setLeads] = React.useState<Lead[]>([]);
-  const [tasks, setTasks] = React.useState<SalesTask[]>([]);
+  const [tasks, setTasks] = React.useState<TaskItem[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   // New Note state
   const [newNoteContent, setNewNoteContent] = React.useState("");
 
   const loadOrgDetails = React.useCallback(async () => {
+    if (!user) return;
     setLoading(true);
-    const [orgData, peopleData, leadData, taskData] = await Promise.all([
-      organizationServices.getOrganizationById(orgId),
-      peopleServices.getDecisionMakers({ organization_id: orgId }),
-      leadServices.getLeads(),
-      taskServices.getTasks(),
-    ]);
+    try {
+      const token = await user.getIdToken(true);
+      const [orgData, peopleData, leadData, taskData] = await Promise.all([
+        organizationServices.getOrganizationById(orgId),
+        peopleServices.getDecisionMakers({ company_id: orgId }),
+        leadServices.getLeadsActionByToken(token),
+        taskServices.getTasksActionByToken(token),
+      ]);
 
-    setOrg(orgData);
-    setPeople(peopleData.people.filter(p => p.organization_name === orgData?.name || p.organization_id === orgId));
-    setLeads(leadData.filter(l => l.organization_name === orgData?.name || l.organization_id === orgId));
-    setTasks(taskData.filter(t => t.organization_name === orgData?.name || t.organization_id === orgId));
-    setLoading(false);
-  }, [orgId]);
+      setOrg(orgData);
+      const orgName = orgData?.name || "";
+      const pList = peopleData?.people || [];
+      const lList = Array.isArray(leadData) ? leadData : [];
+      const tList = Array.isArray(taskData) ? taskData : [];
+
+      setPeople(pList.filter(p => p.company_name === orgName || String(p.company_id) === String(orgId)));
+      setLeads(lList.filter(l => (l.company_name === orgName || l.organization_name === orgName) || String(l.organization_id) === String(orgId)));
+      setTasks(tList.filter(t => t.related_company === orgName || String(t.related_lead_id) === String(orgId)));
+    } catch (e) {
+      console.error("Failed to load organization details:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [orgId, user]);
 
   React.useEffect(() => {
     loadOrgDetails();

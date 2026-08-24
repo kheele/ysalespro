@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { type BillingPlan } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { createPayPalSubscriptionAction, handlePayPalSubscriptionSuccessAction } from "@/services/billingService";
+import { createPayPalSubscriptionActionByToken, handlePayPalSubscriptionSuccessActionByToken } from "@/services/private/billingService";
 
 interface PayPalCheckoutProps {
   plan: BillingPlan;
@@ -42,8 +42,8 @@ export function PayPalCheckout({ plan, onSuccess }: PayPalCheckoutProps) {
       const token = await user?.getIdToken(true);
       if (!token) throw new Error('Not authenticated');
 
-      const subscription = await createPayPalSubscriptionAction(token, Number(plan.id));
-      return subscription.id;
+      const subscription = await createPayPalSubscriptionActionByToken(token, String(plan.id));
+      return subscription.subscriptionID;
     } catch (err: any) {
       console.error("PayPal Create Subscription Error:", err);
       toast({
@@ -62,7 +62,7 @@ export function PayPalCheckout({ plan, onSuccess }: PayPalCheckoutProps) {
       const token = await user?.getIdToken(true);
       if (!token) throw new Error('Not authenticated');
 
-      await handlePayPalSubscriptionSuccessAction(token, data.subscriptionId || data.subscriptionID);
+      await handlePayPalSubscriptionSuccessActionByToken(token, data.subscriptionId || data.subscriptionID || "", String(plan.id));
 
       toast({
         title: "Subscription Successful!",

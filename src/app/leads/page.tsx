@@ -6,13 +6,20 @@ import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
 import { CommandPalette } from "@/components/layout/command-palette";
 import {
-  leadServices,
-  Lead,
-  LeadStage,
+  getLeadsActionByToken,
+  updateLeadStageActionByToken,
+  createLeadActionByToken,
+} from "@/services/private/leadServices";
+import {
   PIPELINE_STAGES,
   STAGE_COLORS,
   TEMP_COLORS,
-} from "@/services/leadServices";
+} from "@/lib/constants";
+import type {
+  Lead,
+  LeadStage,
+} from "@/lib/types";
+import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -39,7 +46,7 @@ import {
   Repeat,
 } from "lucide-react";
 
-const STAGE_ICONS: Record<LeadStage, React.ReactNode> = {
+const STAGE_ICONS: Record<string, React.ReactNode> = {
   Cold: <Snowflake className="h-3.5 w-3.5" />,
   Contacted: <Repeat className="h-3.5 w-3.5" />,
   Warm: <Thermometer className="h-3.5 w-3.5" />,
@@ -48,22 +55,24 @@ const STAGE_ICONS: Record<LeadStage, React.ReactNode> = {
   Lost: <XCircle className="h-3.5 w-3.5" />,
 };
 
-function ScoreBar({ score }: { score: number }) {
-  const color = score >= 85 ? "bg-emerald-400" : score >= 65 ? "bg-amber-400" : "bg-blue-400";
+function ScoreBar({ score }: { score?: number }) {
+  const val = score ?? 70;
+  const color = val >= 85 ? "bg-emerald-400" : val >= 65 ? "bg-amber-400" : "bg-blue-400";
   return (
     <div className="flex items-center gap-2 text-[10px] font-mono">
       <div className="flex-1 h-1.5 rounded-full bg-muted/50 overflow-hidden">
-        <div className={`h-1.5 rounded-full ${color}`} style={{ width: `${score}%` }} />
+        <div className={`h-1.5 rounded-full ${color}`} style={{ width: `${val}%` }} />
       </div>
-      <span className="text-foreground font-bold w-6 text-right">{score}</span>
+      <span className="text-foreground font-bold w-6 text-right">{val}</span>
     </div>
   );
 }
 
 // ─── Kanban Card ───────────────────────────────────────────────────────────
-function KanbanCard({ lead, onMove }: { lead: Lead; onMove: (id: string, stage: LeadStage) => void }) {
-  const sc = STAGE_COLORS[lead.pipeline_stage];
-  const idx = PIPELINE_STAGES.indexOf(lead.pipeline_stage);
+function KanbanCard({ lead, onMove }: { lead: Lead; onMove: (id: string | number, stage: LeadStage) => void }) {
+  const stage = lead.pipeline_stage || "Cold";
+  const sc = STAGE_COLORS[stage] || STAGE_COLORS.Cold;
+  const idx = PIPELINE_STAGES.indexOf(stage);
   const prevStage = idx > 0 ? PIPELINE_STAGES[idx - 1] : null;
   const nextStage = idx < PIPELINE_STAGES.length - 1 ? PIPELINE_STAGES[idx + 1] : null;
 
@@ -93,19 +102,19 @@ function KanbanCard({ lead, onMove }: { lead: Lead; onMove: (id: string, stage: 
       <ScoreBar score={lead.score} />
 
       <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border/20">
-        <span className="text-emerald-400 font-bold">${(lead.deal_value ?? 0).toLocaleString()}</span>
+        <span className="text-emerald-400 font-bold">${Number(lead.deal_value || 0).toLocaleString()}</span>
         <span className="text-muted-foreground">↩ #{lead.followup_count}</span>
       </div>
 
       <div className="flex items-center gap-1 pt-0.5">
         {prevStage && (
-          <button onClick={() => onMove(lead.id, prevStage)}
+          <button onClick={() => onMove(lead.id, prevStage as LeadStage)}
             className="flex-1 text-center text-[10px] py-1 rounded bg-muted/40 hover:bg-muted/70 text-muted-foreground transition-colors">
             ← {prevStage}
           </button>
         )}
         {nextStage && (
-          <button onClick={() => onMove(lead.id, nextStage)}
+          <button onClick={() => onMove(lead.id, nextStage as LeadStage)}
             className="flex-1 text-center text-[10px] py-1 rounded bg-muted/40 hover:bg-muted/70 text-muted-foreground transition-colors">
             {nextStage} →
           </button>
@@ -131,39 +140,59 @@ export default function LeadsPage() {
   const [addOpen, setAddOpen] = React.useState(false);
   const [newLead, setNewLead] = React.useState({ contact_name: "", organization_name: "", deal_value: "" });
 
+  const { user } = useAuth();
   const load = React.useCallback(async () => {
+    if (!user) return;
     setLoading(true);
-    const data = await leadServices.getLeads({ search });
-    let filtered = data;
-    if (filterStage !== "all") filtered = filtered.filter(l => l.pipeline_stage === filterStage);
-    if (filterAssigned !== "all") filtered = filtered.filter(l => l.assigned_to === filterAssigned);
-    setLeads(filtered);
-    setLoading(false);
-  }, [search, filterStage, filterAssigned]);
+    try {
+      const token = await user.getIdToken(true);
+      const data = await getLeadsActionByToken(token, { search });
+      let filtered = Array.isArray(data) ? data : [];
+      if (filterStage !== "all") filtered = filtered.filter(l => l.pipeline_stage === filterStage);
+      if (filterAssigned !== "all") filtered = filtered.filter(l => l.assigned_to === filterAssigned);
+      setLeads(filtered);
+    } catch (e) {
+      console.error("Failed to load leads:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, search, filterStage, filterAssigned]);
 
   React.useEffect(() => { load(); }, [load]);
 
-  const handleMove = async (id: string, stage: LeadStage) => {
-    await leadServices.updateLeadStage(id, stage);
-    load();
+  const handleMove = async (id: string | number, stage: LeadStage) => {
+    if (!user) return;
+    try {
+      const token = await user.getIdToken(true);
+      await updateLeadStageActionByToken(token, id, stage);
+      load();
+    } catch (e) {
+      console.error("Failed to update lead stage:", e);
+    }
   };
 
   const handleAddLead = async (e: React.FormEvent) => {
     e.preventDefault();
-    await leadServices.createLead({
-      contact_name: newLead.contact_name,
-      organization_name: newLead.organization_name,
-      deal_value: Number(newLead.deal_value) || 50000,
-    });
-    setAddOpen(false);
-    setNewLead({ contact_name: "", organization_name: "", deal_value: "" });
-    load();
+    if (!user) return;
+    try {
+      const token = await user.getIdToken(true);
+      await createLeadActionByToken(token, {
+        contact_name: newLead.contact_name,
+        organization_name: newLead.organization_name,
+        deal_value: Number(newLead.deal_value) || 50000,
+      });
+      setAddOpen(false);
+      setNewLead({ contact_name: "", organization_name: "", deal_value: "" });
+      load();
+    } catch (e) {
+      console.error("Failed to create lead:", e);
+    }
   };
 
   // Stats summary
-  const totalPipeline = leads.reduce((s, l) => s + (l.deal_value ?? 0), 0);
+  const totalPipeline = leads.reduce((s, l) => s + (Number(l.deal_value) || 0), 0);
   const hotCount = leads.filter(l => l.pipeline_stage === "Hot").length;
-  const avgScore = leads.length ? Math.round(leads.reduce((s, l) => s + l.score, 0) / leads.length) : 0;
+  const avgScore = leads.length ? Math.round(leads.reduce((s, l) => s + (l.score || l.lead_score || 0), 0) / leads.length) : 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
@@ -244,7 +273,7 @@ export default function LeadsPage() {
               {PIPELINE_STAGES.map((stage) => {
                 const sc = STAGE_COLORS[stage];
                 const stageLeads = leads.filter(l => l.pipeline_stage === stage);
-                const stageValue = stageLeads.reduce((s, l) => s + (l.deal_value ?? 0), 0);
+                const stageValue = stageLeads.reduce((s, l) => s + (Number(l.deal_value) || 0), 0);
                 return (
                   <div key={stage} className="flex flex-col gap-3">
                     {/* Column Header */}
@@ -308,7 +337,8 @@ export default function LeadsPage() {
                       ))
                     ) : leads.length > 0 ? (
                       leads.map((lead) => {
-                        const sc = STAGE_COLORS[lead.pipeline_stage] || STAGE_COLORS['Cold'];
+                        const stage = lead.pipeline_stage || 'Cold';
+                        const sc = STAGE_COLORS[stage] || STAGE_COLORS['Cold'];
                         const tc = TEMP_COLORS[lead.temperature || 'Cold'] || TEMP_COLORS['Cold'];
                         return (
                           <tr key={lead.id} className="hover:bg-muted/40 transition-colors group">
@@ -344,7 +374,7 @@ export default function LeadsPage() {
                             {/* Stage */}
                             <td className="p-3.5">
                               <Badge className={`${sc.bg} ${sc.text} border ${sc.border} text-[10px] gap-1`}>
-                                {STAGE_ICONS[lead.pipeline_stage]} {lead.pipeline_stage}
+                                {STAGE_ICONS[stage]} {stage}
                               </Badge>
                             </td>
                             {/* Score */}
@@ -353,7 +383,7 @@ export default function LeadsPage() {
                             </td>
                             {/* Deal Value */}
                             <td className="p-3.5 font-mono text-emerald-400 font-semibold whitespace-nowrap">
-                              ${(lead.deal_value ?? 0).toLocaleString()}
+                              ${Number(lead.deal_value || 0).toLocaleString()}
                             </td>
                             {/* Last Contact */}
                             <td className="p-3.5 text-muted-foreground font-mono text-[10px] whitespace-nowrap">
@@ -376,7 +406,7 @@ export default function LeadsPage() {
                             {/* Move Buttons */}
                             <td className="p-3.5">
                               {(() => {
-                                const idx = PIPELINE_STAGES.indexOf(lead.pipeline_stage);
+                                const idx = PIPELINE_STAGES.indexOf(stage);
                                 const next = PIPELINE_STAGES[idx + 1];
                                 return next ? (
                                   <Button size="sm" variant="ghost"

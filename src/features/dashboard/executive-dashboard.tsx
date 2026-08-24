@@ -41,10 +41,13 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import { dashboardServices, DashboardKPIs, ActivityFeedItem } from "@/services/dashboardServices";
-import { analyticsServices } from "@/services/analyticsServices";
+import * as dashboardServices from "@/services/private/dashboardServices";
+import * as analyticsServices from "@/services/private/analyticsServices";
+import type { DashboardKPIs, ActivityFeedItem } from "@/lib/types";
+import { useAuth } from "@/hooks/use-auth";
 
 export function ExecutiveDashboard() {
+  const { user } = useAuth();
   const [kpis, setKpis] = React.useState<DashboardKPIs | null>(null);
   const [activities, setActivities] = React.useState<ActivityFeedItem[]>([]);
   const [growthData, setGrowthData] = React.useState<any[]>([]);
@@ -56,8 +59,10 @@ export function ExecutiveDashboard() {
   const [loading, setLoading] = React.useState(true);
 
   const loadDashboardData = React.useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     try {
+      const token = await user.getIdToken(true);
       const [
         kpiRes,
         actRes,
@@ -68,14 +73,14 @@ export function ExecutiveDashboard() {
         pipeRes,
         outRes,
       ] = await Promise.all([
-        dashboardServices.getKPIs(),
-        dashboardServices.getActivityFeed(),
-        analyticsServices.getOrganizationGrowthTrend(),
-        analyticsServices.getIndustryDistribution(),
-        analyticsServices.getLocationDistribution(),
-        analyticsServices.getEmployeeSizeDistribution(),
-        analyticsServices.getLeadPipelineData(),
-        analyticsServices.getOutreachPerformance(),
+        dashboardServices.getKPIsActionByToken(token),
+        dashboardServices.getActivityFeedActionByToken(token),
+        analyticsServices.getOrganizationGrowthTrendActionByToken(token),
+        analyticsServices.getIndustryDistributionAction(),
+        analyticsServices.getLocationDistributionAction(),
+        analyticsServices.getEmployeeSizeDistributionAction(),
+        analyticsServices.getLeadPipelineDataActionByToken(token),
+        analyticsServices.getOutreachPerformanceActionByToken(token),
       ]);
 
       setKpis(kpiRes);
@@ -91,7 +96,7 @@ export function ExecutiveDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   React.useEffect(() => {
     loadDashboardData();

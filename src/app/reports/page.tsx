@@ -4,7 +4,23 @@ import * as React from "react";
 import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
 import { CommandPalette } from "@/components/layout/command-palette";
-import { reportServices, ReportCategory } from "@/services/reportServices";
+import {
+  getCompanyAnalyticsReportsActionByToken,
+  getIndustryAnalyticsReportsActionByToken,
+  getLeadConversionReportsActionByToken,
+  getEmailPerformanceReportsActionByToken,
+  getOutreachPerformanceReportsActionByToken,
+  getSalesActivityReportsActionByToken,
+} from "@/services/private/reportServices";
+import type {
+  CompanyAnalyticsReport,
+  IndustryAnalyticsReport,
+  LeadConversionReport,
+  EmailPerformanceReport,
+  OutreachPerformanceReport,
+  SalesActivityReport,
+} from "@/lib/types";
+import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,16 +31,77 @@ import {
   BarChart3, CheckCircle2, ArrowUpRight, Percent, Users,
 } from "lucide-react";
 
+export type ReportCategory = "company" | "industry" | "conversion" | "email" | "outreach" | "activity";
+
 export default function ReportsPage() {
+  const { user } = useAuth();
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState<ReportCategory>("company");
+  const [companyData, setCompanyData] = React.useState<CompanyAnalyticsReport[]>([]);
+  const [industryData, setIndustryData] = React.useState<IndustryAnalyticsReport[]>([]);
+  const [conversionData, setConversionData] = React.useState<LeadConversionReport[]>([]);
+  const [emailData, setEmailData] = React.useState<EmailPerformanceReport[]>([]);
+  const [outreachData, setOutreachData] = React.useState<OutreachPerformanceReport[]>([]);
+  const [activityData, setActivityData] = React.useState<SalesActivityReport[]>([]);
+  const [loading, setLoading] = React.useState(true);
 
-  const companyData = reportServices.getCompanyAnalytics();
-  const industryData = reportServices.getIndustryAnalytics();
-  const conversionData = reportServices.getLeadConversion();
-  const emailData = reportServices.getEmailPerformance();
-  const outreachData = reportServices.getOutreachPerformance();
-  const activityData = reportServices.getSalesActivity();
+  React.useEffect(() => {
+    async function loadReports() {
+      if (!user) return;
+      setLoading(true);
+      try {
+        const token = await user.getIdToken(true);
+        const [c, i, conv, e, o, a] = await Promise.all([
+          getCompanyAnalyticsReportsActionByToken(token),
+          getIndustryAnalyticsReportsActionByToken(token),
+          getLeadConversionReportsActionByToken(token),
+          getEmailPerformanceReportsActionByToken(token),
+          getOutreachPerformanceReportsActionByToken(token),
+          getSalesActivityReportsActionByToken(token),
+        ]);
+        setCompanyData(c || []);
+        setIndustryData(i || []);
+        setConversionData(conv || []);
+        setEmailData(e || []);
+        setOutreachData(o || []);
+        setActivityData(a || []);
+      } catch (err) {
+        console.error("Failed to load reports:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadReports();
+  }, [user]);
+
+  const handleExportCSV = (tab: ReportCategory) => {
+    let content = "";
+    if (tab === "company") {
+      content = "Company,Industry,Employees,Revenue,Leads,Deals Won,Pipeline\n" +
+        companyData.map(c => `"${c.company_name}","${c.industry}",${c.employee_count},"${c.revenue}",${c.leads_count},${c.deals_won},"${c.pipeline_value}"`).join("\n");
+    } else if (tab === "industry") {
+      content = "Industry,Companies,Total Leads,Conversion Rate,Avg Deal Size,Growth Rate\n" +
+        industryData.map(i => `"${i.industry_name}",${i.company_count},${i.total_leads},"${i.conversion_rate}","${i.avg_deal_size}","${i.growth_rate}"`).join("\n");
+    } else {
+      content = "Report Type,Generated At\n" + `"${tab}","${new Date().toISOString()}"`;
+    }
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${tab}_report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportExcel = (tab: ReportCategory) => {
+    handleExportCSV(tab);
+  };
+
+  const handleExportPDF = () => {
+    window.print();
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
@@ -32,17 +109,17 @@ export default function ReportsPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <SalesProHeader
           title="Reports & Analytics"
-          subtitle="Comprehensive enterprise intelligence reports with direct CSV, Excel, and PDF export capabilities"
+          subtitle="Real-time multi-dimensional analytics: performance, conversions, deliverability, and rep activities"
           onOpenCommandPalette={() => setCommandOpen(true)}
         />
 
-        <main className="flex-1 p-6 space-y-6 max-w-7xl mx-auto overflow-y-auto">
+        <main className="flex-1 p-6 space-y-5 max-w-7xl mx-auto overflow-y-auto w-full">
 
-          {/* Top Export Bar & Category Tabs Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 rounded-2xl backdrop-blur-xl">
+          {/* Controls & Export Header Bar */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card/60 p-4 rounded-xl border border-border/40 backdrop-blur-md">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                <BarChart3 className="h-5 w-5" />
+                <FileText className="h-5 w-5" />
               </div>
               <div>
                 <h1 className="text-base font-bold text-foreground capitalize">{activeTab} Analytics Report</h1>
@@ -52,15 +129,15 @@ export default function ReportsPage() {
 
             {/* Export Actions Group */}
             <div className="flex items-center gap-2 flex-wrap">
-              <Button size="sm" variant="outline" onClick={() => reportServices.exportCSV(activeTab)}
+              <Button size="sm" variant="outline" onClick={() => handleExportCSV(activeTab)}
                 className="text-xs h-9 gap-1.5 border-border/60 bg-muted/30 hover:bg-muted/60 text-foreground">
                 <FileCode className="h-4 w-4 text-emerald-400" /> Export CSV
               </Button>
-              <Button size="sm" variant="outline" onClick={() => reportServices.exportExcel(activeTab)}
+              <Button size="sm" variant="outline" onClick={() => handleExportExcel(activeTab)}
                 className="text-xs h-9 gap-1.5 border-border/60 bg-muted/30 hover:bg-muted/60 text-foreground">
                 <FileSpreadsheet className="h-4 w-4 text-green-400" /> Export Excel (.xls)
               </Button>
-              <Button size="sm" onClick={() => reportServices.exportPDF(activeTab)}
+              <Button size="sm" onClick={handleExportPDF}
                 className="text-xs h-9 gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-lg shadow-indigo-500/20">
                 <Printer className="h-4 w-4" /> Export / Print PDF
               </Button>

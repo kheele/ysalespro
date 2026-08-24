@@ -25,7 +25,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "next-themes";
-import { notificationServices, NotificationItem } from "@/services/notificationServices";
+import { getNotificationsActionByToken, markAsReadActionByToken } from "@/services/private/notificationServices";
+import type { NotificationItem } from "@/lib/types";
+import { useAuth } from "@/hooks/use-auth";
 
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -46,19 +48,35 @@ export function SalesProHeader({
   onAddCompanyClick,
   onNewCampaignClick,
 }: SalesProHeaderProps) {
+  const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = React.useState(0);
 
   React.useEffect(() => {
-    notificationServices.getNotifications().then((res) => {
-      setNotifications(res);
-      setUnreadCount(res.filter((n) => !n.read).length);
-    });
-  }, []);
+    async function loadNotifications() {
+      if (!user) return;
+      try {
+        const token = await user.getIdToken(true);
+        const res = await getNotificationsActionByToken(token);
+        setNotifications(res || []);
+        setUnreadCount((res || []).filter((n) => !n.read).length);
+      } catch (e) {
+        console.error("Failed to load notifications:", e);
+      }
+    }
+    loadNotifications();
+  }, [user]);
 
-  const handleMarkRead = (id: number) => {
-    notificationServices.markAsRead(id);
+  const handleMarkRead = async (id: number) => {
+    if (user) {
+      try {
+        const token = await user.getIdToken(true);
+        await markAsReadActionByToken(token, id);
+      } catch (e) {
+        console.error("Failed to mark notification as read:", e);
+      }
+    }
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );

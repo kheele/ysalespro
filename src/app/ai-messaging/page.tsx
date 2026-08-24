@@ -4,10 +4,14 @@ import * as React from "react";
 import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
 import { CommandPalette } from "@/components/layout/command-palette";
-import {
-  aiMessageServices, PersonContext, CompanyContext,
-  MessageGenerationResult, GeneratedMessage, MessageType,
-} from "@/services/aiMessageServices";
+import * as aiMessageServices from "@/services/private/aiMessageServices";
+import type {
+  MessageType,
+  PersonContext,
+  CompanyContext,
+  GeneratedMessage,
+  MessageGenerationResult,
+} from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -114,7 +118,7 @@ function MessageCard({ msg, editable, onChange }: { msg: GeneratedMessage; edita
       {/* Hooks Used */}
       <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-border/20">
         <span className="text-[9px] uppercase font-bold text-muted-foreground/60 mr-1">Personalized with:</span>
-        {msg.hooks_used.slice(0, 5).map(h => (
+        {msg.hooks_used.slice(0, 5).map((h: string) => (
           <Badge key={h} variant="outline" className="text-[9px] bg-muted/20 font-mono px-1.5 text-muted-foreground">{h}</Badge>
         ))}
       </div>
@@ -138,6 +142,7 @@ export default function AiMessagingPage() {
   const [loading, setLoading] = React.useState(false);
   const [activeFilter, setActiveFilter] = React.useState(0);
   const [editableMessages, setEditableMessages] = React.useState<GeneratedMessage[]>([]);
+  const [painPoints, setPainPoints] = React.useState<string[]>([]);
 
   const [person, setPerson] = React.useState<Partial<PersonContext>>({
     first_name: "Sarah", last_name: "Jenkins", full_name: "Sarah Jenkins",
@@ -154,6 +159,14 @@ export default function AiMessagingPage() {
 
   const [senderName, setSenderName] = React.useState("Alex Rivers");
   const [senderTitle, setSenderTitle] = React.useState("Sales Director, YSalesPro");
+
+  React.useEffect(() => {
+    if (company.industry) {
+      aiMessageServices.getIndustryPainPoints(company.industry)
+        .then((pts: string[]) => setPainPoints(Array.isArray(pts) ? pts : []))
+        .catch(() => setPainPoints([]));
+    }
+  }, [company.industry]);
 
   const handleGenerate = async () => {
     if (!person.first_name || !company.name) return;
@@ -233,25 +246,25 @@ export default function AiMessagingPage() {
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
                         <Label className="text-[10px]">First Name</Label>
-                        <Input value={person.first_name || ""} onChange={e => setPerson(p => ({ ...p, first_name: e.target.value, full_name: `${e.target.value} ${p.last_name || ""}`.trim() }))}
+                        <Input value={person.first_name || ""} onChange={e => setPerson((p: Partial<PersonContext>) => ({ ...p, first_name: e.target.value, full_name: `${e.target.value} ${p.last_name || ""}`.trim() }))}
                           className="h-8 text-xs bg-muted/40 border-border/60" />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-[10px]">Last Name</Label>
-                        <Input value={person.last_name || ""} onChange={e => setPerson(p => ({ ...p, last_name: e.target.value, full_name: `${p.first_name || ""} ${e.target.value}`.trim() }))}
+                        <Input value={person.last_name || ""} onChange={e => setPerson((p: Partial<PersonContext>) => ({ ...p, last_name: e.target.value, full_name: `${p.first_name || ""} ${e.target.value}`.trim() }))}
                           className="h-8 text-xs bg-muted/40 border-border/60" />
                       </div>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-[10px]">Job Title</Label>
-                      <Input value={person.title || ""} onChange={e => setPerson(p => ({ ...p, title: e.target.value }))}
+                      <Input value={person.title || ""} onChange={e => setPerson((p: Partial<PersonContext>) => ({ ...p, title: e.target.value }))}
                         placeholder="e.g. Chief Technology Officer" className="h-8 text-xs bg-muted/40 border-border/60" />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
                         <Label className="text-[10px]">Department</Label>
                         <select value={person.department || "Engineering"}
-                          onChange={e => setPerson(p => ({ ...p, department: e.target.value }))}
+                          onChange={e => setPerson((p: Partial<PersonContext>) => ({ ...p, department: e.target.value }))}
                           className="w-full bg-muted/40 border border-border/60 rounded-md px-2 py-1.5 text-xs outline-none text-foreground h-8">
                           {["Operations", "Engineering", "Finance", "Sales", "Marketing", "IT", "Legal", "HR", "Security"].map(d => <option key={d}>{d}</option>)}
                         </select>
@@ -259,7 +272,7 @@ export default function AiMessagingPage() {
                       <div className="space-y-1">
                         <Label className="text-[10px]">Seniority</Label>
                         <select value={person.seniority || "VP"}
-                          onChange={e => setPerson(p => ({ ...p, seniority: e.target.value as PersonContext['seniority'] }))}
+                          onChange={e => setPerson((p: Partial<PersonContext>) => ({ ...p, seniority: e.target.value as PersonContext['seniority'] }))}
                           className="w-full bg-muted/40 border border-border/60 rounded-md px-2 py-1.5 text-xs outline-none text-foreground h-8">
                           {["C-Suite", "VP", "Director", "Manager", "Individual Contributor"].map(s => <option key={s}>{s}</option>)}
                         </select>
@@ -276,13 +289,13 @@ export default function AiMessagingPage() {
                   <div className="space-y-2.5 text-xs">
                     <div className="space-y-1">
                       <Label className="text-[10px]">Company Name</Label>
-                      <Input value={company.name || ""} onChange={e => setCompany(c => ({ ...c, name: e.target.value }))}
+                      <Input value={company.name || ""} onChange={e => setCompany((c: Partial<CompanyContext>) => ({ ...c, name: e.target.value }))}
                         placeholder="e.g. Acme Enterprise Corp" className="h-8 text-xs bg-muted/40 border-border/60" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-[10px]">Industry</Label>
                       <select value={company.industry || "Technology"}
-                        onChange={e => setCompany(c => ({ ...c, industry: e.target.value }))}
+                        onChange={e => setCompany((c: Partial<CompanyContext>) => ({ ...c, industry: e.target.value }))}
                         className="w-full bg-muted/40 border border-border/60 rounded-md px-2 py-1.5 text-xs outline-none text-foreground h-8">
                         {INDUSTRIES.map(i => <option key={i}>{i}</option>)}
                       </select>
@@ -291,20 +304,20 @@ export default function AiMessagingPage() {
                       <div className="space-y-1">
                         <Label className="text-[10px]">Company Size</Label>
                         <select value={company.size || "Enterprise (1000+)"}
-                          onChange={e => setCompany(c => ({ ...c, size: e.target.value as CompanyContext['size'] }))}
+                          onChange={e => setCompany((c: Partial<CompanyContext>) => ({ ...c, size: e.target.value as CompanyContext['size'] }))}
                           className="w-full bg-muted/40 border border-border/60 rounded-md px-2 py-1.5 text-xs outline-none text-foreground h-8">
                           {["Startup (<50)", "SMB (50-250)", "Mid-Market (250-1000)", "Enterprise (1000+)"].map(s => <option key={s}>{s}</option>)}
                         </select>
                       </div>
                       <div className="space-y-1">
                         <Label className="text-[10px]">Location</Label>
-                        <Input value={company.location || ""} onChange={e => setCompany(c => ({ ...c, location: e.target.value }))}
+                        <Input value={company.location || ""} onChange={e => setCompany((c: Partial<CompanyContext>) => ({ ...c, location: e.target.value }))}
                           placeholder="e.g. San Francisco" className="h-8 text-xs bg-muted/40 border-border/60" />
                       </div>
                     </div>
                     <div className="space-y-1">
                       <Label className="text-[10px]">Recent News / Trigger Event <span className="text-muted-foreground/50">(optional)</span></Label>
-                      <Input value={company.recent_news || ""} onChange={e => setCompany(c => ({ ...c, recent_news: e.target.value }))}
+                      <Input value={company.recent_news || ""} onChange={e => setCompany((c: Partial<CompanyContext>) => ({ ...c, recent_news: e.target.value }))}
                         placeholder="e.g. $200M cloud expansion, new product launch, IPO..." className="h-8 text-xs bg-muted/40 border-border/60" />
                     </div>
                   </div>
@@ -338,11 +351,11 @@ export default function AiMessagingPage() {
                 </Button>
 
                 {/* Industry Pain Points Quick Reference */}
-                {company.industry && (
+                {company.industry && painPoints.length > 0 && (
                   <Card className="border-border/40 bg-muted/20 p-3 space-y-2">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground">{company.industry} — Key Pain Points</p>
                     <ul className="space-y-1">
-                      {aiMessageServices.getIndustryPainPoints(company.industry).map(p => (
+                      {painPoints.map((p: string) => (
                         <li key={p} className="text-[11px] text-muted-foreground flex items-start gap-1.5">
                           <ChevronRight className="h-3 w-3 text-indigo-400 shrink-0 mt-0.5" /> {p}
                         </li>
@@ -406,7 +419,7 @@ export default function AiMessagingPage() {
 
                     {/* Message Cards */}
                     <div className="space-y-4">
-                      {displayedMessages.map((msg, idx) => {
+                      {displayedMessages.map((msg) => {
                         const globalIdx = editableMessages.findIndex(m => m.type === msg.type);
                         return (
                           <MessageCard key={msg.type} msg={msg} editable={true}

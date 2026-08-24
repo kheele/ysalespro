@@ -6,10 +6,14 @@ import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
 import { CommandPalette } from "@/components/layout/command-palette";
 import {
-  outreachServices,
+  getOutreachActivitiesActionByToken,
+  logOutreachActionByToken,
+} from "@/services/private/outreachServices";
+import type {
   OutreachActivity,
   OutreachChannel,
-} from "@/services/outreachServices";
+} from "@/lib/types";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -71,10 +75,10 @@ function ActivityCard({ activity }: { activity: OutreachActivity }) {
 
   const formattedDate = React.useMemo(() => {
     try {
-      return new Date(activity.timestamp).toLocaleString("en-US", {
+      return new Date(activity.timestamp || activity.date || Date.now()).toLocaleString("en-US", {
         month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
       });
-    } catch { return activity.date; }
+    } catch { return activity.date || ""; }
   }, [activity]);
 
   const followupDate = React.useMemo(() => {
@@ -172,7 +176,7 @@ function ActivityCard({ activity }: { activity: OutreachActivity }) {
 
           {activity.tags && activity.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-1 border-t border-border/20">
-              {activity.tags.map(tag => (
+              {activity.tags.map((tag: string) => (
                 <Badge key={tag} variant="outline" className="text-[9px] bg-muted/30 font-mono px-1.5">
                   #{tag}
                 </Badge>
@@ -216,37 +220,51 @@ function OutreachPageContent() {
     assigned_to: "Alex Rivers",
   });
 
+  const { user } = useAuth();
   const load = React.useCallback(async () => {
+    if (!user) return;
     setLoading(true);
-    const data = await outreachServices.getOutreachActivities({
-      channel: channelFilter === "all" ? undefined : channelFilter,
-      status: statusFilter === "all" ? undefined : statusFilter,
-      search: search || undefined,
-      assigned_to: assignedFilter === "all" ? undefined : assignedFilter,
-    });
-    setActivities(data);
-    setLoading(false);
-  }, [channelFilter, statusFilter, search, assignedFilter]);
+    try {
+      const token = await user.getIdToken(true);
+      const data = await getOutreachActivitiesActionByToken(token, {
+        channel: channelFilter === "all" ? undefined : channelFilter,
+        status: statusFilter === "all" ? undefined : statusFilter,
+        search: search || undefined,
+        assigned_to: assignedFilter === "all" ? undefined : assignedFilter,
+      });
+      setActivities(data || []);
+    } catch (e) {
+      console.error("Failed to load outreach activities:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, channelFilter, statusFilter, search, assignedFilter]);
 
   React.useEffect(() => { load(); }, [load]);
 
   const handleCompose = async (e: React.FormEvent) => {
     e.preventDefault();
-    await outreachServices.logOutreach({
-      channel: form.channel,
-      recipient_name: form.recipient_name,
-      recipient_org: form.recipient_org,
-      recipient_email: form.recipient_email,
-      recipient_title: form.recipient_title,
-      subject: form.subject,
-      message: form.message,
-      next_followup: form.next_followup,
-      followup_days: Number(form.followup_days),
-      assigned_to: form.assigned_to,
-    });
-    setComposeOpen(false);
-    setForm(f => ({ ...f, recipient_name: "", recipient_email: prefilledEmail, subject: "", message: "", next_followup: "" }));
-    load();
+    if (!user) return;
+    try {
+      const token = await user.getIdToken(true);
+      await logOutreachActionByToken(token, {
+        channel: form.channel,
+        recipient_name: form.recipient_name,
+        recipient_org: form.recipient_org,
+        recipient_email: form.recipient_email,
+        recipient_title: form.recipient_title,
+        subject: form.subject,
+        message: form.message,
+        next_followup: form.next_followup,
+        followup_days: Number(form.followup_days),
+        assigned_to: form.assigned_to,
+      });
+      setComposeOpen(false);
+      setForm(f => ({ ...f, recipient_name: "", recipient_email: prefilledEmail, subject: "", message: "", next_followup: "" }));
+      load();
+    } catch (e) {
+      console.error("Failed to log outreach activity:", e);
+    }
   };
 
   // Channel tab counts
