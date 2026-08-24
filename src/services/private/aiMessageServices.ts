@@ -23,8 +23,8 @@ export async function getIndustryPainPoints(industry: string): Promise<string[]>
 export async function generateMessages(
   person: PersonContext,
   company: CompanyContext,
-  senderName: string = "Alex Rivers",
-  senderTitle: string = "Sales Director, YSalesPro"
+  senderName: string = "Sales Executive",
+  senderTitle: string = "Sales Representative"
 ): Promise<MessageGenerationResult> {
   const result = await generateSalesOutreachFlow({
     person,

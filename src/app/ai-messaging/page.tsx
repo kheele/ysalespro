@@ -1,16 +1,23 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
 import { CommandPalette } from "@/components/layout/command-palette";
 import * as aiMessageServices from "@/services/private/aiMessageServices";
+import { getDecisionMakers, getDecisionMakerById } from "@/services/public/peopleServices";
+import { getOrganizations, getOrganizationById } from "@/services/public/organizationServices";
+import { getIndustries } from "@/services/public/industryServices";
+import { useAuth } from "@/hooks/use-auth";
 import type {
   MessageType,
   PersonContext,
   CompanyContext,
   GeneratedMessage,
   MessageGenerationResult,
+  DecisionMaker,
+  Organization,
 } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,8 +27,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Sparkles, Mail, Phone, Linkedin, Copy, Check,
-  ChevronRight, User, Building2, Zap, RefreshCw,
+  ChevronRight, User, Building2, RefreshCw,
   Send, ArrowRight, MessageSquare, FileText,
+  Zap,
 } from "lucide-react";
 
 // ─── Message Type Metadata ────────────────────────────────────────────────────
@@ -73,10 +81,10 @@ function CopyBtn({ text }: { text: string }) {
 // ─── Message Card ─────────────────────────────────────────────────────────────
 function MessageCard({ msg, editable, onChange }: { msg: GeneratedMessage; editable: boolean; onChange: (content: string) => void }) {
   const [editing, setEditing] = React.useState(false);
-  const meta = MSG_META[msg.type];
+  const meta = MSG_META[msg.type] || MSG_META.initial_email;
 
   return (
-    <Card className={`${meta.border} bg-card marker:backdrop-blur-sm p-4 space-y-3 transition-all hover:bg-card/80`}>
+    <Card className={`${meta.border} bg-card p-4 space-y-3 transition-all hover:bg-card/80`}>
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
@@ -126,7 +134,7 @@ function MessageCard({ msg, editable, onChange }: { msg: GeneratedMessage; edita
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Filters ──────────────────────────────────────────────────────────────────
 const FILTERS: { label: string; types: MessageType[] }[] = [
   { label: "All Messages", types: ["email_subject", "initial_email", "followup_1", "followup_2", "final", "linkedin", "call_script"] },
   { label: "Email Sequence", types: ["email_subject", "initial_email", "followup_1", "followup_2", "final"] },
@@ -134,9 +142,10 @@ const FILTERS: { label: string; types: MessageType[] }[] = [
   { label: "Call Script", types: ["call_script"] },
 ];
 
-const INDUSTRIES = ["Cloud Infrastructure", "Cybersecurity", "Fintech & AI", "Healthcare Tech", "Logistics & Supply Chain", "Robotics & Automation", "Retail Tech", "Mining & Resources"];
+function AiMessagingContent() {
+  const { user, dbUser } = useAuth();
+  const searchParams = useSearchParams();
 
-export default function AiMessagingPage() {
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [result, setResult] = React.useState<MessageGenerationResult | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -144,22 +153,164 @@ export default function AiMessagingPage() {
   const [editableMessages, setEditableMessages] = React.useState<GeneratedMessage[]>([]);
   const [painPoints, setPainPoints] = React.useState<string[]>([]);
 
+  // Real Database Records
+  const [people, setPeople] = React.useState<DecisionMaker[]>([]);
+  const [companies, setCompanies] = React.useState<Organization[]>([]);
+  const [industryList, setIndustryList] = React.useState<string[]>([]);
+  const [, setLoadingDb] = React.useState(true);
+
+  // Selected entities
+  const [selectedPersonId, setSelectedPersonId] = React.useState<string>("");
+  const [selectedCompanyId, setSelectedCompanyId] = React.useState<string>("");
+
   const [person, setPerson] = React.useState<Partial<PersonContext>>({
-    first_name: "Sarah", last_name: "Jenkins", full_name: "Sarah Jenkins",
-    title: "Chief Technology Officer", department: "Engineering",
-    seniority: "C-Suite",
+    first_name: "",
+    last_name: "",
+    full_name: "",
+    title: "",
+    department: "Operations",
+    seniority: "VP",
   });
 
   const [company, setCompany] = React.useState<Partial<CompanyContext>>({
-    name: "Acme Enterprise Corp", industry: "Cloud Infrastructure",
-    size: "Enterprise (1000+)", location: "San Francisco", country: "USA",
-    recent_news: "Acme's recent $200M cloud expansion initiative",
+    name: "",
+    industry: "Technology",
+    size: "Mid-Market (250-1000)",
+    location: "",
+    country: "",
+    recent_news: "",
     challenges: [],
   });
 
-  const [senderName, setSenderName] = React.useState("Alex Rivers");
-  const [senderTitle, setSenderTitle] = React.useState("Sales Director, YSalesPro");
+  const [senderName, setSenderName] = React.useState("");
+  const [senderTitle, setSenderTitle] = React.useState("");
 
+  // Sync authenticated user profile as sender
+  React.useEffect(() => {
+    if (dbUser || user) {
+      const fullName = dbUser?.fname || dbUser?.lname
+        ? `${dbUser?.fname || ""} ${dbUser?.lname || ""}`.trim()
+        : user?.displayName || "";
+      const companyName = dbUser?.account_company?.name || "";
+      const role = dbUser?.role || "Sales Representative";
+      const title = companyName ? `${role}, ${companyName}` : role;
+
+      if (fullName) setSenderName(fullName);
+      if (title) setSenderTitle(title);
+    }
+  }, [user, dbUser]);
+
+  const applyPersonData = React.useCallback((p: DecisionMaker) => {
+    setSelectedPersonId(String(p.id));
+    const names = (p.name || "").trim().split(" ");
+    const firstName = names[0] || "";
+    const lastName = names.slice(1).join(" ") || "";
+    setPerson({
+      first_name: firstName,
+      last_name: lastName,
+      full_name: p.name || "",
+      title: p.job_title || p.title || "Executive",
+      department: p.department || "Operations",
+      seniority: (["C-Suite", "VP", "Director", "Manager", "Individual Contributor"].includes(p.seniority || "")
+        ? (p.seniority as any)
+        : "VP"),
+    });
+
+    if (p.company_name || p.company?.name) {
+      const compName = p.company_name || p.company?.name || "";
+      const compInd = p.industry || p.company?.primary_industry || "";
+      const compLoc = p.location || p.city || p.country || "";
+      setCompany(c => ({
+        ...c,
+        name: compName || c.name || "",
+        industry: compInd || c.industry || "Technology",
+        location: compLoc || c.location || "",
+        country: p.country || c.country || "",
+      }));
+    }
+  }, []);
+
+  const applyCompanyData = React.useCallback((org: Organization) => {
+    setSelectedCompanyId(String(org.id));
+    const employees = org.estimated_num_employees || org.employee_count || 0;
+    const size: CompanyContext["size"] = employees >= 1000
+      ? "Enterprise (1000+)"
+      : employees >= 250
+      ? "Mid-Market (250-1000)"
+      : employees >= 50
+      ? "SMB (50-250)"
+      : "Startup (<50)";
+
+    const loc = [org.city, org.state, org.country].filter(Boolean).join(", ") || org.headquarters_location || org.location || "";
+
+    setCompany({
+      name: org.name,
+      industry: org.primary_industry || org.industry || "Technology",
+      size,
+      location: loc,
+      country: org.country || "",
+      recent_news: org.intent_signal_account || (org.show_intent ? `High buying intent detected (${org.intent_strength || "Strong"} signal)` : ""),
+      challenges: (org.keywords_list || []).map(k => k.keyword?.name).filter(Boolean) as string[],
+    });
+  }, []);
+
+  // Fetch real data from Hasura GraphQL backend
+  React.useEffect(() => {
+    async function loadRealData() {
+      setLoadingDb(true);
+      try {
+        const [peopleRes, orgsRes, indRes] = await Promise.allSettled([
+          getDecisionMakers({ limit: 60 }),
+          getOrganizations({ limit: 60 }),
+          getIndustries({ limit: 60 }),
+        ]);
+
+        const loadedPeople = peopleRes.status === "fulfilled" ? peopleRes.value.people || [] : [];
+        const loadedOrgs = orgsRes.status === "fulfilled" ? orgsRes.value.organizations || [] : [];
+        const loadedInds = indRes.status === "fulfilled"
+          ? (indRes.value.industries || []).map(i => i.name).filter(Boolean)
+          : [];
+
+        setPeople(loadedPeople);
+        setCompanies(loadedOrgs);
+        if (loadedInds.length > 0) {
+          setIndustryList(loadedInds);
+        }
+
+        const paramPersonId = searchParams?.get("person_id");
+        const paramCompanyId = searchParams?.get("company_id");
+
+        if (paramPersonId) {
+          const matchPerson = loadedPeople.find(p => String(p.id) === String(paramPersonId));
+          if (matchPerson) {
+            applyPersonData(matchPerson);
+          } else {
+            getDecisionMakerById(paramPersonId).then(p => {
+              if (p) applyPersonData(p);
+            });
+          }
+        } else if (paramCompanyId) {
+          const matchOrg = loadedOrgs.find(o => String(o.id) === String(paramCompanyId));
+          if (matchOrg) {
+            applyCompanyData(matchOrg);
+          } else {
+            getOrganizationById(paramCompanyId).then(o => {
+              if (o) applyCompanyData(o);
+            });
+          }
+        } else if (loadedPeople.length > 0) {
+          applyPersonData(loadedPeople[0]);
+        }
+      } catch (err) {
+        console.error("Failed to load real data for AI messaging:", err);
+      } finally {
+        setLoadingDb(false);
+      }
+    }
+    loadRealData();
+  }, [searchParams, applyPersonData, applyCompanyData]);
+
+  // Load real industry pain points dynamically
   React.useEffect(() => {
     if (company.industry) {
       aiMessageServices.getIndustryPainPoints(company.industry)
@@ -174,7 +325,7 @@ export default function AiMessagingPage() {
     const fullPerson: PersonContext = {
       first_name: person.first_name || "",
       last_name: person.last_name || "",
-      full_name: person.full_name || `${person.first_name} ${person.last_name}`,
+      full_name: person.full_name || `${person.first_name} ${person.last_name}`.trim(),
       title: person.title || "Decision Maker",
       department: person.department || "Operations",
       seniority: person.seniority || "VP",
@@ -183,12 +334,17 @@ export default function AiMessagingPage() {
       name: company.name || "",
       industry: company.industry || "Technology",
       size: company.size || "Mid-Market (250-1000)",
-      location: company.location || "New York",
-      country: company.country || "USA",
+      location: company.location || "",
+      country: company.country || "",
       recent_news: company.recent_news,
       challenges: company.challenges,
     };
-    const res = await aiMessageServices.generateMessages(fullPerson, fullCompany, senderName, senderTitle);
+    const res = await aiMessageServices.generateMessages(
+      fullPerson,
+      fullCompany,
+      senderName || "Sales Executive",
+      senderTitle || "Enterprise Account Executive"
+    );
     setResult(res);
     setEditableMessages(res.messages);
     setLoading(false);
@@ -209,7 +365,7 @@ export default function AiMessagingPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <SalesProHeader
           title="AI Personalized Messaging"
-          subtitle="Generate hyper-personalized emails, LinkedIn messages, and call scripts using company and person intelligence"
+          subtitle="Generate hyper-personalized emails, LinkedIn messages, and call scripts using live database intelligence"
           onOpenCommandPalette={() => setCommandOpen(true)}
         />
 
@@ -220,29 +376,42 @@ export default function AiMessagingPage() {
               {/* ─── LEFT: Context Form ──────────────────────────────────── */}
               <div className="space-y-4">
 
-                {/* Before / After Example */}
-                <Card className=" bg-indigo-500/5 p-4 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-indigo-300">
-                    <Sparkles className="h-4 w-4" /> Personalization Engine
-                  </div>
-                  <div className="space-y-2 text-[11px]">
-                    <div className="p-2.5 bg-muted/30 rounded-lg border border-border/30 text-muted-foreground">
-                      <span className="text-[9px] font-bold uppercase text-red-400/80 block mb-1">❌ Generic</span>
-                      "Hello John, we help companies improve safety."
-                    </div>
-                    <div className="p-2.5 bg-emerald-500/5 rounded-lg border border-emerald-500/20 text-foreground leading-relaxed">
-                      <span className="text-[9px] font-bold uppercase text-emerald-400 block mb-1">✓ Personalized</span>
-                      "Hello John, companies in the mining sector often struggle with contractor compliance, incident reporting, and audit readiness. Our platform helps operations teams manage these areas centrally."
-                    </div>
-                  </div>
-                </Card>
-
                 {/* Person Context */}
                 <Card className="bg-card p-4 space-y-3">
-                  <div className="flex items-center gap-1.5 text-xs font-bold">
-                    <User className="h-3.5 w-3.5 text-indigo-400" /> Person Context
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold">
+                      <User className="h-3.5 w-3.5 text-indigo-400" /> Person Context
+                    </div>
+                    {people.length > 0 && (
+                      <Badge variant="outline" className="text-[9px] bg-indigo-500/10 text-indigo-400 border-indigo-500/20 font-mono">
+                        {people.length} Live Contacts
+                      </Badge>
+                    )}
                   </div>
-                  <div className="space-y-2.5 text-xs">
+
+                  {/* Real Contact Dropdown Picker */}
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground font-semibold">
+                      Load Contact from Database
+                    </Label>
+                    <select
+                      value={selectedPersonId}
+                      onChange={(e) => {
+                        const sel = people.find(p => String(p.id) === e.target.value);
+                        if (sel) applyPersonData(sel);
+                      }}
+                      className="w-full bg-muted/40 border border-border/60 rounded-md px-2 py-1.5 text-xs outline-none text-foreground h-8 truncate font-medium"
+                    >
+                      <option value="">Choose a contact</option>
+                      {people.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.title || p.job_title || "Executive"} · {p.company_name || "Company"})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2.5 text-xs pt-1 border-t border-border/30">
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
                         <Label className="text-[10px]">First Name</Label>
@@ -258,15 +427,15 @@ export default function AiMessagingPage() {
                     <div className="space-y-1">
                       <Label className="text-[10px]">Job Title</Label>
                       <Input value={person.title || ""} onChange={e => setPerson((p: Partial<PersonContext>) => ({ ...p, title: e.target.value }))}
-                        placeholder="e.g. Chief Technology Officer" className="h-8 text-xs bg-muted/40 border-border/60" />
+                        className="h-8 text-xs bg-muted/40 border-border/60" />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
                         <Label className="text-[10px]">Department</Label>
-                        <select value={person.department || "Engineering"}
+                        <select value={person.department || "Operations"}
                           onChange={e => setPerson((p: Partial<PersonContext>) => ({ ...p, department: e.target.value }))}
                           className="w-full bg-muted/40 border border-border/60 rounded-md px-2 py-1.5 text-xs outline-none text-foreground h-8">
-                          {["Operations", "Engineering", "Finance", "Sales", "Marketing", "IT", "Legal", "HR", "Security"].map(d => <option key={d}>{d}</option>)}
+                          {["Operations", "Engineering", "Finance", "Sales", "Marketing", "IT", "Legal", "HR", "Security", "Procurement"].map(d => <option key={d}>{d}</option>)}
                         </select>
                       </div>
                       <div className="space-y-1">
@@ -283,21 +452,51 @@ export default function AiMessagingPage() {
 
                 {/* Company Context */}
                 <Card className="bg-card p-4 space-y-3">
-                  <div className="flex items-center gap-1.5 text-xs font-bold">
-                    <Building2 className="h-3.5 w-3.5 text-purple-400" /> Company Context
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold">
+                      <Building2 className="h-3.5 w-3.5 text-purple-400" /> Company Context
+                    </div>
+                    {companies.length > 0 && (
+                      <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-400 border-purple-500/20 font-mono">
+                        {companies.length} Live Orgs
+                      </Badge>
+                    )}
                   </div>
-                  <div className="space-y-2.5 text-xs">
+
+                  {/* Real Company Dropdown Picker */}
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground font-semibold">
+                      Load Organization from Database
+                    </Label>
+                    <select
+                      value={selectedCompanyId}
+                      onChange={(e) => {
+                        const sel = companies.find(c => String(c.id) === e.target.value);
+                        if (sel) applyCompanyData(sel);
+                      }}
+                      className="w-full bg-muted/40 border border-border/60 rounded-md px-2 py-1.5 text-xs outline-none text-foreground h-8 truncate font-medium"
+                    >
+                      <option value="">Choose an organization</option>
+                      {companies.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.primary_industry || c.industry || "General"} · {c.city || c.country || "Global"})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2.5 text-xs pt-1 border-t border-border/30">
                     <div className="space-y-1">
                       <Label className="text-[10px]">Company Name</Label>
                       <Input value={company.name || ""} onChange={e => setCompany((c: Partial<CompanyContext>) => ({ ...c, name: e.target.value }))}
-                        placeholder="e.g. Acme Enterprise Corp" className="h-8 text-xs bg-muted/40 border-border/60" />
+                        className="h-8 text-xs bg-muted/40 border-border/60" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-[10px]">Industry</Label>
                       <select value={company.industry || "Technology"}
                         onChange={e => setCompany((c: Partial<CompanyContext>) => ({ ...c, industry: e.target.value }))}
                         className="w-full bg-muted/40 border border-border/60 rounded-md px-2 py-1.5 text-xs outline-none text-foreground h-8">
-                        {INDUSTRIES.map(i => <option key={i}>{i}</option>)}
+                        {(industryList.length > 0 ? industryList : ["Mining & Metals", "Heavy Manufacturing", "Construction", "Engineering", "Technology", "Logistics & Supply Chain", "Energy", "Financial Services"]).map(i => <option key={i}>{i}</option>)}
                       </select>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -312,21 +511,28 @@ export default function AiMessagingPage() {
                       <div className="space-y-1">
                         <Label className="text-[10px]">Location</Label>
                         <Input value={company.location || ""} onChange={e => setCompany((c: Partial<CompanyContext>) => ({ ...c, location: e.target.value }))}
-                          placeholder="e.g. San Francisco" className="h-8 text-xs bg-muted/40 border-border/60" />
+                          className="h-8 text-xs bg-muted/40 border-border/60" />
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[10px]">Recent News / Trigger Event <span className="text-muted-foreground/50">(optional)</span></Label>
+                      <Label className="text-[10px]">Recent News / Trigger Event</Label>
                       <Input value={company.recent_news || ""} onChange={e => setCompany((c: Partial<CompanyContext>) => ({ ...c, recent_news: e.target.value }))}
-                        placeholder="e.g. $200M cloud expansion, new product launch, IPO..." className="h-8 text-xs bg-muted/40 border-border/60" />
+                        className="h-8 text-xs bg-muted/40 border-border/60" />
                     </div>
                   </div>
                 </Card>
 
                 {/* Sender Identity */}
                 <Card className="bg-card p-4 space-y-3">
-                  <div className="flex items-center gap-1.5 text-xs font-bold">
-                    <Send className="h-3.5 w-3.5 text-emerald-400" /> Sender Identity
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold">
+                      <Send className="h-3.5 w-3.5 text-emerald-400" /> Sender Identity
+                    </div>
+                    {dbUser && (
+                      <Badge variant="outline" className="text-[9px] bg-emerald-500/10 text-emerald-400 border-emerald-500/20 font-mono">
+                        Authenticated
+                      </Badge>
+                    )}
                   </div>
                   <div className="space-y-2.5 text-xs">
                     <div className="space-y-1">
@@ -344,7 +550,7 @@ export default function AiMessagingPage() {
                 <Button onClick={handleGenerate} disabled={loading || !person.first_name || !company.name}
                   className="w-full h-11 gap-2 font-bold text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white disabled:opacity-50 shadow-lg shadow-indigo-500/20">
                   {loading ? (
-                    <><RefreshCw className="h-4 w-4 animate-spin" /> Generating…</>
+                    <><RefreshCw className="h-4 w-4 animate-spin" /> Generating Outreach…</>
                   ) : (
                     <><Sparkles className="h-4 w-4" /> Generate Personalized Messages</>
                   )}
@@ -371,15 +577,15 @@ export default function AiMessagingPage() {
                   <>
                     {/* Stats Bar */}
                     <div className="grid grid-cols-3 gap-3">
-                      <Card className="border-border/50 bg-card/60 p-3 text-center">
+                      <Card className="border-border/50 bg-card p-3 text-center">
                         <div className="text-xl font-extrabold font-mono text-indigo-300">{avgScore}</div>
                         <div className="text-[10px] text-muted-foreground">Avg Personalization Score</div>
                       </Card>
-                      <Card className="border-border/50 bg-card/60 p-3 text-center">
+                      <Card className="border-border/50 bg-card p-3 text-center">
                         <div className="text-xl font-extrabold font-mono text-emerald-400">{editableMessages.length}</div>
                         <div className="text-[10px] text-muted-foreground">Messages Generated</div>
                       </Card>
-                      <Card className="border-border/50 bg-card/60 p-3 text-center">
+                      <Card className="border-border/50 bg-card p-3 text-center">
                         <div className="text-xl font-extrabold font-mono text-purple-400">
                           {new Set(editableMessages.flatMap(m => m.hooks_used)).size}
                         </div>
@@ -388,7 +594,7 @@ export default function AiMessagingPage() {
                     </div>
 
                     {/* Context Summary */}
-                    <div className="flex flex-wrap items-center gap-2 p-3 bg-card/40 border border-border/40 rounded-xl text-[10px]">
+                    <div className="flex flex-wrap items-center gap-2 p-3 bg-card border border-border/40 rounded-xl text-[10px]">
                       <span className="font-bold text-foreground">{result.person.full_name}</span>
                       <ChevronRight className="h-3 w-3 text-muted-foreground/40" />
                       <span className="text-muted-foreground">{result.person.title}</span>
@@ -437,7 +643,7 @@ export default function AiMessagingPage() {
                     <div className="space-y-2">
                       <p className="text-sm font-bold">Ready to Generate</p>
                       <p className="text-xs text-muted-foreground max-w-xs">
-                        Fill in the person and company context on the left, then click <strong>Generate</strong> to create 7 personalized messages.
+                        Select a contact or organization from the database on the left, then click <strong>Generate</strong> to create 7 personalized messages.
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-[11px] text-left w-full max-w-xs">
@@ -452,7 +658,7 @@ export default function AiMessagingPage() {
                         </div>
                       ))}
                     </div>
-                    <Button onClick={handleGenerate} disabled={loading}
+                    <Button onClick={handleGenerate} disabled={loading || !person.first_name || !company.name}
                       className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold gap-2 shadow-lg shadow-indigo-500/20">
                       <Sparkles className="h-4 w-4" /> Generate Now
                     </Button>
@@ -466,5 +672,13 @@ export default function AiMessagingPage() {
 
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
     </div>
+  );
+}
+
+export default function AiMessagingPage() {
+  return (
+    <React.Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center text-xs text-muted-foreground">Loading AI messaging engine...</div>}>
+      <AiMessagingContent />
+    </React.Suspense>
   );
 }
