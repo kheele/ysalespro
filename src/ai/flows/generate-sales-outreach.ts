@@ -1,26 +1,20 @@
 'use server';
 
 /**
- * @fileOverview Hyper-personalized B2B sales outreach generation and industry analysis using Google Gemini API.
+ * @fileOverview Hyper-personalized B2B sales outreach generation and industry analysis using Genkit.
  */
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { ai } from '@/ai/genkit';
 import type { AIMessageRequest, AIMessageResponse } from '@/lib/types';
-import type {
-  GenerateSalesOutreachInput,
-  GenerateSalesOutreachOutput,
-  IndustryPainPointsInput,
-  IndustryPainPointsOutput,
+import {
+  type GenerateSalesOutreachInput,
+  type GenerateSalesOutreachOutput,
+  type IndustryPainPointsInput,
+  type IndustryPainPointsOutput,
+  GenerateSalesOutreachInputSchema,
+  GenerateSalesOutreachOutputSchema,
+  IndustryPainPointsInputSchema,
+  IndustryPainPointsOutputSchema,
 } from '@/ai/schemas/sales-outreach';
-
-function getGeminiClient(): GoogleGenerativeAI | null {
-  const apiKey =
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_GENAI_API_KEY ||
-    process.env.GOOGLE_API_KEY ||
-    '';
-  if (!apiKey) return null;
-  return new GoogleGenerativeAI(apiKey);
-}
 
 function generateFallbackOutreach(input: GenerateSalesOutreachInput): GenerateSalesOutreachOutput {
   const personName = input.person.first_name || input.person.name || input.person.full_name || 'there';
@@ -118,15 +112,15 @@ function generateFallbackOutreach(input: GenerateSalesOutreachInput): GenerateSa
   };
 }
 
-export async function generateSalesOutreachFlow(input: GenerateSalesOutreachInput): Promise<GenerateSalesOutreachOutput> {
-  const genAI = getGeminiClient();
-  if (!genAI) {
-    return generateFallbackOutreach(input);
-  }
-
-  try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const prompt = `You are an elite B2B Sales Outreach Strategist and Copywriter.
+export const generateSalesOutreachFlow = ai.defineFlow(
+  {
+    name: 'generateSalesOutreachFlow',
+    inputSchema: GenerateSalesOutreachInputSchema,
+    outputSchema: GenerateSalesOutreachOutputSchema,
+  },
+  async (input) => {
+    try {
+      const prompt = `You are an elite B2B Sales Outreach Strategist and Copywriter.
 Generate a complete, hyper-personalized sales outreach sequence in JSON format.
 
 PROSPECT CONTEXT:
@@ -146,120 +140,61 @@ SENDER CONTEXT:
 - Sender Name: ${input.senderName || 'Sales Operations'}
 - Sender Title: ${input.senderTitle || 'Account Executive'}
 
-Format your response as a valid JSON object matching this structure:
-{
-  "industry_matched": "${input.company.industry}",
-  "messages": [
-    {
-      "type": "email_subject",
-      "label": "Subject Line Options",
-      "content": "...",
-      "personalization_score": 94,
-      "rationale": "...",
-      "hooks_used": ["..."]
-    },
-    {
-      "type": "initial_email",
-      "label": "Initial Cold Email",
-      "subject": "...",
-      "content": "...",
-      "personalization_score": 95,
-      "rationale": "...",
-      "hooks_used": ["..."]
-    },
-    {
-      "type": "followup_1",
-      "label": "Value-Add Follow-up",
-      "subject": "...",
-      "content": "...",
-      "personalization_score": 93,
-      "rationale": "...",
-      "hooks_used": ["..."]
-    },
-    {
-      "type": "followup_2",
-      "label": "Case Study Pitch",
-      "subject": "...",
-      "content": "...",
-      "personalization_score": 92,
-      "rationale": "...",
-      "hooks_used": ["..."]
-    },
-    {
-      "type": "final",
-      "label": "Breakup Email",
-      "subject": "...",
-      "content": "...",
-      "personalization_score": 91,
-      "rationale": "...",
-      "hooks_used": ["..."]
-    },
-    {
-      "type": "linkedin",
-      "label": "LinkedIn Connection Note",
-      "content": "...",
-      "personalization_score": 96,
-      "rationale": "...",
-      "hooks_used": ["..."]
-    },
-    {
-      "type": "call_script",
-      "label": "Cold Call Script",
-      "content": "...",
-      "personalization_score": 94,
-      "rationale": "...",
-      "hooks_used": ["..."]
-    }
-  ]
-}`;
+Generate exactly 7 messages (email_subject, initial_email, followup_1, followup_2, final, linkedin, call_script) with personalized hooks.`;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    const cleanJson = text.replace(/```json\s*/g, '').replace(/```\s*$/g, '').trim();
-    const parsed = JSON.parse(cleanJson);
+      const response = await ai.generate({
+        prompt,
+        output: { schema: GenerateSalesOutreachOutputSchema },
+      });
 
-    if (parsed && Array.isArray(parsed.messages) && parsed.messages.length > 0) {
-      return {
-        generated_at: new Date().toISOString(),
-        industry_matched: parsed.industry_matched || input.company.industry,
-        person: input.person,
-        company: input.company,
-        messages: parsed.messages,
-      };
+      if (response.output) {
+        return {
+          ...response.output,
+          generated_at: response.output.generated_at || new Date().toISOString(),
+          industry_matched: response.output.industry_matched || input.company.industry,
+          person: input.person,
+          company: input.company,
+        };
+      }
+
+      return generateFallbackOutreach(input);
+    } catch (err) {
+      console.warn('[Genkit] generateSalesOutreachFlow fallback:', err);
+      return generateFallbackOutreach(input);
     }
-  } catch (err) {
-    console.warn('[Gemini] generateSalesOutreachFlow fallback:', err);
   }
+);
 
-  return generateFallbackOutreach(input);
-}
-
-export async function getIndustryPainPointsFlow(input: IndustryPainPointsInput): Promise<IndustryPainPointsOutput> {
-  const genAI = getGeminiClient();
-  if (genAI) {
+export const getIndustryPainPointsFlow = ai.defineFlow(
+  {
+    name: 'getIndustryPainPointsFlow',
+    inputSchema: IndustryPainPointsInputSchema,
+    outputSchema: IndustryPainPointsOutputSchema,
+  },
+  async (input) => {
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      const prompt = `Return a JSON object with exactly 3 concise, highly realistic operational pain points for the industry: "${input.industry}". Format: {"pain_points": ["...", "...", "..."]}`;
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const cleanJson = text.replace(/```json\s*/g, '').replace(/```\s*$/g, '').trim();
-      const parsed = JSON.parse(cleanJson);
-      if (parsed && Array.isArray(parsed.pain_points) && parsed.pain_points.length > 0) {
-        return parsed;
+      const prompt = `Return 3 concise, highly realistic operational and regulatory pain points for the industry: "${input.industry}".`;
+      const response = await ai.generate({
+        prompt,
+        output: { schema: IndustryPainPointsOutputSchema },
+      });
+
+      if (response.output?.pain_points?.length) {
+        return response.output;
       }
     } catch (err) {
-      console.warn('[Gemini] getIndustryPainPointsFlow fallback:', err);
+      console.warn('[Genkit] getIndustryPainPointsFlow fallback:', err);
     }
-  }
 
-  return {
-    pain_points: [
-      `Operational efficiency and qualification bottlenecks in ${input.industry}`,
-      `Compliance, governance, and audit readiness across ${input.industry} workflows`,
-      `Fragmented decision-maker telemetry and sales cycle delays in ${input.industry}`,
-    ],
-  };
-}
+    return {
+      pain_points: [
+        `Operational efficiency and qualification bottlenecks in ${input.industry}`,
+        `Compliance, governance, and audit readiness across ${input.industry} workflows`,
+        `Fragmented prospect data and sales cycle delays in ${input.industry}`,
+      ],
+    };
+  }
+);
 
 export async function generateSingleMessageFlow(req: AIMessageRequest): Promise<AIMessageResponse> {
   const { company, person, message_type } = req;
@@ -268,11 +203,8 @@ export async function generateSingleMessageFlow(req: AIMessageRequest): Promise<
   const role = person.role || 'Executive';
   const name = person.name || 'Colleague';
 
-  const genAI = getGeminiClient();
-  if (genAI) {
-    try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      const prompt = `You are an elite B2B sales copywriter and strategist.
+  try {
+    const prompt = `You are an elite B2B sales copywriter and strategist.
 Generate a high-converting, personalized ${message_type} for:
 Prospect: ${name} (${role}, Department: ${person.department || 'Operations'}, Seniority: ${person.seniority || 'Executive'})
 Company: ${company.name} (Industry: ${industry}, Employees: ${company.employee_count || 'N/A'}, Location: ${location})
@@ -280,43 +212,44 @@ ${company.business_challenges?.length ? `Key challenges: ${company.business_chal
 
 Provide a compelling response.`;
 
-      const response = await model.generateContent(prompt);
-      const text = response.response.text();
-      return {
-        message_type,
-        subject: message_type.toLowerCase().includes('email') ? `Regarding ${company.name}'s ${industry} initiatives` : undefined,
-        content: text,
-        key_hooks_used: [company.name, industry, role],
-      };
-    } catch (err) {
-      console.warn('[Gemini] generateSingleMessageFlow fallback:', err);
+    const response = await ai.generate({
+      prompt,
+    });
+
+    const text = response.text || '';
+    return {
+      message_type,
+      subject: message_type.toLowerCase().includes('email') ? `Regarding ${company.name}'s ${industry} initiatives` : undefined,
+      content: text,
+      key_hooks_used: [company.name, industry, role],
+    };
+  } catch (err) {
+    console.warn('[Genkit] generateSingleMessageFlow fallback:', err);
+    const hooks = [
+      `${industry} workflow optimization`,
+      `operations at ${company.name}`,
+      `${role} leadership in ${location}`,
+    ];
+
+    let subject = `Quick question regarding ${company.name}'s ${industry.toLowerCase()} operations`;
+    let content = `Hi ${name},\n\nGiven your role leading ${person.department || 'initiatives'} as ${role} at ${company.name}, I wanted to reach out regarding ${hooks[0]}.\n\nOur platform helps ${industry} teams in ${location} streamline data qualification and reduce manual overhead by 35%.\n\nWould you be open to a brief 10-minute introductory call next week?\n\nBest regards,\nYSalesPro Intelligence`;
+
+    if (message_type === 'LinkedIn Message') {
+      subject = '';
+      content = `Hi ${name}, noticed your leadership as ${role} at ${company.name}. We work with ${industry} teams on ${hooks[0]} and would love to connect!`;
+    } else if (message_type === 'Follow-up') {
+      subject = `Re: ${company.name}'s ${industry.toLowerCase()} operations`;
+      content = `Hi ${name},\n\nFollowing up on my note regarding ${hooks[0]} at ${company.name}. Peer organizations in ${location} have seen substantial gains in team productivity.\n\nWould Thursday work for a brief call?\n\nBest,\nYSalesPro Intelligence`;
+    } else if (message_type === 'Call Script') {
+      subject = '';
+      content = `[COLD CALL SCRIPT FOR ${name.toUpperCase()} (${role.toUpperCase()} @ ${company.name.toUpperCase()})]\nOpening: "Hi ${name}, reaching out because of your leadership at ${company.name} in ${industry}."\nDiscovery: "How are your teams currently handling ${hooks[0]} across ${location}?"\nValue: "We help ${industry} enterprises streamline operations with 100% audit readiness."`;
     }
+
+    return {
+      message_type,
+      subject: subject || undefined,
+      content,
+      key_hooks_used: hooks,
+    };
   }
-
-  const hooks = [
-    `${industry} workflow optimization`,
-    `operations at ${company.name}`,
-    `${role} leadership in ${location}`,
-  ];
-
-  let subject = `Quick question regarding ${company.name}'s ${industry.toLowerCase()} operations`;
-  let content = `Hi ${name},\n\nGiven your role leading ${person.department || 'initiatives'} as ${role} at ${company.name}, I wanted to reach out regarding ${hooks[0]}.\n\nOur platform helps ${industry} teams in ${location} streamline data qualification and reduce manual overhead by 35%.\n\nWould you be open to a brief 10-minute introductory call next week?\n\nBest regards,\nYSalesPro Intelligence`;
-
-  if (message_type === 'LinkedIn Message') {
-    subject = '';
-    content = `Hi ${name}, noticed your leadership as ${role} at ${company.name}. We work with ${industry} teams on ${hooks[0]} and would love to connect!`;
-  } else if (message_type === 'Follow-up') {
-    subject = `Re: ${company.name}'s ${industry.toLowerCase()} operations`;
-    content = `Hi ${name},\n\nFollowing up on my note regarding ${hooks[0]} at ${company.name}. Peer organizations in ${location} have seen substantial gains in team productivity.\n\nWould Thursday work for a brief call?\n\nBest,\nYSalesPro Intelligence`;
-  } else if (message_type === 'Call Script') {
-    subject = '';
-    content = `[COLD CALL SCRIPT FOR ${name.toUpperCase()} (${role.toUpperCase()} @ ${company.name.toUpperCase()})]\nOpening: "Hi ${name}, reaching out because of your leadership at ${company.name} in ${industry}."\nDiscovery: "How are your teams currently handling ${hooks[0]} across ${location}?"\nValue: "We help ${industry} enterprises streamline operations with 100% audit readiness."`;
-  }
-
-  return {
-    message_type,
-    subject: subject || undefined,
-    content,
-    key_hooks_used: hooks,
-  };
 }
