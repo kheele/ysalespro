@@ -1,6 +1,6 @@
 'use server';
 
-import { listGraphQL, getGraphQLOne } from "@/graphql";
+import { sendGraphQL, getGraphQLOne } from "@/graphql";
 import { DecisionMaker } from "@/lib/types";
 
 const DECISION_MAKER_FIELDS = `
@@ -187,26 +187,39 @@ export async function getDecisionMakers(params?: {
         ) {
           ${DECISION_MAKER_FIELDS}
         }
+        aa_s_people_aggregate(where: $where) {
+          aggregate {
+            count
+          }
+        }
       }
     `;
 
-    const res = await listGraphQL({
+    const res = await sendGraphQL({
       query,
       variables: {
         where,
         order_by,
-        limit: params?.limit || 100,
+        limit: params?.limit || 30,
         offset: params?.offset || 0,
       },
       operationName: "GetDecisionMakers",
+      multi_queries: true,
     });
 
-    const rawList = Array.isArray(res) ? res : [];
+    const {
+      aa_s_people: rawList,
+      aa_s_people_aggregate: { aggregate: { count: total } }
+    } = res || {
+      aa_s_people: [],
+      aa_s_people_aggregate: { aggregate: { count: 0 } }
+    };
+
     const people = rawList.map(mapDbDecisionMaker).filter(Boolean);
 
     return {
       people,
-      total: people.length,
+      total,
     };
   } catch (err) {
     console.error("Hasura peopleServices getDecisionMakers error:", err);

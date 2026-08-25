@@ -1,7 +1,19 @@
 'use server';
 
-import { listGraphQL, getGraphQLOne } from "@/graphql";
+import { sendGraphQL, getGraphQLOne } from "@/graphql";
 import { Keyword } from "@/lib/types";
+
+function mapDbKeyword(k: any): Keyword {
+  if (!k) return null as any;
+
+  const orgCount = k.organization_list_aggregate?.aggregate?.count || 0;
+  return {
+    id: k.id,
+    name: k.name,
+    organization_count: orgCount,
+    usage_count: orgCount,
+  };
+}
 
 export async function getKeywords(params?: {
   search?: string;
@@ -9,9 +21,15 @@ export async function getKeywords(params?: {
   offset?: number;
 }): Promise<{ keywords: Keyword[]; total: number }> {
   try {
+    const where: any = {};
+    if (params?.search && params.search.trim()) {
+      where.name = { _ilike: `%${params.search.trim()}%` };
+    }
+
     const query = `
-      query GetKeywords($limit: Int, $offset: Int) {
+      query GetKeywords($where: aa_s_keywords_bool_exp, $limit: Int, $offset: Int) {
         aa_s_keywords(
+          where: $where
           order_by: { name: asc }
           limit: $limit
           offset: $offset
@@ -24,35 +42,36 @@ export async function getKeywords(params?: {
             }
           }
         }
+        aa_s_keywords_aggregate(where: $where) {
+          aggregate {
+            count
+          }
+        }
       }
     `;
-    const res = await listGraphQL({
+
+    const res = await sendGraphQL({
       query,
       variables: {
-        limit: params?.limit || 100,
+        where: Object.keys(where).length > 0 ? where : undefined,
+        limit: params?.limit || 30,
         offset: params?.offset || 0,
       },
       operationName: "GetKeywords",
+      multi_queries: true,
     });
 
-    const rawList = Array.isArray(res) ? res : [];
+    const {
+      aa_s_keywords: rawList,
+      aa_s_keywords_aggregate: { aggregate: { count: total } }
+    } = res || {
+      aa_s_keywords: [],
+      aa_s_keywords_aggregate: { aggregate: { count: 0 } }
+    };
 
-    let items: Keyword[] = rawList.map((k: any) => {
-      const orgCount = k.organization_list_aggregate?.aggregate?.count || 0;
-      return {
-        id: k.id,
-        name: k.name,
-        organization_count: orgCount,
-        usage_count: orgCount,
-      };
-    });
+    const items: Keyword[] = rawList.map(mapDbKeyword).filter(Boolean);
 
-    if (params?.search) {
-      const s = params.search.toLowerCase();
-      items = items.filter(k => (k.name || "").toLowerCase().includes(s));
-    }
-
-    return { keywords: items, total: items.length };
+    return { keywords: items, total };
   } catch (err) {
     console.error("Hasura keywordServices error:", err);
     return { keywords: [], total: 0 };
@@ -84,13 +103,7 @@ export async function getKeywordById(id: string | number): Promise<Keyword | nul
     });
 
     if (item && item.id !== undefined) {
-      const orgCount = item.organization_list_aggregate?.aggregate?.count || 0;
-      return {
-        id: item.id,
-        name: item.name,
-        organization_count: orgCount,
-        usage_count: orgCount,
-      };
+      return mapDbKeyword(item);
     }
   } catch (err) {
     console.error("Hasura getKeywordById error:", err);

@@ -11,22 +11,24 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { DecisionMakerRow } from "./_components/decision-maker-row";
 import {
   Search,
   Users,
-  ArrowRight,
-  CheckCircle2,
-  XCircle,
   SlidersHorizontal,
   ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  Linkedin,
-  Mail,
-  Phone,
+  Filter,
 } from "lucide-react";
 
-const SENIORITY_OPTIONS = ["all", "C-Suite", "VP", "Director", "Manager", "Individual Contributor"];
+const SENIORITY_OPTIONS = [
+  "all",
+  "C-Suite",
+  "VP",
+  "Director",
+  "Manager",
+  "Individual Contributor",
+];
 const DEPARTMENT_OPTIONS = [
   "all",
   "Engineering & Technology",
@@ -55,25 +57,12 @@ const COMPANY_OPTIONS = [
   "Nexus Robotics Solutions",
 ];
 
-function ScoreRing({ score }: { score: number }) {
-  const color =
-    score >= 90
-      ? "text-emerald-400 border-emerald-400"
-      : score >= 75
-        ? "text-amber-400 border-amber-400"
-        : "text-blue-400 border-blue-400";
-  return (
-    <div
-      className={`h-9 w-9 rounded-full border-2 flex items-center justify-center font-bold text-[11px] font-mono shrink-0 ${color}`}
-    >
-      {score}
-    </div>
-  );
-}
+const DEFAULT_PAGE_SIZE = 30;
 
 export default function PeoplePage() {
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [people, setPeople] = React.useState<DecisionMaker[]>([]);
+  const [total, setTotal] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
 
   // Filters
@@ -84,44 +73,35 @@ export default function PeoplePage() {
   const [filterSeniority, setFilterSeniority] = React.useState("all");
   const [filterLocation, setFilterLocation] = React.useState("");
 
-  // Sorting
-  const [sortBy, setSortBy] = React.useState("score");
+  // Sort
+  const [sortBy, setSortBy] = React.useState<string>("score");
   const [sortOrder, setSortOrder] = React.useState<"asc" | "desc">("desc");
 
   // Pagination
   const [currentPage, setCurrentPage] = React.useState(1);
-  const [pageSize] = React.useState(10);
+  const [pageSize, setPageSize] = React.useState(DEFAULT_PAGE_SIZE);
 
   const load = React.useCallback(async () => {
     setLoading(true);
-    const { people } = await peopleServices.getDecisionMakers({
+    const { people: rawPeople, total: countTotal } = await peopleServices.getDecisionMakers({
       search,
       industry: filterIndustry,
       company_name: filterCompany,
       department: filterDepartment,
       seniority: filterSeniority,
       location: filterLocation || undefined,
+      limit: pageSize,
+      offset: (currentPage - 1) * pageSize,
     });
 
-    // Client-side sort
-    const sorted = [...people].sort((a, b) => {
-      let va: number | string = 0;
-      let vb: number | string = 0;
-      if (sortBy === "score") { va = a.score ?? 0; vb = b.score ?? 0; }
-      else if (sortBy === "name") { va = a.name; vb = b.name; }
-      else if (sortBy === "seniority") {
-        const order = ["C-Suite", "VP", "Director", "Manager", "Individual Contributor"];
-        va = order.indexOf(a.seniority ?? "Manager");
-        vb = order.indexOf(b.seniority ?? "Manager");
-      }
-      if (va < vb) return sortOrder === "asc" ? -1 : 1;
-      if (va > vb) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-
-    setPeople(sorted);
+    setPeople(rawPeople);
+    setTotal(countTotal);
     setLoading(false);
-  }, [search, filterIndustry, filterCompany, filterDepartment, filterSeniority, filterLocation, sortBy, sortOrder]);
+  }, [search, filterIndustry, filterCompany, filterDepartment, filterSeniority, filterLocation, currentPage, pageSize]);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterIndustry, filterCompany, filterDepartment, filterSeniority, filterLocation]);
 
   React.useEffect(() => { load(); }, [load]);
 
@@ -129,9 +109,6 @@ export default function PeoplePage() {
     if (sortBy === field) setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
     else { setSortBy(field); setSortOrder("desc"); }
   };
-
-  const totalPages = Math.ceil(people.length / pageSize) || 1;
-  const paged = people.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const resetFilters = () => {
     setSearch(""); setFilterIndustry("all"); setFilterCompany("all");
@@ -245,117 +222,9 @@ export default function PeoplePage() {
                         <td colSpan={13} className="p-4 bg-card/20" />
                       </tr>
                     ))
-                  ) : paged.length > 0 ? (
-                    paged.map((person) => (
-                      <tr key={person.id} className="hover:bg-muted/40 transition-colors group">
-                        {/* Avatar */}
-                        <td className="p-3.5">
-                          <img
-                            src={person.avatar_url || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80"}
-                            alt={person.name}
-                            className="h-8 w-8 rounded-full object-cover border border-indigo-500/30"
-                          />
-                        </td>
-
-                        {/* Name + Verified */}
-                        <td className="p-3.5 font-semibold">
-                          <div className="flex items-center gap-1.5">
-                            <Link href={`/people/${person.id}`} className="hover:text-indigo-400 font-bold whitespace-nowrap">
-                              {person.name}
-                            </Link>
-                            {person.verified ? (
-                              <span title="Verified"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" /></span>
-                            ) : (
-                              <XCircle className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Job Title */}
-                        <td className="p-3.5 text-muted-foreground max-w-[140px]">
-                          <span className="truncate block">{person.title}</span>
-                        </td>
-
-                        {/* Company */}
-                        <td className="p-3.5">
-                          <Link href={`/companies/${person.company_id || person.company?.id}`} className="text-indigo-400 hover:text-indigo-300 whitespace-nowrap font-medium">
-                            {person.company_name || person.company?.name || "Company"}
-                          </Link>
-                        </td>
-
-                        {/* Industry */}
-                        <td className="p-3.5">
-                          <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/20 font-normal text-[10px] whitespace-nowrap">
-                            {person.industry || "Technology"}
-                          </Badge>
-                        </td>
-
-                        {/* Department */}
-                        <td className="p-3.5 text-muted-foreground max-w-[140px]">
-                          <span className="truncate block text-[11px]">{person.department || "—"}</span>
-                        </td>
-
-                        {/* Seniority */}
-                        <td className="p-3.5">
-                          <Badge
-                            className={
-                              person.seniority === "C-Suite"
-                                ? "bg-red-500/10 text-red-400 border-red-500/20"
-                                : person.seniority === "VP"
-                                  ? "bg-orange-500/10 text-orange-400 border-orange-500/20"
-                                  : person.seniority === "Director"
-                                    ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                    : "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                            }
-                          >
-                            {person.seniority || "Manager"}
-                          </Badge>
-                        </td>
-
-                        {/* Email */}
-                        <td className="p-3.5 font-mono text-[10px]">
-                          <a href={`mailto:${person.email}`} className="text-muted-foreground hover:text-indigo-400 flex items-center gap-1">
-                            <Mail className="h-3 w-3 shrink-0" />
-                            <span className="truncate max-w-[130px] block">{person.email}</span>
-                          </a>
-                        </td>
-
-                        {/* Phone */}
-                        <td className="p-3.5 font-mono text-[10px] text-muted-foreground whitespace-nowrap">
-                          {person.phone ? (
-                            <a href={`tel:${person.phone}`} className="flex items-center gap-1 hover:text-indigo-400">
-                              <Phone className="h-3 w-3 shrink-0" /> {person.phone}
-                            </a>
-                          ) : "—"}
-                        </td>
-
-                        {/* LinkedIn */}
-                        <td className="p-3.5">
-                          {person.linkedin_url ? (
-                            <a href={person.linkedin_url} target="_blank" rel="noreferrer"
-                              className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 text-[10px]">
-                              <Linkedin className="h-3.5 w-3.5" /> View
-                            </a>
-                          ) : <span className="text-muted-foreground">—</span>}
-                        </td>
-
-                        {/* Location */}
-                        <td className="p-3.5 text-muted-foreground text-[11px] whitespace-nowrap">
-                          {person.location || "—"}
-                        </td>
-
-                        {/* Decision Maker Score */}
-                        <td className="p-3.5">
-                          <ScoreRing score={person.score ?? 80} />
-                        </td>
-
-                        {/* Profile Link */}
-                        <td className="p-3.5">
-                          <Link href={`/people/${person.id}`} className="text-indigo-400 hover:text-indigo-300 flex items-center gap-0.5 text-[11px] opacity-0 group-hover:opacity-100 transition-opacity">
-                            Profile <ArrowRight className="h-3 w-3" />
-                          </Link>
-                        </td>
-                      </tr>
+                  ) : people.length > 0 ? (
+                    people.map((person) => (
+                      <DecisionMakerRow key={person.id} person={person} />
                     ))
                   ) : (
                     <tr>
@@ -367,22 +236,18 @@ export default function PeoplePage() {
                 </tbody>
               </table>
             </div>
-
-            {/* Pagination */}
-            <div className="p-4 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
-              <span>{people.length} contacts · Page {currentPage} of {totalPages}</span>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((p) => p - 1)} className="h-8 px-2 text-xs border-border/60">
-                  <ChevronLeft className="h-3.5 w-3.5 mr-1" /> Prev
-                </Button>
-                <Button variant="outline" size="sm" disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage((p) => p + 1)} className="h-8 px-2 text-xs border-border/60">
-                  Next <ChevronRight className="h-3.5 w-3.5 ml-1" />
-                </Button>
-              </div>
-            </div>
           </Card>
+
+          {/* Pagination */}
+          <DataTablePagination
+            page={currentPage}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            pageSizeOptions={[DEFAULT_PAGE_SIZE, 50, 100]}
+            itemLabel="decision makers"
+          />
         </main>
       </div>
 

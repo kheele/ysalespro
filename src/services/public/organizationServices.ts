@@ -1,6 +1,6 @@
 'use server';
 
-import { listGraphQL, getGraphQLOne } from "@/graphql";
+import { sendGraphQL, getGraphQLOne } from "@/graphql";
 import { Organization, OrganizationNote, OrganizationActivity } from "@/lib/types";
 
 function mapDbOrganization(o: any): Organization {
@@ -193,38 +193,39 @@ export async function getOrganizations(params?: {
             sic_code
           }
         }
+        aa_s_organizations_aggregate(where: $where) {
+          aggregate {
+            count
+          }
+        }
       }
     `;
 
-    const res = await listGraphQL({
+    const res = await sendGraphQL({
       query,
       variables: {
         where,
         order_by,
-        limit: params?.limit || 100,
+        limit: params?.limit || 30,
         offset: params?.offset || 0,
       },
       operationName: "GetOrganizations",
+      multi_queries: true,
     });
 
-    let rawList: any[] = [];
-    let countTotal = 0;
+    const {
+      aa_s_organizations: rawList,
+      aa_s_organizations_aggregate: { aggregate: { count: total } }
+    } = res || {
+      aa_s_organizations: [],
+      aa_s_organizations_aggregate: { aggregate: { count: 0 } }
+    };
 
-    if (res && typeof res === 'object') {
-      if (Array.isArray(res)) {
-        rawList = res;
-        countTotal = rawList.length;
-      } else if (res.aa_s_organizations) {
-        rawList = res.aa_s_organizations;
-        countTotal = res.aa_s_organizations_aggregate?.aggregate?.count ?? rawList.length;
-      }
-    }
-
-    const orgs = rawList.map(mapDbOrganization);
+    const orgs = rawList.map(mapDbOrganization).filter(Boolean);
 
     return {
       organizations: orgs,
-      total: countTotal || orgs.length,
+      total,
     };
   } catch (err) {
     console.error("Hasura organization query error:", err);

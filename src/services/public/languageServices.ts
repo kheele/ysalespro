@@ -1,7 +1,19 @@
 'use server';
 
-import { listGraphQL, getGraphQLOne } from "@/graphql";
+import { sendGraphQL, getGraphQLOne } from "@/graphql";
 import { Language } from "@/lib/types";
+
+function mapDbLanguage(l: any): Language {
+  if (!l) return null as any;
+
+  const orgCount = l.organization_list_aggregate?.aggregate?.count || 0;
+  return {
+    id: l.id,
+    name: l.name,
+    organization_count: orgCount,
+    org_count: orgCount,
+  };
+}
 
 export async function getLanguages(params?: {
   search?: string;
@@ -9,9 +21,15 @@ export async function getLanguages(params?: {
   offset?: number;
 }): Promise<{ languages: Language[]; total: number }> {
   try {
+    const where: any = {};
+    if (params?.search && params.search.trim()) {
+      where.name = { _ilike: `%${params.search.trim()}%` };
+    }
+
     const query = `
-      query GetLanguages($limit: Int, $offset: Int) {
+      query GetLanguages($where: aa_s_languages_bool_exp, $limit: Int, $offset: Int) {
         aa_s_languages(
+          where: $where
           order_by: { name: asc }
           limit: $limit
           offset: $offset
@@ -24,35 +42,36 @@ export async function getLanguages(params?: {
             }
           }
         }
+        aa_s_languages_aggregate(where: $where) {
+          aggregate {
+            count
+          }
+        }
       }
     `;
-    const res = await listGraphQL({
+
+    const res = await sendGraphQL({
       query,
       variables: {
-        limit: params?.limit || 100,
+        where: Object.keys(where).length > 0 ? where : undefined,
+        limit: params?.limit || 30,
         offset: params?.offset || 0,
       },
       operationName: "GetLanguages",
+      multi_queries: true,
     });
 
-    const rawList = Array.isArray(res) ? res : [];
+    const {
+      aa_s_languages: rawList,
+      aa_s_languages_aggregate: { aggregate: { count: total } }
+    } = res || {
+      aa_s_languages: [],
+      aa_s_languages_aggregate: { aggregate: { count: 0 } }
+    };
 
-    let items: Language[] = rawList.map((l: any) => {
-      const orgCount = l.organization_list_aggregate?.aggregate?.count || 0;
-      return {
-        id: l.id,
-        name: l.name,
-        organization_count: orgCount,
-        org_count: orgCount,
-      };
-    });
+    const items: Language[] = rawList.map(mapDbLanguage).filter(Boolean);
 
-    if (params?.search) {
-      const s = params.search.toLowerCase();
-      items = items.filter(l => (l.name || "").toLowerCase().includes(s));
-    }
-
-    return { languages: items, total: items.length };
+    return { languages: items, total };
   } catch (err) {
     console.error("Hasura languageServices error:", err);
     return { languages: [], total: 0 };
@@ -84,13 +103,7 @@ export async function getLanguageById(id: string | number): Promise<Language | n
     });
 
     if (item && item.id !== undefined) {
-      const orgCount = item.organization_list_aggregate?.aggregate?.count || 0;
-      return {
-        id: item.id,
-        name: item.name,
-        organization_count: orgCount,
-        org_count: orgCount,
-      };
+      return mapDbLanguage(item);
     }
   } catch (err) {
     console.error("Hasura getLanguageById error:", err);

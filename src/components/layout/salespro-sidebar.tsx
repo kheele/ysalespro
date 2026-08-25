@@ -128,16 +128,16 @@ export function SidebarContent({ onOpenCommandPalette }: SalesProSidebarProps) {
     { name: "Executive Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Reports & Analytics", href: "/reports", icon: BarChart3 },
     {
-      name: "Companies",
-      href: "/companies",
-      icon: Building2,
-      badge: formatBadgeCount(counts.companies),
-    },
-    {
       name: "Industries",
       href: "/industries",
       icon: Factory,
       badge: formatBadgeCount(counts.industries),
+    },
+    {
+      name: "Companies",
+      href: "/companies",
+      icon: Building2,
+      badge: formatBadgeCount(counts.companies),
     },
     // {
     //   name: "Decision Makers",

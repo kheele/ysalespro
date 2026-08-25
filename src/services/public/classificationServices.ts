@@ -3,6 +3,29 @@
 import { listGraphQL } from "@/graphql";
 import { NAICSCode, SICCode } from "@/lib/types";
 
+function mapDbCode(key: "naics_code" | "sic_code", title: "NAICS Code" | "SIC Code") {
+  return (c: NAICSCode | SICCode) => {
+    if (!c) return null as any;
+
+    return {
+      id: c.id,
+      organization_id: c.organization_id,
+      ...(key === "naics_code" && ((n: NAICSCode) => ({
+        naics_code: n.naics_code || "",
+        code: n.naics_code || "",
+        title: n.naics_code || title,
+      }))(c)),
+      ...(key === "sic_code" && ((s: SICCode) => ({
+        sic_code: s.sic_code || "",
+        code: s.sic_code || "",
+        title: s.sic_code || title,
+      }))(c)),
+      organization_count: 1,
+      organization: c.organization,
+    };
+  };
+}
+
 export async function getNAICSCodes(params?: {
   organization_id?: number;
   limit?: number;
@@ -25,22 +48,14 @@ export async function getNAICSCodes(params?: {
     const res = await listGraphQL({
       query,
       variables: {
-        limit: params?.limit || 100,
+        limit: params?.limit || 30,
         offset: params?.offset || 0,
       },
       operationName: "GetNAICS",
     });
     const rawList = Array.isArray(res) ? res : [];
 
-    return rawList.map((n: any) => ({
-      id: n.id,
-      organization_id: n.organization_id,
-      naics_code: n.naics_code || "",
-      code: n.naics_code || "",
-      title: n.naics_code || "NAICS Code",
-      organization_count: 1,
-      organization: n.organization,
-    }));
+    return rawList.map(mapDbCode("naics_code", "NAICS Code")).filter(Boolean);
   } catch (err) {
     console.error("Hasura NAICS error:", err);
     return [];
@@ -69,22 +84,14 @@ export async function getSICCodes(params?: {
     const res = await listGraphQL({
       query,
       variables: {
-        limit: params?.limit || 100,
+        limit: params?.limit || 30,
         offset: params?.offset || 0,
       },
       operationName: "GetSIC",
     });
     const rawList = Array.isArray(res) ? res : [];
 
-    return rawList.map((s: any) => ({
-      id: s.id,
-      organization_id: s.organization_id,
-      sic_code: s.sic_code || "",
-      code: s.sic_code || "",
-      title: s.sic_code || "SIC Code",
-      organization_count: 1,
-      organization: s.organization,
-    }));
+    return rawList.map(mapDbCode("sic_code", "SIC Code")).filter(Boolean);
   } catch (err) {
     console.error("Hasura SIC error:", err);
     return [];
