@@ -2,13 +2,14 @@
 
 import { sendGraphQL, getGraphQLOne } from "@/graphql";
 import { Industry } from "@/lib/types";
+import { toTitleCase } from "@/lib/utils";
 
 function mapDbIndustry(i: any): Industry {
   if (!i) return null as any;
 
   return {
     id: i.id,
-    name: i.name,
+    name: toTitleCase(i.name),
     active: i.active,
     organization_count: i.organization_list_aggregate?.aggregate?.count || 0,
     campaign_target_count: i.campaign_target_list_aggregate?.aggregate?.count || 0,

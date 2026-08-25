@@ -70,7 +70,7 @@ export function DecisionMakerRow({ person }: DecisionMakerRowProps) {
           variant="outline"
           className="bg-purple-500/10 text-purple-400 border-purple-500/20 font-normal text-[10px] whitespace-nowrap"
         >
-          {person.industry || "Technology"}
+          {person.industry || "—"}
         </Badge>
       </td>
 

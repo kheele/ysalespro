@@ -165,11 +165,11 @@ export default function CompanyProfilePage() {
                       )}
                       <span>·</span>
                       <span className="flex items-center gap-1">
-                        <Building2 className="h-3.5 w-3.5 text-purple-400" /> {org.industry || "Technology"}
+                        <Building2 className="h-3.5 w-3.5 text-purple-400" /> {org.primary_industry || org.industry || "-"}
                       </span>
                       <span>·</span>
                       <span className="flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5 text-amber-400" /> {org.location || org.city || "San Francisco, USA"}
+                        <MapPin className="h-3.5 w-3.5 text-amber-400" /> {org.location || org.city || "Headquarters"}
                       </span>
                     </div>
                   </div>
@@ -211,8 +211,8 @@ export default function CompanyProfilePage() {
                     <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">Employee Count</CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 pt-0">
-                    <div className="text-2xl font-bold font-mono">{org.employee_count?.toLocaleString() || "1,450"}</div>
-                    <p className="text-[11px] text-muted-foreground mt-1">Headcount Tier: Enterprise 500+</p>
+                    <div className="text-2xl font-bold font-mono">{org.employee_count?.toLocaleString() || "—"}</div>
+                    <p className="text-[11px] text-muted-foreground mt-1">Headcount Tier: Enterprise</p>
                   </CardContent>
                 </Card>
 
@@ -221,8 +221,8 @@ export default function CompanyProfilePage() {
                     <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">Annual Revenue</CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 pt-0">
-                    <div className="text-2xl font-bold font-mono text-emerald-400">{org.revenue || "$120M - $250M"}</div>
-                    <p className="text-[11px] text-muted-foreground mt-1">Estimated Sales Target</p>
+                    <div className="text-2xl font-bold font-mono text-emerald-400">{org.revenue || "—"}</div>
+                    <p className="text-[11px] text-muted-foreground mt-1">Reported Revenue</p>
                   </CardContent>
                 </Card>
 
@@ -231,7 +231,7 @@ export default function CompanyProfilePage() {
                     <CardTitle className="text-xs font-semibold uppercase text-muted-foreground">Founded Year</CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 pt-0">
-                    <div className="text-2xl font-bold font-mono">{org.founded_year || 2012}</div>
+                    <div className="text-2xl font-bold font-mono">{org.founded_year || "—"}</div>
                     <p className="text-[11px] text-muted-foreground mt-1">Established Account</p>
                   </CardContent>
                 </Card>
@@ -244,11 +244,11 @@ export default function CompanyProfilePage() {
                 </CardHeader>
                 <CardContent className="p-5 pt-0 text-xs space-y-3 leading-relaxed text-muted-foreground">
                   <p>
-                    <strong className="text-foreground">{org.name}</strong> operates within the <strong className="text-foreground">{org.industry || "Technology"}</strong> sector with a headcount of <strong className="text-foreground">{org.employee_count?.toLocaleString() || "1,450"}</strong> employees. Key domain tech stacks include {org.keywords_list?.map(k => k.keyword?.name).join(", ") || "Cloud, Microservices, Security"}.
+                    <strong className="text-foreground">{org.name}</strong> operates within the <strong className="text-foreground">{org.primary_industry || org.industry || "-"}</strong> sector with a headcount of <strong className="text-foreground">{org.employee_count?.toLocaleString() || "—"}</strong> employees. Key domain tech stacks include {org.keywords_list?.map(k => k.keyword?.name).join(", ") || "-"}.
                   </p>
                   <div className="p-3 rounded-lg bg-muted/40 border border-border/40 flex items-center justify-between font-mono text-[11px]">
                     <span>Last Telemetry Activity: <strong className="text-foreground">{org.last_activity || "Recently"}</strong></span>
-                    <span className="text-indigo-400 font-bold">Account Score: {org.score || 94}/100</span>
+                    <span className="text-indigo-400 font-bold">Account Score: {org.score || '-'}/100</span>
                   </div>
                 </CardContent>
               </Card>
@@ -264,14 +264,14 @@ export default function CompanyProfilePage() {
                       <div key={ind.id} className="p-3 rounded-lg bg-muted/30 border border-border/40 flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
                           <Factory className="h-4 w-4 text-purple-400" />
-                          <span className="font-bold text-foreground">{ind.industry?.name || org.industry}</span>
+                          <span className="font-bold text-foreground">{ind.industry?.name || org.primary_industry || org.industry}</span>
                         </div>
-                        <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-400">Primary Sector</Badge>
+                        <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-400">Sector</Badge>
                       </div>
                     ))
                   ) : (
                     <div className="p-3 rounded-lg bg-muted/30 border border-border/40 text-xs font-bold">
-                      {org.industry || "General Technology"}
+                      {org.primary_industry || org.industry || "-"}
                     </div>
                   )}
                 </div>

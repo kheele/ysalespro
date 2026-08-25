@@ -25,11 +25,10 @@ export function IndustryCard({ industry }: IndustryCardProps) {
             </Badge>
           ) : industry.active !== undefined ? (
             <Badge
-              className={`text-xs font-mono ${
-                industry.active
+              className={`text-xs font-mono ${industry.active
                   ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                   : "bg-muted/40 text-muted-foreground border-border/40"
-              }`}
+                }`}
             >
               {industry.active ? "Active" : "Inactive"}
             </Badge>

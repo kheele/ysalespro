@@ -2,6 +2,7 @@
 
 import { sendGraphQL, getGraphQLOne } from "@/graphql";
 import { DecisionMaker } from "@/lib/types";
+import { toTitleCase } from "@/lib/utils";
 
 const DECISION_MAKER_FIELDS = `
   id
@@ -75,7 +76,7 @@ function mapDbDecisionMaker(p: any): DecisionMaker {
     company_id: orgId ? Number(orgId) : null,
     company_name: orgName,
     company: p.company,
-    industry: p.industry || "",
+    industry: toTitleCase(p.industry || p.company?.primary_industry || ""),
     department: p.department || "",
     seniority: p.seniority || "",
     email: p.email || "",

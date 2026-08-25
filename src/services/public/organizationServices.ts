@@ -2,12 +2,14 @@
 
 import { sendGraphQL, getGraphQLOne } from "@/graphql";
 import { Organization, OrganizationNote, OrganizationActivity } from "@/lib/types";
+import { toTitleCase } from "@/lib/utils";
 
 function mapDbOrganization(o: any): Organization {
   if (!o) return null as any;
   const location = o.street_address || o.raw_address || [o.city, o.state, o.country].filter(Boolean).join(", ");
   const primaryDomain = o.primary_domain || (o.website_url ? o.website_url.replace(/^https?:\/\//, '').replace(/\/.*$/, '') : "");
-  const industry = o.primary_industry || (o.industry_list?.[0]?.industry?.name) || "";
+  const rawIndustry = o.primary_industry || (o.industry_list?.[0]?.industry?.name) || o.industry || "";
+  const industry = toTitleCase(rawIndustry);
   const revenue = o.organization_revenue_str || (o.organization_revenue ? `$${Number(o.organization_revenue).toLocaleString()}` : "");
 
   return {
@@ -18,8 +20,8 @@ function mapDbOrganization(o: any): Organization {
     website_url: o.website_url || (primaryDomain ? `https://${primaryDomain}` : ""),
     primary_domain: o.primary_domain || primaryDomain,
     logo_url: o.logo_url || null,
-    industry: industry || o.industry,
-    primary_industry: o.primary_industry || industry,
+    industry: industry,
+    primary_industry: industry,
     employee_count: o.estimated_num_employees ?? o.employee_count ?? 0,
     estimated_num_employees: o.estimated_num_employees ?? o.employee_count ?? 0,
     revenue: revenue || o.revenue,
