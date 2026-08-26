@@ -190,7 +190,7 @@ export default function CompanyProfilePage() {
                         {org.status || org.lead_status || "Prospect"}
                       </Badge>
                       <Badge variant="outline" className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 text-xs">
-                        Score {org.score || 90}/100
+                        Score {org.score || '-'}/100
                       </Badge>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1.5 font-mono">
