@@ -8,8 +8,9 @@ export default defineConfig({
         environment: 'jsdom',
         globals: true,
         setupFiles: [],
+        pool: 'threads',
         alias: {
-            '@': path.resolve(__dirname, './src'),
+            '@': path.resolve(process.cwd(), './src'),
         },
     },
 })

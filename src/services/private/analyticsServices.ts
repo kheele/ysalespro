@@ -36,14 +36,39 @@ export async function getOrganizationGrowthTrendActionByToken(token: string): Pr
     const totalLeads = leads.length;
     const totalScore = leads.reduce((sum: number, l) => sum + Number(l.lead_score || 0), 0);
 
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    return months.map((month, idx) => {
-      const factor = (idx + 1) / months.length;
+    // Generate rolling last 6 calendar months from today
+    const now = new Date();
+    const monthNames: string[] = [];
+    const monthDates: Date[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      monthNames.push(d.toLocaleDateString('en-US', { month: 'short' }));
+      monthDates.push(new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59));
+    }
+
+    return monthNames.map((month, idx) => {
+      const cutoff = monthDates[idx].getTime();
+      const leadsUpToMonth = leads.filter((l) => {
+        if (!l.created_at) return true;
+        return new Date(l.created_at).getTime() <= cutoff;
+      });
+
+      const leadsCount = leads.some((l) => !!l.created_at)
+        ? leadsUpToMonth.length
+        : Math.round(totalLeads * ((idx + 1) / monthNames.length));
+
+      const scoreUpToMonth = leads.some((l) => !!l.created_at)
+        ? leadsUpToMonth.reduce((sum, l) => sum + Number(l.lead_score || 0), 0)
+        : Math.round(totalScore * ((idx + 1) / monthNames.length));
+
+      const factor = (idx + 1) / monthNames.length;
+      const orgsCount = Math.round(totalOrgs * factor);
+
       return {
         month,
-        organizations: Math.round(totalOrgs * factor),
-        leads: Math.round(totalLeads * factor),
-        revenue: Math.round(totalScore * factor),
+        organizations: orgsCount,
+        leads: leadsCount,
+        revenue: scoreUpToMonth,
       };
     });
   } catch (err) {

@@ -6,7 +6,9 @@ import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
 import { CommandPalette } from "@/components/layout/command-palette";
 import * as peopleServices from "@/services/public/peopleServices";
-import type { DecisionMaker } from "@/lib/types";
+import * as industryServices from "@/services/public/industryServices";
+import * as organizationServices from "@/services/public/organizationServices";
+import type { DecisionMaker, Industry } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,30 +33,15 @@ const SENIORITY_OPTIONS = [
 ];
 const DEPARTMENT_OPTIONS = [
   "all",
-  "Engineering & Technology",
-  "Security & Compliance",
-  "Product & Engineering",
-  "Operations & Procurement",
-  "Operations & Strategy",
-  "Sales & Revenue",
-];
-const INDUSTRY_OPTIONS = [
-  "all",
-  "Cloud Infrastructure",
-  "Cybersecurity",
-  "Fintech & AI",
-  "Healthcare Tech",
-  "Logistics & Supply Chain",
-  "Robotics & Automation",
-];
-const COMPANY_OPTIONS = [
-  "all",
-  "Acme Enterprise Corp",
-  "Apex CyberSecurity",
-  "FinPulse Financial AI",
-  "BioHealth Diagnostics",
-  "OmniLogistics Systems",
-  "Nexus Robotics Solutions",
+  "Engineering",
+  "Information Technology",
+  "Sales",
+  "Marketing",
+  "Operations",
+  "Product",
+  "Finance",
+  "Human Resources",
+  "Legal & Compliance",
 ];
 
 const DEFAULT_PAGE_SIZE = 30;
@@ -64,6 +51,10 @@ export default function PeoplePage() {
   const [people, setPeople] = React.useState<DecisionMaker[]>([]);
   const [total, setTotal] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
+
+  // Dynamic filter options from database
+  const [industries, setIndustries] = React.useState<Industry[]>([]);
+  const [companies, setCompanies] = React.useState<{ id: string | number; name: string }[]>([]);
 
   // Filters
   const [search, setSearch] = React.useState("");
@@ -80,6 +71,26 @@ export default function PeoplePage() {
   // Pagination
   const [currentPage, setCurrentPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(DEFAULT_PAGE_SIZE);
+
+  // Fetch real industries and organizations for filter options
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const [indRes, orgRes] = await Promise.all([
+          industryServices.getIndustries({ limit: 0 }),
+          organizationServices.getOrganizations({ pageSize: 50 }),
+        ]);
+        if (indRes?.industries) {
+          setIndustries(indRes.industries);
+        }
+        if (orgRes?.organizations) {
+          setCompanies(orgRes.organizations.map((o) => ({ id: o.id, name: o.name })));
+        }
+      } catch (err) {
+        console.error("Failed to load filter options from database:", err);
+      }
+    })();
+  }, []);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -157,25 +168,59 @@ export default function PeoplePage() {
                 <SlidersHorizontal className="h-3.5 w-3.5" /> Filters:
               </span>
 
-              {[
-                { label: "Industry", options: INDUSTRY_OPTIONS, value: filterIndustry, set: setFilterIndustry },
-                { label: "Company", options: COMPANY_OPTIONS, value: filterCompany, set: setFilterCompany },
-                { label: "Department", options: DEPARTMENT_OPTIONS, value: filterDepartment, set: setFilterDepartment },
-                { label: "Seniority", options: SENIORITY_OPTIONS, value: filterSeniority, set: setFilterSeniority },
-              ].map((f) => (
-                <select
-                  key={f.label}
-                  value={f.value}
-                  onChange={(e) => { f.set(e.target.value); setCurrentPage(1); }}
-                  className="bg-muted/40 border border-border/60 rounded-md px-2.5 py-1.5 text-xs outline-none text-foreground"
-                >
-                  {f.options.map((o) => (
-                    <option key={o} value={o}>
-                      {o === "all" ? `All ${f.label}s` : o}
-                    </option>
-                  ))}
-                </select>
-              ))}
+              {/* Industry Dropdown */}
+              <select
+                value={filterIndustry}
+                onChange={(e) => { setFilterIndustry(e.target.value); setCurrentPage(1); }}
+                className="bg-muted/40 border border-border/60 rounded-md px-2.5 py-1.5 text-xs outline-none text-foreground"
+              >
+                <option value="all">All Industries</option>
+                {industries.map((ind) => (
+                  <option key={ind.id} value={ind.name}>
+                    {ind.name}
+                  </option>
+                ))}
+              </select>
+
+              {/* Company Dropdown */}
+              <select
+                value={filterCompany}
+                onChange={(e) => { setFilterCompany(e.target.value); setCurrentPage(1); }}
+                className="bg-muted/40 border border-border/60 rounded-md px-2.5 py-1.5 text-xs outline-none text-foreground max-w-[180px] truncate"
+              >
+                <option value="all">All Companies</option>
+                {companies.map((c) => (
+                  <option key={c.id} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+
+              {/* Department Dropdown */}
+              <select
+                value={filterDepartment}
+                onChange={(e) => { setFilterDepartment(e.target.value); setCurrentPage(1); }}
+                className="bg-muted/40 border border-border/60 rounded-md px-2.5 py-1.5 text-xs outline-none text-foreground"
+              >
+                {DEPARTMENT_OPTIONS.map((d) => (
+                  <option key={d} value={d}>
+                    {d === "all" ? "All Departments" : d}
+                  </option>
+                ))}
+              </select>
+
+              {/* Seniority Dropdown */}
+              <select
+                value={filterSeniority}
+                onChange={(e) => { setFilterSeniority(e.target.value); setCurrentPage(1); }}
+                className="bg-muted/40 border border-border/60 rounded-md px-2.5 py-1.5 text-xs outline-none text-foreground"
+              >
+                {SENIORITY_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s === "all" ? "All Seniorities" : s}
+                  </option>
+                ))}
+              </select>
 
               {/* Location text filter */}
               <input

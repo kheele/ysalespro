@@ -9,6 +9,9 @@ import {
   createCampaignActionByToken,
   updateCampaignStatusActionByToken,
 } from "@/services/private/campaignServices";
+import * as industryServices from "@/services/public/industryServices";
+import * as organizationServices from "@/services/public/organizationServices";
+import * as peopleServices from "@/services/public/peopleServices";
 import {
   DEFAULT_SEQUENCE,
   DEFAULT_RULES,
@@ -35,14 +38,10 @@ import {
   Search, Plus, Play, Pause, CheckCircle2, XCircle, FileEdit,
   Mail, Users, Target, Zap, Clock, ChevronRight, Settings2, BarChart3,
   Trash2, GripVertical, AlertCircle, CalendarDays, StopCircle,
-  ListChecks, ArrowRight, ArrowLeft, Rocket,
+  ListChecks, ArrowRight, ArrowLeft, Rocket, Loader2,
 } from "lucide-react";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const INDUSTRIES = ["Cloud Infrastructure", "Cybersecurity", "Fintech & AI", "Healthcare Tech", "Logistics & Supply Chain", "Robotics & Automation", "Retail Tech"];
-const COMPANIES = ["Acme Enterprise Corp", "Apex CyberSecurity", "FinPulse Financial AI", "BioHealth Diagnostics", "OmniLogistics Systems", "Nexus Robotics Solutions", "GlobalRetail Ventures"];
-const PEOPLE = ["Sarah Jenkins (CTO, Acme)", "Marcus Vance (VP, Apex)", "Elena Rostova (Head of AI, FinPulse)", "David Chen (VP, BioHealth)", "Rachel Sommer (Director, OmniLogistics)", "Klaus Brenner (CRO, Nexus)"];
-
 const STEP_TYPES: SequenceStepType[] = ["Introduction", "Follow-up", "Case Study", "Final Message", "Custom"];
 
 const STEP_COLORS: Record<SequenceStepType, string> = {
@@ -79,27 +78,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   );
 }
 
-// ─── Multi-select Chip Group ──────────────────────────────────────────────────
-function ChipSelect({ options, selected, onChange }: {
-  options: string[]; selected: string[]; onChange: (v: string[]) => void;
-}) {
-  const toggle = (o: string) => onChange(selected.includes(o) ? selected.filter(s => s !== o) : [...selected, o]);
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map(o => {
-        const active = selected.includes(o);
-        return (
-          <button key={o} type="button" onClick={() => toggle(o)}
-            className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all ${active ? "bg-indigo-600 text-white border-indigo-600" : "bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/60 hover:text-foreground"
-              }`}>
-            {active && <CheckCircle2 className="h-3 w-3 inline mr-1 -mt-0.5" />}
-            {o}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+import { SearchableMultiSelect } from "@/components/ui/searchable-multi-select";
 
 // ─── Campaign Builder Wizard Modal ────────────────────────────────────────────
 function CampaignBuilderModal({ open, onClose, onSave }: {
@@ -112,9 +91,129 @@ function CampaignBuilderModal({ open, onClose, onSave }: {
   const [audience, setAudience] = React.useState<CampaignAudience>({
     industries: [], companies: [], people: [], estimated_contacts: 0,
   });
+
+  // Dynamic cascading option states
+  const [availableIndustries, setAvailableIndustries] = React.useState<string[]>([]);
+  const [loadingIndustries, setLoadingIndustries] = React.useState(false);
+
+  const [availableCompanies, setAvailableCompanies] = React.useState<string[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = React.useState(false);
+
+  const [availablePeople, setAvailablePeople] = React.useState<string[]>([]);
+  const [loadingPeople, setLoadingPeople] = React.useState(false);
+
+  // 1. Fetch available industries on modal open
   React.useEffect(() => {
-    const est = audience.industries.length * 40 + audience.companies.length * 12 + audience.people.length;
-    setAudience(a => ({ ...a, estimated_contacts: est }));
+    if (!open) return;
+    (async () => {
+      setLoadingIndustries(true);
+      try {
+        const res = await industryServices.getIndustries({ limit: 0 });
+        if (res?.industries) {
+          setAvailableIndustries(res.industries.map((i) => i.name).filter(Boolean));
+        }
+      } catch (err) {
+        console.error("Failed to load industries:", err);
+      } finally {
+        setLoadingIndustries(false);
+      }
+    })();
+  }, [open]);
+
+  // 2. Fetch companies cascading from selected industries
+  React.useEffect(() => {
+    if (!open) return;
+    let isMounted = true;
+    (async () => {
+      setLoadingCompanies(true);
+      try {
+        let companiesList: string[] = [];
+        if (audience.industries.length === 0) {
+          const res = await organizationServices.getOrganizations({ pageSize: 60 });
+          companiesList = (res?.organizations || []).map((o) => o.name).filter(Boolean);
+        } else {
+          const results = await Promise.all(
+            audience.industries.map((ind) =>
+              organizationServices.getOrganizations({ industry: ind, pageSize: 50 })
+            )
+          );
+          const allOrgs = results.flatMap((r) => r?.organizations || []);
+          companiesList = Array.from(new Set(allOrgs.map((o) => o.name).filter(Boolean)));
+        }
+        if (isMounted) {
+          setAvailableCompanies(companiesList);
+        }
+      } catch (err) {
+        console.error("Failed to load companies for selected industries:", err);
+      } finally {
+        if (isMounted) setLoadingCompanies(false);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, [open, audience.industries]);
+
+  // 3. Fetch people cascading from selected companies and industries
+  React.useEffect(() => {
+    if (!open) return;
+    let isMounted = true;
+    (async () => {
+      setLoadingPeople(true);
+      try {
+        let peopleList: string[] = [];
+        if (audience.companies.length > 0) {
+          const results = await Promise.all(
+            audience.companies.map((comp) =>
+              peopleServices.getDecisionMakers({ company_name: comp, limit: 50 })
+            )
+          );
+          const allPpl = results.flatMap((r) => r?.people || []);
+          peopleList = Array.from(
+            new Set(
+              allPpl.map((p) => `${p.name} (${p.title || p.job_title || "Executive"}, ${p.company_name || ""})`)
+            )
+          ).filter(Boolean);
+        } else if (audience.industries.length > 0) {
+          const results = await Promise.all(
+            audience.industries.map((ind) =>
+              peopleServices.getDecisionMakers({ industry: ind, limit: 50 })
+            )
+          );
+          const allPpl = results.flatMap((r) => r?.people || []);
+          peopleList = Array.from(
+            new Set(
+              allPpl.map((p) => `${p.name} (${p.title || p.job_title || "Executive"}, ${p.company_name || ""})`)
+            )
+          ).filter(Boolean);
+        } else {
+          const res = await peopleServices.getDecisionMakers({ limit: 60 });
+          peopleList = (res?.people || []).map(
+            (p) => `${p.name} (${p.title || p.job_title || "Executive"}, ${p.company_name || ""})`
+          ).filter(Boolean);
+        }
+
+        if (isMounted) {
+          setAvailablePeople(peopleList);
+        }
+      } catch (err) {
+        console.error("Failed to load decision makers:", err);
+      } finally {
+        if (isMounted) setLoadingPeople(false);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, [open, audience.industries, audience.companies]);
+
+  // Estimated reach calculation
+  React.useEffect(() => {
+    let est = 0;
+    if (audience.people.length > 0) {
+      est = audience.people.length;
+    } else if (audience.companies.length > 0) {
+      est = audience.companies.length * 8;
+    } else if (audience.industries.length > 0) {
+      est = audience.industries.length * 35;
+    }
+    setAudience((a) => ({ ...a, estimated_contacts: est }));
   }, [audience.industries, audience.companies, audience.people]);
 
   const [sequence, setSequence] = React.useState<SequenceStep[]>(DEFAULT_SEQUENCE);
@@ -204,29 +303,61 @@ function CampaignBuilderModal({ open, onClose, onSave }: {
                   onChange={e => setDescription(e.target.value)} className="bg-muted/40 border-border/60 h-9 text-xs" />
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs flex items-center gap-1.5">
-                  <Target className="h-3.5 w-3.5 text-indigo-400" /> Select Industries
-                </Label>
-                <ChipSelect options={INDUSTRIES} selected={audience.industries}
-                  onChange={v => setAudience(a => ({ ...a, industries: v }))} />
-              </div>
+              {/* 1. Select Industries */}
+              <SearchableMultiSelect
+                label="Select Industries"
+                icon={<Target className="h-3.5 w-3.5 text-indigo-400" />}
+                placeholder="Search & filter industries..."
+                options={availableIndustries}
+                selected={audience.industries}
+                onChange={v => setAudience(a => ({ ...a, industries: v }))}
+                loading={loadingIndustries}
+                hint="Filters company & decision maker suggestions"
+              />
 
-              <div className="space-y-2">
-                <Label className="text-xs flex items-center gap-1.5">
-                  <Target className="h-3.5 w-3.5 text-purple-400" /> Select Companies
-                </Label>
-                <ChipSelect options={COMPANIES} selected={audience.companies}
-                  onChange={v => setAudience(a => ({ ...a, companies: v }))} />
-              </div>
+              {/* 2. Select Companies (loaded from Selected Industries) */}
+              <SearchableMultiSelect
+                label="Select Companies"
+                icon={<Target className="h-3.5 w-3.5 text-purple-400" />}
+                placeholder={
+                  audience.industries.length > 0
+                    ? `Search organizations in ${audience.industries.length} selected industry(ies)...`
+                    : "Search all verified organizations..."
+                }
+                options={availableCompanies}
+                selected={audience.companies}
+                onChange={v => setAudience(a => ({ ...a, companies: v }))}
+                loading={loadingCompanies}
+                hint={
+                  audience.industries.length > 0
+                    ? `Loaded from ${audience.industries.length} selected industry(ies)`
+                    : "All industries"
+                }
+              />
 
-              <div className="space-y-2">
-                <Label className="text-xs flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5 text-emerald-400" /> Select People
-                </Label>
-                <ChipSelect options={PEOPLE} selected={audience.people}
-                  onChange={v => setAudience(a => ({ ...a, people: v }))} />
-              </div>
+              {/* 3. Select People (loaded from Selected Companies & Selected Industries) */}
+              <SearchableMultiSelect
+                label="Select People (Decision Makers)"
+                icon={<Users className="h-3.5 w-3.5 text-emerald-400" />}
+                placeholder={
+                  audience.companies.length > 0
+                    ? `Search contacts in ${audience.companies.length} selected company(ies)...`
+                    : audience.industries.length > 0
+                      ? `Search contacts in ${audience.industries.length} selected industry(ies)...`
+                      : "Search all verified decision makers..."
+                }
+                options={availablePeople}
+                selected={audience.people}
+                onChange={v => setAudience(a => ({ ...a, people: v }))}
+                loading={loadingPeople}
+                hint={
+                  audience.companies.length > 0
+                    ? `Filtered by ${audience.companies.length} company(ies)`
+                    : audience.industries.length > 0
+                      ? `Filtered by ${audience.industries.length} industry(ies)`
+                      : "All contacts"
+                }
+              />
 
               {audience.estimated_contacts > 0 && (
                 <div className="flex items-center gap-2 p-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl">

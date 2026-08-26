@@ -95,33 +95,63 @@ export async function runDailyAutomationActionByToken(token: string): Promise<Au
   const followups = await getFollowUpsActionByToken(token);
   const emails_sent = followups.filter((f) => f.channel === 'Email').length;
   const leads_escalated = followups.filter((f) => f.status === 'Escalated').length;
+  const sequences_stopped = followups.filter((f) => f.status === 'Replied' || f.status === 'Cancelled').length;
+  const tasks_created = followups.filter((f) => f.status === 'Scheduled' || f.status === 'Pending Today').length;
+
+  const logs: { timestamp: string; type: "info" | "success" | "warning" | "escalation"; message: string }[] = [
+    {
+      timestamp: new Date().toLocaleTimeString(),
+      type: 'info',
+      message: `Processed ${followups.length} active leads across daily follow-up automation rules.`,
+    },
+  ];
+
+  if (emails_sent > 0) {
+    logs.push({
+      timestamp: new Date().toLocaleTimeString(),
+      type: 'success',
+      message: `Dispatched ${emails_sent} automated sequence touchpoints.`,
+    });
+  }
+
+  if (leads_escalated > 0) {
+    logs.push({
+      timestamp: new Date().toLocaleTimeString(),
+      type: 'escalation',
+      message: `Escalated ${leads_escalated} high-intent lead(s) for immediate AE review.`,
+    });
+  }
 
   return {
     executed_at: new Date().toISOString(),
     emails_sent,
-    sequences_stopped: 2,
+    sequences_stopped,
     leads_escalated,
-    tasks_created: 1,
-    log_entries: [
-      {
-        timestamp: new Date().toLocaleTimeString(),
-        type: 'info',
-        message: `Processed ${followups.length} active leads across 4 daily automation rules.`,
-      },
-    ],
+    tasks_created,
+    log_entries: logs,
   };
 }
 
 export async function processDailyFollowUpsActionByToken(token: string): Promise<{ processed: number; escalated: number; halted: number }> {
   const followups = await getFollowUpsActionByToken(token);
+  const escalated = followups.filter((f) => f.status === 'Escalated').length;
+  const halted = followups.filter((f) => f.status === 'Replied' || f.status === 'Cancelled').length;
   return {
     processed: followups.length,
-    escalated: followups.filter(f => f.status === 'Escalated').length,
-    halted: 2,
+    escalated,
+    halted,
   };
 }
 
 export async function markAsRespondedActionByToken(token: string, id: string | number): Promise<boolean> {
-  // Mock action updating lead status upon response
-  return true;
+  try {
+    const leadId = typeof id === 'string' && id.startsWith('fup-') ? null : Number(id);
+    if (leadId && !isNaN(leadId)) {
+      await leadServices.updateLeadStageActionByToken(token, leadId, 'Warm');
+    }
+    return true;
+  } catch (err) {
+    console.error('markAsResponded error:', err);
+    return false;
+  }
 }
