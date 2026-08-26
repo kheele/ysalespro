@@ -145,19 +145,19 @@ export function SidebarContent({ onOpenCommandPalette }: SalesProSidebarProps) {
     //   icon: Users,
     //   badge: formatBadgeCount(counts.people),
     // },
-    {
-      name: "Lead Pipeline",
-      href: "/leads",
-      icon: Target,
-      badge: counts.leads && counts.leads > 0 ? String(counts.leads) : undefined,
-    },
     { name: "AI Messaging", href: "/ai-messaging", icon: Sparkles },
-    { name: "Outreach & Calls", href: "/outreach", icon: Send },
     {
       name: "Sales Campaigns",
       href: "/campaigns",
       icon: Megaphone,
       badge: counts.campaigns && counts.campaigns > 0 ? String(counts.campaigns) : undefined,
+    },
+    { name: "Outreach & Calls", href: "/outreach", icon: Send },
+    {
+      name: "Lead Pipeline",
+      href: "/leads",
+      icon: Target,
+      badge: counts.leads && counts.leads > 0 ? String(counts.leads) : undefined,
     },
     {
       name: "Follow-up Tasks",
