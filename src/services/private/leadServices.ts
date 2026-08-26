@@ -7,38 +7,38 @@ import { toTitleCase } from "@/lib/utils";
 import { getAccountCompanyIdFromClaims } from "@/lib/auth-utils";
 
 function mapDbLead(l: any): Lead {
-  if (!l) return l;
-  const stage = (l.stage || 'Cold') as LeadStage;
-  const temp = (l.lead_temperature || (stage === 'Hot' ? 'Hot' : stage === 'Warm' ? 'Warm' : 'Cold')) as LeadTemperature;
+  if (!l) return null as any;
 
   return {
     id: l.id,
     account_company_id: l.account_company_id,
-    person_id: l.person_id,
-    contact_name: l.person_name || l.person?.name || "Contact",
-    person_name: l.person_name || l.person?.name || "Contact",
-    contact_title: l.person?.job_title || "Decision Maker",
-    contact_email: l.person?.email || "",
-    contact_avatar: l.person?.avatar_url,
-    organization_id: l.person_id || l.id,
-    organization_name: l.company_name || "Company",
-    company_name: l.company_name || "Company",
-    industry: toTitleCase(l.industry || "Technology"),
-    stage,
-    pipeline_stage: stage,
-    temperature: temp,
-    lead_temperature: temp,
-    score: l.lead_score ?? 0,
+    person_id: l.person_id ?? null,
+    person_name: l.person_name ?? null,
+    company_name: l.company_name ?? null,
+    industry: toTitleCase(l.industry),
+    lead_temperature: l.lead_temperature ?? 'COLD',
     lead_score: l.lead_score ?? 0,
-    deal_value: 50000,
-    probability: stage === 'Hot' ? 80 : stage === 'Warm' ? 50 : 25,
-    last_contact: l.last_contact ? new Date(l.last_contact).toLocaleDateString('en-ZA') : undefined,
-    next_followup: l.next_followup ? new Date(l.next_followup).toLocaleDateString('en-ZA') : undefined,
-    followup_count: l.followup_count || 0,
-    assigned_to: l.assigned_user || "Sales Team",
-    assigned_user: l.assigned_user || "Sales Team",
-    created_at: l.created_at,
-    updated_at: l.updated_at,
+    stage: l.stage ?? 'Cold',
+    last_contact: l.last_contact ?? null,
+    next_followup: l.next_followup ?? null,
+    assigned_user: l.assigned_user ?? null,
+    followup_count: l.followup_count ?? 0,
+    created_at: l.created_at ?? null,
+    updated_at: l.updated_at ?? null,
+    person: l.person ? {
+      id: l.person.id,
+      name: l.person.name,
+      job_title: l.person.job_title,
+      company_name: l.person.company_name,
+      email: l.person.email,
+      phone: l.person.phone,
+      linkedin_url: l.person.linkedin_url,
+      score: l.person.score,
+    } : null,
+    account_company: l.account_company ?? null,
+    followup_item_list: l.followup_item_list ?? [],
+    outreach_activity_list: l.outreach_activity_list ?? [],
+    task_list: l.task_list ?? [],
   };
 }
 
@@ -71,16 +71,19 @@ export async function getLeadsActionByToken(
       whereConditions.push({ stage: { _eq: params.stage } });
     }
 
-    if (params?.temperature && params.temperature !== ('all' as any)) {
-      whereConditions.push({ lead_temperature: { _eq: params.temperature } });
+    const temp = params?.lead_temperature;
+    if (temp && temp !== ('all' as any)) {
+      whereConditions.push({ lead_temperature: { _eq: temp } });
     }
 
-    if (params?.assigned_to && params.assigned_to !== 'all') {
-      whereConditions.push({ assigned_user: { _eq: params.assigned_to } });
+    const assigned = params?.assigned_user;
+    if (assigned && assigned !== 'all') {
+      whereConditions.push({ assigned_user: { _eq: assigned } });
     }
 
-    if (params?.organization_name) {
-      whereConditions.push({ company_name: { _eq: params.organization_name } });
+    const companyName = params?.company_name;
+    if (companyName) {
+      whereConditions.push({ company_name: { _eq: companyName } });
     }
 
     const where = { _and: whereConditions };
@@ -89,7 +92,7 @@ export async function getLeadsActionByToken(
       query GetLeads($where: aa_s_leads_bool_exp) {
         aa_s_leads(
           where: $where
-          order_by: { lead_score: desc }
+          order_by: { lead_score: desc_nulls_last, id: desc }
         ) {
           id
           account_company_id
@@ -146,9 +149,9 @@ export async function updateLeadStageActionByToken(
 
   try {
     const parsedId = Number(id);
-    const temp = newStage === "Hot" || newStage === "Customer" ? "Hot"
-      : newStage === "Cold" || newStage === "Lost" ? "Cold"
-        : "Warm";
+    const temp = newStage === "Hot" || newStage === "Customer" ? "HOT"
+      : newStage === "Cold" || newStage === "Lost" ? "COLD"
+        : "WARM";
 
     const mutation = `
       mutation UpdateLeadStage($id: Int!, $stage: String!, $lead_temperature: String!) {
@@ -247,7 +250,18 @@ export async function updateLeadStatusActionByToken(
 
 export async function createLeadActionByToken(
   token: string,
-  input: Partial<Lead>
+  input: {
+    person_name?: string | null;
+    person_id?: number | null;
+    company_name?: string | null;
+    industry?: string | null;
+    stage?: string | null;
+    lead_temperature?: string | null;
+    lead_score?: number | null;
+    assigned_user?: string | null;
+    next_followup?: string | null;
+    last_contact?: string | null;
+  }
 ): Promise<Lead | null> {
   const companyId = await getAccountCompanyIdFromClaims(token);
   if (!companyId) {
@@ -260,6 +274,7 @@ export async function createLeadActionByToken(
         insert_aa_s_leads_one(object: $object) {
           id
           account_company_id
+          person_id
           person_name
           company_name
           industry
@@ -267,7 +282,10 @@ export async function createLeadActionByToken(
           lead_temperature
           lead_score
           assigned_user
+          next_followup
+          last_contact
           created_at
+          updated_at
         }
       }
     `;
@@ -276,13 +294,16 @@ export async function createLeadActionByToken(
       mutation,
       input: {
         account_company_id: companyId,
-        person_name: input.contact_name || input.person_name || "New Contact",
-        company_name: input.organization_name || input.company_name || "Target Company",
-        industry: input.industry || "Technology",
-        stage: input.pipeline_stage || input.stage || "Cold",
-        lead_temperature: input.temperature || input.lead_temperature || "Cold",
-        lead_score: input.score ?? input.lead_score ?? 50,
-        assigned_user: input.assigned_to || input.assigned_user || "Unassigned",
+        person_id: input.person_id ?? null,
+        person_name: input.person_name || null,
+        company_name: input.company_name || null,
+        industry: input.industry || null,
+        stage: input.stage || "Cold",
+        lead_temperature: input.lead_temperature || "COLD",
+        lead_score: input.lead_score ?? 0,
+        assigned_user: input.assigned_user || null,
+        next_followup: input.next_followup || null,
+        last_contact: input.last_contact || null,
       },
       operationName: "CreateLead",
     });

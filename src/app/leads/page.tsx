@@ -10,41 +10,55 @@ import {
   updateLeadStageActionByToken,
   createLeadActionByToken,
 } from "@/services/private/leadServices";
-import {
-  PIPELINE_STAGES,
-  STAGE_COLORS,
-  TEMP_COLORS,
-} from "@/lib/constants";
-import type {
-  Lead,
-  LeadStage,
-} from "@/lib/types";
+import type { Lead, LeadStage, LeadTemperature } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Search,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Flame,
   Thermometer,
   Snowflake,
-  ArrowRight,
+  Plus,
+  Search,
   LayoutList,
   Kanban,
-  Plus,
-  DollarSign,
-  SlidersHorizontal,
-  ChevronRight,
-  Users,
-  Clock,
-  ArrowUpDown,
   CheckCircle,
   XCircle,
   Repeat,
+  Building2,
+  Calendar,
 } from "lucide-react";
+
+// ─── Visual Tokens ─────────────────────────────────────────────────────────
+const PIPELINE_STAGES: LeadStage[] = ["Cold", "Contacted", "Warm", "Hot", "Customer", "Lost"];
+
+const STAGE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  Cold: { bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-400" },
+  Contacted: { bg: "bg-purple-500/10", border: "border-purple-500/30", text: "text-purple-400" },
+  Warm: { bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-400" },
+  Hot: { bg: "bg-red-500/10", border: "border-red-500/30", text: "text-red-400" },
+  Customer: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400" },
+  Lost: { bg: "bg-zinc-500/10", border: "border-zinc-500/30", text: "text-zinc-400" },
+};
+
+const TEMP_COLORS: Record<string, { badge: string; text: string }> = {
+  HOT: { badge: "bg-red-500/15 text-red-400 border-red-500/30", text: "text-red-400" },
+  Hot: { badge: "bg-red-500/15 text-red-400 border-red-500/30", text: "text-red-400" },
+  WARM: { badge: "bg-amber-500/15 text-amber-400 border-amber-500/30", text: "text-amber-400" },
+  Warm: { badge: "bg-amber-500/15 text-amber-400 border-amber-500/30", text: "text-amber-400" },
+  COLD: { badge: "bg-blue-500/15 text-blue-400 border-blue-500/30", text: "text-blue-400" },
+  Cold: { badge: "bg-blue-500/15 text-blue-400 border-blue-500/30", text: "text-blue-400" },
+};
 
 const STAGE_ICONS: Record<string, React.ReactNode> = {
   Cold: <Snowflake className="h-3.5 w-3.5" />,
@@ -55,13 +69,13 @@ const STAGE_ICONS: Record<string, React.ReactNode> = {
   Lost: <XCircle className="h-3.5 w-3.5" />,
 };
 
-function ScoreBar({ score }: { score?: number }) {
-  const val = score ?? 70;
+function ScoreBar({ score }: { score?: number | null }) {
+  const val = score ?? 0;
   const color = val >= 85 ? "bg-emerald-400" : val >= 65 ? "bg-amber-400" : "bg-blue-400";
   return (
     <div className="flex items-center gap-2 text-[10px] font-mono">
       <div className="flex-1 h-1.5 rounded-full bg-muted/50 overflow-hidden">
-        <div className={`h-1.5 rounded-full ${color}`} style={{ width: `${val}%` }} />
+        <div className={`h-1.5 rounded-full ${color}`} style={{ width: `${Math.min(val, 100)}%` }} />
       </div>
       <span className="text-foreground font-bold w-6 text-right">{val}</span>
     </div>
@@ -70,52 +84,73 @@ function ScoreBar({ score }: { score?: number }) {
 
 // ─── Kanban Card ───────────────────────────────────────────────────────────
 function KanbanCard({ lead, onMove }: { lead: Lead; onMove: (id: string | number, stage: LeadStage) => void }) {
-  const stage = lead.pipeline_stage || "Cold";
+  const stage = (lead.stage || "Cold") as LeadStage;
   const sc = STAGE_COLORS[stage] || STAGE_COLORS.Cold;
   const idx = PIPELINE_STAGES.indexOf(stage);
   const prevStage = idx > 0 ? PIPELINE_STAGES[idx - 1] : null;
   const nextStage = idx < PIPELINE_STAGES.length - 1 ? PIPELINE_STAGES[idx + 1] : null;
+  const tempKey = lead.lead_temperature || "COLD";
+  const tc = TEMP_COLORS[tempKey] || TEMP_COLORS.COLD;
+
+  const personName = lead.person_name || lead.person?.name || "Lead Contact";
+  const personTitle = lead.person?.job_title;
+  const initials = personName.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase() || "L";
 
   return (
     <div className={`rounded-xl ${sc.border} ${sc.bg} p-3 space-y-2.5 text-xs hover:shadow-md transition-shadow`}>
       <div className="flex items-center justify-between gap-2">
-        {lead.contact_avatar && (
-          <img src={lead.contact_avatar} alt={lead.contact_name} className="h-7 w-7 rounded-full object-cover border border-border/40 shrink-0" />
-        )}
-        <div className="flex-1 min-w-0">
-          <Link href={`/people/${lead.id}`} className={`font-bold truncate block hover:text-indigo-400 ${sc.text}`}>
-            {lead.contact_name}
-          </Link>
-          <p className="text-muted-foreground text-[10px] truncate">{lead.contact_title}</p>
+        <div className="h-7 w-7 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 flex items-center justify-center font-bold text-[10px] shrink-0">
+          {initials}
         </div>
-        <Badge className={`${TEMP_COLORS[lead.temperature || 'Cold']?.badge || 'bg-blue-500/10 text-blue-400 border-blue-500/20'} text-[9px] px-1.5 shrink-0`}>
-          {lead.temperature || 'Cold'}
+        <div className="flex-1 min-w-0">
+          {lead.person_id ? (
+            <Link href={`/people/${lead.person_id}`} className={`font-bold truncate block hover:text-indigo-400 ${sc.text}`}>
+              {personName}
+            </Link>
+          ) : (
+            <span className={`font-bold truncate block ${sc.text}`}>{personName}</span>
+          )}
+          {personTitle && <p className="text-muted-foreground text-[10px] truncate">{personTitle}</p>}
+        </div>
+        <Badge className={`${tc.badge} text-[9px] px-1.5 shrink-0`}>
+          {lead.lead_temperature || 'COLD'}
         </Badge>
       </div>
 
-      <div className="text-[10px] text-muted-foreground font-mono">
-        <Link href={`/companies/${lead.organization_id}`} className="text-indigo-400 hover:text-indigo-300 font-semibold">
-          {lead.organization_name}
-        </Link>
-      </div>
+      {lead.company_name && (
+        <div className="text-[10px] text-muted-foreground font-mono flex items-center gap-1">
+          <Building2 className="h-2.5 w-2.5 text-indigo-400 shrink-0" />
+          <span className="font-semibold text-foreground truncate">{lead.company_name}</span>
+        </div>
+      )}
 
-      <ScoreBar score={lead.score} />
+      {lead.industry && (
+        <div className="text-[10px] text-muted-foreground font-mono truncate">
+          {lead.industry}
+        </div>
+      )}
 
-      <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border/20">
-        <span className="text-emerald-400 font-bold">${Number(lead.deal_value || 0).toLocaleString()}</span>
-        <span className="text-muted-foreground">↩ #{lead.followup_count}</span>
+      <ScoreBar score={lead.lead_score} />
+
+      <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border/20 text-muted-foreground">
+        <span>{lead.next_followup ? `Next: ${new Date(lead.next_followup).toLocaleDateString()}` : `Score: ${lead.lead_score || 0}`}</span>
+        <span>↩ #{lead.followup_count || 0}</span>
       </div>
 
       <div className="flex items-center gap-1 pt-0.5">
         {prevStage && (
-          <button onClick={() => onMove(lead.id, prevStage as LeadStage)}
-            className="flex-1 text-center text-[10px] py-1 rounded bg-muted/40 hover:bg-muted/70 text-muted-foreground transition-colors">
+          <button
+            onClick={() => onMove(lead.id, prevStage as LeadStage)}
+            className="flex-1 text-center text-[10px] py-1 rounded bg-muted/40 hover:bg-muted/70 text-muted-foreground transition-colors"
+          >
             ← {prevStage}
           </button>
         )}
         {nextStage && (
-          <button onClick={() => onMove(lead.id, nextStage as LeadStage)}
-            className="flex-1 text-center text-[10px] py-1 rounded bg-muted/40 hover:bg-muted/70 text-muted-foreground transition-colors">
+          <button
+            onClick={() => onMove(lead.id, nextStage as LeadStage)}
+            className="flex-1 text-center text-[10px] py-1 rounded bg-muted/40 hover:bg-muted/70 text-muted-foreground transition-colors"
+          >
             {nextStage} →
           </button>
         )}
@@ -138,7 +173,7 @@ export default function LeadsPage() {
 
   // Add Lead Modal
   const [addOpen, setAddOpen] = React.useState(false);
-  const [newLead, setNewLead] = React.useState({ contact_name: "", organization_name: "", deal_value: "" });
+  const [newLead, setNewLead] = React.useState({ person_name: "", company_name: "", industry: "" });
 
   const { user } = useAuth();
   const load = React.useCallback(async () => {
@@ -146,11 +181,12 @@ export default function LeadsPage() {
     setLoading(true);
     try {
       const token = await user.getIdToken(true);
-      const data = await getLeadsActionByToken(token, { search });
-      let filtered = Array.isArray(data) ? data : [];
-      if (filterStage !== "all") filtered = filtered.filter(l => l.pipeline_stage === filterStage);
-      if (filterAssigned !== "all") filtered = filtered.filter(l => l.assigned_to === filterAssigned);
-      setLeads(filtered);
+      const data = await getLeadsActionByToken(token, {
+        search,
+        stage: filterStage !== "all" ? (filterStage as LeadStage) : undefined,
+        assigned_user: filterAssigned !== "all" ? filterAssigned : undefined,
+      });
+      setLeads(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error("Failed to load leads:", e);
     } finally {
@@ -158,7 +194,9 @@ export default function LeadsPage() {
     }
   }, [user, search, filterStage, filterAssigned]);
 
-  React.useEffect(() => { load(); }, [load]);
+  React.useEffect(() => {
+    load();
+  }, [load]);
 
   const handleMove = async (id: string | number, stage: LeadStage) => {
     if (!user) return;
@@ -177,12 +215,12 @@ export default function LeadsPage() {
     try {
       const token = await user.getIdToken(true);
       await createLeadActionByToken(token, {
-        contact_name: newLead.contact_name,
-        organization_name: newLead.organization_name,
-        deal_value: Number(newLead.deal_value) || 50000,
+        person_name: newLead.person_name,
+        company_name: newLead.company_name,
+        industry: newLead.industry,
       });
       setAddOpen(false);
-      setNewLead({ contact_name: "", organization_name: "", deal_value: "" });
+      setNewLead({ person_name: "", company_name: "", industry: "" });
       load();
     } catch (e) {
       console.error("Failed to create lead:", e);
@@ -190,9 +228,9 @@ export default function LeadsPage() {
   };
 
   // Stats summary
-  const totalPipeline = leads.reduce((s, l) => s + (Number(l.deal_value) || 0), 0);
-  const hotCount = leads.filter(l => l.pipeline_stage === "Hot").length;
-  const avgScore = leads.length ? Math.round(leads.reduce((s, l) => s + (l.score || l.lead_score || 0), 0) / leads.length) : 0;
+  const hotCount = leads.filter(l => l.lead_temperature?.toUpperCase() === "HOT" || l.stage === "Hot").length;
+  const warmCount = leads.filter(l => l.lead_temperature?.toUpperCase() === "WARM" || l.stage === "Warm").length;
+  const avgScore = leads.length ? Math.round(leads.reduce((s, l) => s + (l.lead_score || 0), 0) / leads.length) : 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
@@ -206,13 +244,12 @@ export default function LeadsPage() {
         />
 
         <main className="flex-1 p-6 space-y-5 overflow-y-auto">
-
           {/* Stats Bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
               { label: "Total Leads", value: leads.length.toString(), color: "text-foreground" },
               { label: "Hot Leads", value: hotCount.toString(), color: "text-red-400" },
-              { label: "Pipeline Value", value: `$${(totalPipeline / 1000).toFixed(0)}k`, color: "text-emerald-400" },
+              { label: "Warm Leads", value: warmCount.toString(), color: "text-amber-400" },
               { label: "Avg Score", value: `${avgScore}/100`, color: "text-indigo-300" },
             ].map((stat) => (
               <Card key={stat.label} className="bg-card p-4 text-center">
@@ -226,12 +263,18 @@ export default function LeadsPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-card p-4 rounded-xl backdrop-blur-xl">
             {/* View Toggle */}
             <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 shrink-0">
-              <button onClick={() => setView("kanban")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${view === "kanban" ? "bg-indigo-600 text-white shadow-lg" : "text-muted-foreground hover:text-foreground"}`}>
+              <button
+                onClick={() => setView("kanban")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${view === "kanban" ? "bg-indigo-600 text-white shadow-lg" : "text-muted-foreground hover:text-foreground"
+                  }`}
+              >
                 <Kanban className="h-3.5 w-3.5" /> Kanban
               </button>
-              <button onClick={() => setView("table")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${view === "table" ? "bg-indigo-600 text-white shadow-lg" : "text-muted-foreground hover:text-foreground"}`}>
+              <button
+                onClick={() => setView("table")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${view === "table" ? "bg-indigo-600 text-white shadow-lg" : "text-muted-foreground hover:text-foreground"
+                  }`}
+              >
                 <LayoutList className="h-3.5 w-3.5" /> Table
               </button>
             </div>
@@ -239,30 +282,34 @@ export default function LeadsPage() {
             {/* Search */}
             <div className="relative flex-1 w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search by contact, company, industry..."
-                value={search} onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 bg-muted/40 text-xs h-9" />
+              <Input
+                placeholder="Search by contact, company, industry..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 bg-muted/40 text-xs h-9"
+              />
             </div>
 
             {/* Stage filter */}
-            <select value={filterStage} onChange={(e) => setFilterStage(e.target.value)}
-              className="bg-muted/40 rounded-md px-2.5 py-1.5 text-xs outline-none text-foreground shrink-0">
+            <select
+              value={filterStage}
+              onChange={(e) => setFilterStage(e.target.value)}
+              className="bg-muted/40 rounded-md px-2.5 py-1.5 text-xs outline-none text-foreground shrink-0"
+            >
               <option value="all">All Stages</option>
-              {PIPELINE_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-
-            {/* Assigned filter */}
-            <select value={filterAssigned} onChange={(e) => setFilterAssigned(e.target.value)}
-              className="bg-muted/40 rounded-md px-2.5 py-1.5 text-xs outline-none text-foreground shrink-0">
-              <option value="all">All Reps</option>
-              <option value="Alex Rivers">Alex Rivers</option>
-              <option value="Sarah Connor">Sarah Connor</option>
-              <option value="David Kim">David Kim</option>
+              {PIPELINE_STAGES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
             </select>
 
             {/* Add Lead */}
-            <Button size="sm" onClick={() => setAddOpen(true)}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 font-semibold h-9 shrink-0">
+            <Button
+              size="sm"
+              onClick={() => setAddOpen(true)}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 font-semibold h-9 shrink-0"
+            >
               <Plus className="h-3.5 w-3.5" /> Add Lead
             </Button>
           </div>
@@ -272,8 +319,7 @@ export default function LeadsPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               {PIPELINE_STAGES.map((stage) => {
                 const sc = STAGE_COLORS[stage];
-                const stageLeads = leads.filter(l => l.pipeline_stage === stage);
-                const stageValue = stageLeads.reduce((s, l) => s + (Number(l.deal_value) || 0), 0);
+                const stageLeads = leads.filter((l) => l.stage === stage);
                 return (
                   <div key={stage} className="flex flex-col gap-3">
                     {/* Column Header */}
@@ -285,18 +331,15 @@ export default function LeadsPage() {
                         {stageLeads.length}
                       </Badge>
                     </div>
-                    {/* Stage Value */}
-                    <div className="text-[10px] text-muted-foreground font-mono px-1">
-                      ${(stageValue / 1000).toFixed(0)}k pipeline
-                    </div>
+
                     {/* Cards */}
                     <div className="space-y-2.5">
                       {stageLeads.length > 0 ? (
-                        stageLeads.map(lead => (
+                        stageLeads.map((lead) => (
                           <KanbanCard key={lead.id} lead={lead} onMove={handleMove} />
                         ))
                       ) : (
-                        <div className="h-20 rounded-xl flex items-center justify-center text-[10px] text-muted-foreground/40">
+                        <div className="h-20 rounded-xl flex items-center justify-center text-[10px] text-muted-foreground/40 border border-dashed border-border/30">
                           Empty
                         </div>
                       )}
@@ -320,7 +363,6 @@ export default function LeadsPage() {
                       <th className="p-3.5">Temperature</th>
                       <th className="p-3.5">Stage</th>
                       <th className="p-3.5">Score</th>
-                      <th className="p-3.5">Deal Value</th>
                       <th className="p-3.5">Last Contact</th>
                       <th className="p-3.5">Next Follow-Up</th>
                       <th className="p-3.5">Follow-Ups</th>
@@ -332,34 +374,48 @@ export default function LeadsPage() {
                     {loading ? (
                       Array.from({ length: 5 }).map((_, i) => (
                         <tr key={i} className="animate-pulse">
-                          <td colSpan={12} className="p-4 bg-card/20" />
+                          <td colSpan={11} className="p-4 bg-card/20" />
                         </tr>
                       ))
                     ) : leads.length > 0 ? (
                       leads.map((lead) => {
-                        const stage = lead.pipeline_stage || 'Cold';
-                        const sc = STAGE_COLORS[stage] || STAGE_COLORS['Cold'];
-                        const tc = TEMP_COLORS[lead.temperature || 'Cold'] || TEMP_COLORS['Cold'];
+                        const stage = (lead.stage || "Cold") as LeadStage;
+                        const sc = STAGE_COLORS[stage] || STAGE_COLORS.Cold;
+                        const tempKey = lead.lead_temperature || "COLD";
+                        const tc = TEMP_COLORS[tempKey] || TEMP_COLORS.COLD;
+                        const personName = lead.person_name || lead.person?.name || "Lead Contact";
+                        const personTitle = lead.person?.job_title;
+                        const initials = personName.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase() || "L";
+
                         return (
                           <tr key={lead.id} className="hover:bg-muted/40 transition-colors group">
                             {/* Person */}
                             <td className="p-3.5">
                               <div className="flex items-center gap-2">
-                                {lead.contact_avatar && (
-                                  <img src={lead.contact_avatar} alt={lead.contact_name}
-                                    className="h-7 w-7 rounded-full object-cover border border-indigo-500/20 shrink-0" />
-                                )}
+                                <div className="h-7 w-7 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 flex items-center justify-center font-bold text-[10px] shrink-0">
+                                  {initials}
+                                </div>
                                 <div className="min-w-0">
-                                  <p className="font-bold truncate max-w-[110px]">{lead.contact_name}</p>
-                                  <p className="text-[10px] text-muted-foreground truncate max-w-[110px]">{lead.contact_title}</p>
+                                  {lead.person_id ? (
+                                    <Link href={`/people/${lead.person_id}`} className="font-bold truncate max-w-[120px] block hover:text-indigo-400">
+                                      {personName}
+                                    </Link>
+                                  ) : (
+                                    <p className="font-bold truncate max-w-[120px]">{personName}</p>
+                                  )}
+                                  {personTitle && (
+                                    <p className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                                      {personTitle}
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                             </td>
                             {/* Company */}
                             <td className="p-3.5">
-                              <Link href={`/companies/${lead.organization_id}`} className="text-indigo-400 hover:text-indigo-300 font-semibold whitespace-nowrap">
-                                {lead.organization_name}
-                              </Link>
+                              <span className="font-semibold text-foreground whitespace-nowrap">
+                                {lead.company_name || "—"}
+                              </span>
                             </td>
                             {/* Industry */}
                             <td className="p-3.5 text-muted-foreground text-[11px] whitespace-nowrap">
@@ -368,7 +424,7 @@ export default function LeadsPage() {
                             {/* Temperature */}
                             <td className="p-3.5">
                               <Badge className={`${tc.badge} text-[10px]`}>
-                                {lead.temperature || 'Cold'}
+                                {lead.lead_temperature || "COLD"}
                               </Badge>
                             </td>
                             {/* Stage */}
@@ -379,29 +435,25 @@ export default function LeadsPage() {
                             </td>
                             {/* Score */}
                             <td className="p-3.5 w-28">
-                              <ScoreBar score={lead.score} />
-                            </td>
-                            {/* Deal Value */}
-                            <td className="p-3.5 font-mono text-emerald-400 font-semibold whitespace-nowrap">
-                              ${Number(lead.deal_value || 0).toLocaleString()}
+                              <ScoreBar score={lead.lead_score} />
                             </td>
                             {/* Last Contact */}
                             <td className="p-3.5 text-muted-foreground font-mono text-[10px] whitespace-nowrap">
-                              {lead.last_contact || "—"}
+                              {lead.last_contact ? new Date(lead.last_contact).toLocaleDateString() : "—"}
                             </td>
                             {/* Next Follow-Up */}
                             <td className="p-3.5 text-muted-foreground font-mono text-[10px] whitespace-nowrap">
-                              {lead.next_followup || "—"}
+                              {lead.next_followup ? new Date(lead.next_followup).toLocaleDateString() : "—"}
                             </td>
                             {/* Follow-Up Count */}
                             <td className="p-3.5 font-mono text-center">
                               <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] font-bold">
-                                {lead.followup_count}
+                                {lead.followup_count || 0}
                               </span>
                             </td>
                             {/* Assigned */}
                             <td className="p-3.5 text-muted-foreground text-[11px] whitespace-nowrap">
-                              {lead.assigned_to}
+                              {lead.assigned_user || "—"}
                             </td>
                             {/* Move Buttons */}
                             <td className="p-3.5">
@@ -409,9 +461,12 @@ export default function LeadsPage() {
                                 const idx = PIPELINE_STAGES.indexOf(stage);
                                 const next = PIPELINE_STAGES[idx + 1];
                                 return next ? (
-                                  <Button size="sm" variant="ghost"
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
                                     onClick={() => handleMove(lead.id, next)}
-                                    className={`text-[10px] h-7 gap-0.5 opacity-0 group-hover:opacity-100 ${sc.text}`}>
+                                    className={`text-[10px] h-7 gap-0.5 opacity-0 group-hover:opacity-100 ${sc.text}`}
+                                  >
                                     → {next}
                                   </Button>
                                 ) : null;
@@ -422,7 +477,7 @@ export default function LeadsPage() {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={12} className="p-10 text-center text-muted-foreground text-xs">
+                        <td colSpan={11} className="p-10 text-center text-muted-foreground text-xs">
                           No leads found. Try adjusting your filters.
                         </td>
                       </tr>
@@ -431,12 +486,9 @@ export default function LeadsPage() {
                   {leads.length > 0 && (
                     <tfoot>
                       <tr className="border-t border-border/40 bg-muted/20 text-[11px] font-semibold text-muted-foreground">
-                        <td className="p-3.5 font-bold text-foreground">{leads.length} leads</td>
-                        <td colSpan={5} />
-                        <td className="p-3.5 font-mono font-bold text-emerald-400">
-                          ${totalPipeline.toLocaleString()} total
+                        <td colSpan={11} className="p-3.5 font-bold text-foreground">
+                          {leads.length} Total Leads ({hotCount} Hot, {warmCount} Warm)
                         </td>
-                        <td colSpan={5} />
                       </tr>
                     </tfoot>
                   )}
@@ -464,22 +516,37 @@ export default function LeadsPage() {
           <form onSubmit={handleAddLead} className="space-y-4 text-xs">
             <div className="space-y-1.5">
               <Label>Contact Name</Label>
-              <Input placeholder="e.g. Jane Doe" value={newLead.contact_name}
-                onChange={e => setNewLead(p => ({ ...p, contact_name: e.target.value }))} required />
+              <Input
+                placeholder="e.g. Jane Doe"
+                value={newLead.person_name}
+                onChange={(e) => setNewLead((p) => ({ ...p, person_name: e.target.value }))}
+                required
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Company Name</Label>
-              <Input placeholder="e.g. Acme Inc" value={newLead.organization_name}
-                onChange={e => setNewLead(p => ({ ...p, organization_name: e.target.value }))} required />
+              <Input
+                placeholder="e.g. Acme Inc"
+                value={newLead.company_name}
+                onChange={(e) => setNewLead((p) => ({ ...p, company_name: e.target.value }))}
+                required
+              />
             </div>
             <div className="space-y-1.5">
-              <Label>Deal Value ($)</Label>
-              <Input type="number" placeholder="e.g. 75000" value={newLead.deal_value}
-                onChange={e => setNewLead(p => ({ ...p, deal_value: e.target.value }))} />
+              <Label>Industry</Label>
+              <Input
+                placeholder="e.g. Construction"
+                value={newLead.industry}
+                onChange={(e) => setNewLead((p) => ({ ...p, industry: e.target.value }))}
+              />
             </div>
             <DialogFooter className="pt-2">
-              <Button type="button" variant="ghost" onClick={() => setAddOpen(false)}>Cancel</Button>
-              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold">Add Lead</Button>
+              <Button type="button" variant="ghost" onClick={() => setAddOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold">
+                Add Lead
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

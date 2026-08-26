@@ -36,15 +36,13 @@ export async function getCompanyAnalyticsReportsActionByToken(token: string): Pr
 
     return orgs.map((org: any) => {
       const orgName = org.name || "Unnamed";
-      const matchingLeads = leadsList.filter(
-        (l) => l.company_name === orgName || (org.id && String(l.organization_id) === String(org.id))
-      );
+      const matchingLeads = leadsList.filter((l) => l.company_name === orgName);
 
       const dealsWon = matchingLeads.filter(
-        (l) => l.pipeline_stage === "Customer" || l.stage === "Customer" || l.stage === "Closed Won"
+        (l) => l.stage === "Customer" || l.stage === "Closed Won"
       ).length;
 
-      const pipelineTotal = matchingLeads.reduce((acc: number, l) => acc + parseDealValue(l.deal_value), 0);
+      const pipelineTotal = matchingLeads.reduce((acc: number, l) => acc + (l.lead_score || 0), 0);
       const leadsCount = matchingLeads.length > 0
         ? matchingLeads.length
         : (org.people_list ? org.people_list.length : (org.decision_makers ? org.decision_makers.length : 0));
@@ -57,7 +55,7 @@ export async function getCompanyAnalyticsReportsActionByToken(token: string): Pr
         revenue: org.organization_revenue_str || (org.organization_revenue ? `$${(org.organization_revenue / 1000000).toFixed(1)}M` : "N/A"),
         leads_count: leadsCount,
         deals_won: dealsWon,
-        pipeline_value: pipelineTotal > 0 ? `$${pipelineTotal.toLocaleString()}` : "$0",
+        pipeline_value: pipelineTotal > 0 ? `Score: ${pipelineTotal}` : "0",
       };
     });
   } catch (err) {
@@ -81,12 +79,12 @@ export async function getIndustryAnalyticsReportsActionByToken(token: string): P
       const indName = toTitleCase(ind.name || "Industry");
       const matchingLeads = leadsList.filter((l) => l.industry === indName);
       const totalLeads = matchingLeads.length;
-      const customers = matchingLeads.filter((l) => l.stage === "Customer" || l.pipeline_stage === "Customer" || l.stage === "Closed Won").length;
+      const customers = matchingLeads.filter((l) => l.stage === "Customer" || l.stage === "Closed Won").length;
       const convRate = totalLeads > 0 ? `${Math.round((customers / totalLeads) * 100)}%` : "0%";
 
-      const totalValue = matchingLeads.reduce((acc: number, l) => acc + parseDealValue(l.deal_value), 0);
+      const totalValue = matchingLeads.reduce((acc: number, l) => acc + (l.lead_score || 0), 0);
       const avgValue = totalLeads > 0 ? totalValue / totalLeads : 0;
-      const avgDealSize = avgValue > 0 ? `$${Math.round(avgValue).toLocaleString()}` : "$0";
+      const avgDealSize = avgValue > 0 ? `${Math.round(avgValue)} score` : "0";
 
       const sharePct = totalAllLeads > 0 ? Math.round((totalLeads / totalAllLeads) * 100) : 0;
       const growthRate = sharePct > 0 ? `+${sharePct}%` : "0%";
@@ -114,7 +112,7 @@ export async function getLeadConversionReportsActionByToken(token: string): Prom
 
     const stages = ["Cold", "Contacted", "Warm", "Hot", "Customer"];
     return stages.map((stage) => {
-      const stageLeads = leadsList.filter((l) => (l.pipeline_stage || l.stage) === stage);
+      const stageLeads = leadsList.filter((l) => l.stage === stage);
       const count = stageLeads.length;
       const convRate = total > 0 ? `${Math.round((count / total) * 100)}%` : "0%";
       const dropRate = total > 0 ? `${Math.max(0, 100 - Math.round((count / total) * 100))}%` : "0%";
@@ -243,7 +241,7 @@ export async function getSalesActivityReportsActionByToken(token: string): Promi
     const leadsList = Array.isArray(leads) ? leads : [];
 
     const repsFromActs = actList.map((a) => a.assigned_to).filter(Boolean) as string[];
-    const repsFromLeads = leadsList.map((l) => l.assigned_to || l.assigned_user).filter(Boolean) as string[];
+    const repsFromLeads = leadsList.map((l) => l.assigned_user).filter(Boolean) as string[];
     const activeReps = Array.from(new Set([...repsFromActs, ...repsFromLeads]));
 
     if (activeReps.length === 0) {
@@ -252,16 +250,16 @@ export async function getSalesActivityReportsActionByToken(token: string): Promi
 
     return activeReps.map((repName) => {
       const repActs = actList.filter((a) => a.assigned_to === repName);
-      const repLeads = leadsList.filter((l) => l.assigned_to === repName || l.assigned_user === repName);
+      const repLeads = leadsList.filter((l) => l.assigned_user === repName);
 
       const emails = repActs.filter((a) => a.channel === "Email").length;
       const calls = repActs.filter((a) => a.channel === "Phone").length;
       const linkedin = repActs.filter((a) => a.channel === "LinkedIn").length;
       const meetings = repActs.filter((a) => a.status === "Meeting Set" || a.status === "Completed").length;
 
-      const closedLeads = repLeads.filter((l) => l.stage === "Customer" || l.pipeline_stage === "Customer" || l.stage === "Closed Won");
+      const closedLeads = repLeads.filter((l) => l.stage === "Customer" || l.stage === "Closed Won");
       const dealsClosed = closedLeads.length;
-      const totalRevenue = closedLeads.reduce((acc: number, l) => acc + parseDealValue(l.deal_value), 0);
+      const totalScore = closedLeads.reduce((acc: number, l) => acc + (l.lead_score || 0), 0);
 
       return {
         rep_name: repName,
@@ -270,7 +268,7 @@ export async function getSalesActivityReportsActionByToken(token: string): Promi
         linkedin_messages: linkedin,
         meetings_held: meetings,
         deals_closed: dealsClosed,
-        revenue_generated: totalRevenue > 0 ? `$${totalRevenue.toLocaleString()}` : "$0",
+        revenue_generated: totalScore > 0 ? `Score: ${totalScore}` : "0",
       };
     });
   } catch (err) {

@@ -26,6 +26,7 @@ import {
   Send,
   MessageSquare,
   Target,
+  User,
 } from "lucide-react";
 
 const TIMELINE_ICONS: Record<string, React.ReactNode> = {
@@ -61,28 +62,69 @@ function ScoreBar({ label, value, color }: { label: string; value: number; color
 export default function PersonProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const personId = (params?.id as string) || "person-1";
+  const personId = params?.id as string | undefined;
 
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [person, setPerson] = React.useState<DecisionMaker | null>(null);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
+    if (!personId) {
+      setLoading(false);
+      return;
+    }
     (async () => {
       setLoading(true);
-      const data = await peopleServices.getDecisionMakerById(personId);
-      setPerson(data);
-      setLoading(false);
+      try {
+        const data = await peopleServices.getDecisionMakerById(personId);
+        setPerson(data);
+      } catch (err) {
+        console.error("Failed to load person:", err);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [personId]);
 
-  if (loading || !person) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-background text-foreground flex">
         <SalesProSidebar />
         <div className="flex-1 p-8 space-y-6">
           <div className="h-12 bg-card/40 border border-border/40 rounded-xl animate-pulse" />
           <div className="h-80 bg-card/40 border border-border/40 rounded-xl animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!person) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex">
+        <SalesProSidebar onOpenCommandPalette={() => setCommandOpen(true)} />
+        <div className="flex-1 flex flex-col min-w-0">
+          <SalesProHeader
+            title="Person Not Found"
+            subtitle={personId ? `No decision maker profile found matching ID #${personId}` : "Invalid person ID provided"}
+            onOpenCommandPalette={() => setCommandOpen(true)}
+          />
+          <main className="flex-1 p-6 flex flex-col items-center justify-center text-center space-y-4">
+            <User className="h-12 w-12 text-muted-foreground/40" />
+            <div>
+              <h2 className="text-base font-bold">Person Profile Not Found</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                The requested decision maker could not be located in the database.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/people")}
+              className="text-xs gap-1.5"
+            >
+              <ChevronLeft className="h-4 w-4" /> Back to People
+            </Button>
+          </main>
         </div>
       </div>
     );
@@ -120,11 +162,9 @@ export default function PersonProfilePage() {
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
               {/* Avatar */}
               <div className="relative shrink-0">
-                <img
-                  src={person.avatar_url}
-                  alt={person.name}
-                  className="h-20 w-20 rounded-2xl object-cover border-2 border-indigo-500/30 shadow-lg shadow-indigo-500/10"
-                />
+                <div className="h-20 w-20 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 border-2 border-indigo-500/30 shadow-lg shadow-indigo-500/10 flex items-center justify-center text-white font-bold text-2xl">
+                  {person.name.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase() || "P"}
+                </div>
                 {person.verified && (
                   <div className="absolute -bottom-1.5 -right-1.5 h-6 w-6 rounded-full bg-emerald-500 border-2 border-background flex items-center justify-center">
                     <CheckCircle2 className="h-3.5 w-3.5 text-white" />

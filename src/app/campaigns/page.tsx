@@ -141,10 +141,12 @@ function CampaignBuilderModal({ open, onClose, onSave }: {
     }));
   };
 
+  const { user } = useAuth();
+
   const handleLaunch = async (asDraft = false) => {
     await onSave({
       name, description, audience, sequence, rules, schedule,
-      created_by: "Alex Rivers",
+      created_by: user?.displayName || user?.email?.split("@")[0] || "User",
     });
     onClose();
     setStep(1);
@@ -408,9 +410,15 @@ function CampaignBuilderModal({ open, onClose, onSave }: {
                   <Label className="text-xs">Timezone</Label>
                   <select value={schedule.timezone} onChange={e => setSchedule(s => ({ ...s, timezone: e.target.value }))}
                     className="w-full bg-muted/40 border border-border/60 rounded-md px-3 py-2 text-xs outline-none text-foreground h-9">
-                    <option>UTC-8 (Pacific)</option><option>UTC-7 (Mountain)</option>
-                    <option>UTC-6 (Central)</option><option>UTC-5 (Eastern)</option>
-                    <option>UTC+1 (CET)</option><option>UTC+0 (GMT)</option>
+                    <option>SAST (UTC+2 - Johannesburg / South Africa)</option>
+                    <option>UTC+0 (GMT / London)</option>
+                    <option>UTC+1 (CET / Paris / Berlin)</option>
+                    <option>UTC+2 (EET / Cairo)</option>
+                    <option>UTC+3 (EAT / Nairobi)</option>
+                    <option>UTC-5 (Eastern / New York)</option>
+                    <option>UTC-6 (Central / Chicago)</option>
+                    <option>UTC-7 (Mountain / Denver)</option>
+                    <option>UTC-8 (Pacific / Los Angeles)</option>
                   </select>
                 </div>
               </div>

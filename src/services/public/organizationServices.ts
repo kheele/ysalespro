@@ -62,16 +62,44 @@ function mapDbOrganization(o: any): Organization {
   };
 }
 
-export async function getOrganizations(params?: {
+export interface GetOrganizationsParams {
   search?: string;
   industry?: string;
+  industry_id?: number | string;
   country?: string;
   status?: string;
+  employee_range?: string;
+  min_employees?: number;
+  max_employees?: number;
+  revenue_range?: string;
+  min_revenue?: number;
+  max_revenue?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
   limit?: number;
   offset?: number;
-}): Promise<{ organizations: Organization[]; total: number }> {
+}
+
+export interface PaginatedOrganizationsResponse {
+  organizations: Organization[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasMore: boolean;
+}
+
+export async function getOrganizations(params?: GetOrganizationsParams): Promise<PaginatedOrganizationsResponse> {
+  const limit = params?.pageSize ?? params?.limit ?? 30;
+  const offset = params?.offset !== undefined
+    ? params.offset
+    : params?.page
+      ? (params.page - 1) * limit
+      : 0;
+  const page = params?.page ?? (limit > 0 ? Math.floor(offset / limit) + 1 : 1);
+
   try {
     const whereConditions: Record<string, any>[] = [];
 
@@ -90,17 +118,87 @@ export async function getOrganizations(params?: {
     }
 
     if (params?.industry && params.industry !== "all") {
-      whereConditions.push({ primary_industry: { _eq: params.industry } });
+      const numInd = Number(params.industry);
+      if (!isNaN(numInd) && numInd > 0) {
+        whereConditions.push({
+          industry_list: { industry_id: { _eq: numInd } }
+        });
+      } else {
+        whereConditions.push({
+          _or: [
+            { primary_industry: { _eq: params.industry } },
+            { industry_list: { industry: { name: { _ilike: `%${params.industry}%` } } } },
+          ],
+        });
+      }
+    }
+
+    if (params?.industry_id) {
+      const numIndId = Number(params.industry_id);
+      whereConditions.push({
+        industry_list: { industry_id: { _eq: isNaN(numIndId) ? params.industry_id : numIndId } }
+      });
+    }
+
+    if (params?.employee_range && params.employee_range !== "all") {
+      switch (params.employee_range) {
+        case "1-10":
+          whereConditions.push({ estimated_num_employees: { _gte: 1, _lte: 10 } });
+          break;
+        case "11-50":
+          whereConditions.push({ estimated_num_employees: { _gte: 11, _lte: 50 } });
+          break;
+        case "51-200":
+          whereConditions.push({ estimated_num_employees: { _gte: 51, _lte: 200 } });
+          break;
+        case "201-500":
+          whereConditions.push({ estimated_num_employees: { _gte: 201, _lte: 500 } });
+          break;
+        case "501-1000":
+          whereConditions.push({ estimated_num_employees: { _gte: 501, _lte: 1000 } });
+          break;
+        case "1000+":
+          whereConditions.push({ estimated_num_employees: { _gte: 1000 } });
+          break;
+      }
+    } else {
+      if (params?.min_employees !== undefined) {
+        whereConditions.push({ estimated_num_employees: { _gte: params.min_employees } });
+      }
+      if (params?.max_employees !== undefined) {
+        whereConditions.push({ estimated_num_employees: { _lte: params.max_employees } });
+      }
+    }
+
+    if (params?.revenue_range && params.revenue_range !== "all") {
+      switch (params.revenue_range) {
+        case "<1M":
+          whereConditions.push({ organization_revenue: { _gt: 0, _lt: 1000000 } });
+          break;
+        case "1M-10M":
+          whereConditions.push({ organization_revenue: { _gte: 1000000, _lte: 10000000 } });
+          break;
+        case "10M-50M":
+          whereConditions.push({ organization_revenue: { _gte: 10000000, _lte: 50000000 } });
+          break;
+        case "50M-100M":
+          whereConditions.push({ organization_revenue: { _gte: 50000000, _lte: 100000000 } });
+          break;
+        case "100M+":
+          whereConditions.push({ organization_revenue: { _gte: 100000000 } });
+          break;
+      }
+    } else {
+      if (params?.min_revenue !== undefined) {
+        whereConditions.push({ organization_revenue: { _gte: params.min_revenue } });
+      }
+      if (params?.max_revenue !== undefined) {
+        whereConditions.push({ organization_revenue: { _lte: params.max_revenue } });
+      }
     }
 
     if (params?.country && params.country !== "all") {
       whereConditions.push({ country: { _eq: params.country } });
-    }
-
-    if (params?.status && params.status !== "all") {
-      if (params.status === "Active") {
-        whereConditions.push({ show_intent: { _eq: true } });
-      }
     }
 
     const where = whereConditions.length > 0 ? { _and: whereConditions } : {};
@@ -115,11 +213,6 @@ export async function getOrganizations(params?: {
         $limit: Int
         $offset: Int
       ) {
-        aa_s_organizations_aggregate(where: $where) {
-          aggregate {
-            count
-          }
-        }
         aa_s_organizations(
           where: $where
           order_by: $order_by
@@ -167,30 +260,30 @@ export async function getOrganizations(params?: {
           intent_signal_account
           created_at
           updated_at
-          industry_list {
+          industry_list(order_by: [{ industry: {name: asc} }]) {
             id
             industry {
               id
               name
             }
           }
-          keywords_list {
+          keywords_list(order_by: [{ keyword: {name: asc} }]) {
             id
             keyword {
               name
             }
           }
-          language_list {
+          language_list(order_by: [{ language: {name: asc} }]) {
             id
             language {
               name
             }
           }
-          naics_code_list {
+          naics_code_list(order_by: [{ naics_code: asc }]) {
             id
             naics_code
           }
-          sic_code_list {
+          sic_code_list(order_by: [{ sic_code: asc }]) {
             id
             sic_code
           }
@@ -208,8 +301,8 @@ export async function getOrganizations(params?: {
       variables: {
         where,
         order_by,
-        limit: params?.limit || 30,
-        offset: params?.offset || 0,
+        limit,
+        offset,
       },
       operationName: "GetOrganizations",
       multi_queries: true,
@@ -224,18 +317,32 @@ export async function getOrganizations(params?: {
     };
 
     const orgs = rawList.map(mapDbOrganization).filter(Boolean);
+    const totalPages = limit > 0 ? Math.ceil(total / limit) : 0;
+    const hasMore = offset + orgs.length < total;
 
     return {
       organizations: orgs,
       total,
+      page,
+      pageSize: limit,
+      totalPages,
+      hasMore,
     };
   } catch (err) {
     console.error("Hasura organization query error:", err);
     return {
       organizations: [],
       total: 0,
+      page: 1,
+      pageSize: limit,
+      totalPages: 0,
+      hasMore: false,
     };
   }
+}
+
+export async function getOrganizationsAction(params?: GetOrganizationsParams): Promise<PaginatedOrganizationsResponse> {
+  return getOrganizations(params);
 }
 
 export async function getOrganizationById(id: string | number): Promise<Organization | null> {
@@ -287,34 +394,34 @@ export async function getOrganizationById(id: string | number): Promise<Organiza
           intent_signal_account
           created_at
           updated_at
-          industry_list {
+          industry_list(order_by: [{ industry: {name: asc} }]) {
             id
             industry {
               id
               name
             }
           }
-          keywords_list {
+          keywords_list(order_by: [{ keyword: {name: asc} }]) {
             id
             keyword {
               name
             }
           }
-          language_list {
+          language_list(order_by: [{ language: {name: asc} }]) {
             id
             language {
               name
             }
           }
-          naics_code_list {
+          naics_code_list(order_by: [{ naics_code: asc }]) {
             id
             naics_code
           }
-          sic_code_list {
+          sic_code_list(order_by: [{ sic_code: asc }]) {
             id
             sic_code
           }
-          people_list {
+          people_list(order_by: [{ name: asc }]) {
             id
             name
             job_title
@@ -349,5 +456,29 @@ export async function createOrganization(input: Partial<Organization>): Promise<
 
 export async function addNote(organization_id: string | number, content: string, author: string = "Admin"): Promise<OrganizationNote | null> {
   return null;
+}
+
+export async function getOrganizationsByIndustryId(
+  industryId: number | string,
+  options?: { page?: number; pageSize?: number; limit?: number; offset?: number }
+): Promise<PaginatedOrganizationsResponse> {
+  try {
+    return await getOrganizations({
+      industry_id: industryId,
+      page: options?.page,
+      pageSize: options?.pageSize ?? options?.limit ?? 30,
+      offset: options?.offset,
+    });
+  } catch (err) {
+    console.error("getOrganizationsByIndustryId error:", err);
+    return {
+      organizations: [],
+      total: 0,
+      page: 1,
+      pageSize: options?.pageSize ?? options?.limit ?? 30,
+      totalPages: 0,
+      hasMore: false,
+    };
+  }
 }
 

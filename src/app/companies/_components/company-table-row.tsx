@@ -36,24 +36,35 @@ export function CompanyTableRow({ company: c }: CompanyTableRowProps) {
         </div>
       </td>
       <td className="p-3">
-        <span className="text-indigo-300 font-semibold">{c.primary_industry || c.industry || "N/A"}</span>
+        <div className="flex flex-wrap gap-1">
+          {c.industry_list && c.industry_list.length > 0 ? (
+            c.industry_list.map((ind) => (
+              <Badge className="rounded-lg text-[10px]" variant="secondary" key={ind.industry?.id || ind.id}>
+                {ind.industry?.name}
+              </Badge>
+            ))
+          ) : c.primary_industry || c.industry ? (
+            <Badge className="rounded-lg text-[10px]" variant="secondary">
+              {c.primary_industry || c.industry}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground">N/A</span>
+          )}
+        </div>
       </td>
       <td className="p-3 text-muted-foreground font-mono">
         <MapPin className="h-3 w-3 inline text-muted-foreground/60 mr-1" />
-        {c.city || "N/A"}, {c.country || "N/A"}
+        {c.city || "N/A"}
       </td>
       <td className="p-3 font-mono">
         <Users className="h-3 w-3 inline text-muted-foreground/60 mr-1" />
         {(c.estimated_num_employees || c.employee_count || 0).toLocaleString()}
       </td>
       <td className="p-3 font-mono text-emerald-400 font-bold">{c.annual_revenue || "N/A"}</td>
-      <td className="p-3">
-        <Badge className="bg-indigo-500/10 text-indigo-300 border-indigo-500/20 text-[10px]">Active</Badge>
-      </td>
       <td className="p-3 text-right">
         <Link href={`/companies/${c.id}`}>
           <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-indigo-400 hover:text-indigo-300">
-            <Eye className="h-3.5 w-3.5" /> View Profile
+            <Eye className="h-3.5 w-3.5" /> Profile
           </Button>
         </Link>
       </td>

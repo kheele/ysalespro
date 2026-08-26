@@ -58,8 +58,8 @@ export default function SettingsPage() {
   const [profile, setProfile] = React.useState<{
     name: string; title: string; email: string; company: string; timezone: string; language: string;
   }>({
-    name: "Alex Rivers", title: "Sales Director", email: "alex.rivers@salespro.ai",
-    company: "YSalesPro Enterprise", timezone: "UTC-5 (Eastern)", language: "English",
+    name: "", title: "", email: "",
+    company: "", timezone: "UTC+2 (South Africa / SAST)", language: "English",
   });
 
   React.useEffect(() => {
@@ -106,12 +106,6 @@ export default function SettingsPage() {
     { name: "HubSpot CRM", desc: "Bidirectional sync with HubSpot contacts and deals", color: "text-orange-400", status: "Not Connected", statusColor: "bg-muted/40 text-muted-foreground border-border/40" },
   ];
 
-  const TEAM_MEMBERS = [
-    { name: "Alex Rivers", email: "alex.rivers@salespro.ai", role: "Admin", avatar: "AR" },
-    { name: "Sarah Connor", email: "s.connor@salespro.ai", role: "Sales Rep", avatar: "SC" },
-    { name: "David Kim", email: "d.kim@salespro.ai", role: "Sales Rep", avatar: "DK" },
-  ];
-
   const renderSection = () => {
     switch (activeSection) {
 
@@ -149,12 +143,15 @@ export default function SettingsPage() {
                 <Label>Timezone</Label>
                 <select value={profile.timezone} onChange={e => setProfile(p => ({ ...p, timezone: e.target.value }))}
                   className="w-full bg-muted/40 border border-border/60 rounded-md px-3 py-2 text-xs outline-none text-foreground h-9">
-                  <option>UTC-8 (Pacific)</option>
-                  <option>UTC-7 (Mountain)</option>
-                  <option>UTC-6 (Central)</option>
-                  <option>UTC-5 (Eastern)</option>
-                  <option>UTC+1 (CET)</option>
-                  <option>UTC+0 (GMT)</option>
+                  <option>UTC+2 (South Africa / SAST)</option>
+                  <option>UTC+0 (GMT / London)</option>
+                  <option>UTC+1 (CET / Paris / Berlin)</option>
+                  <option>UTC+2 (EET / Cairo)</option>
+                  <option>UTC+3 (EAT / Nairobi)</option>
+                  <option>UTC-5 (Eastern / New York)</option>
+                  <option>UTC-6 (Central / Chicago)</option>
+                  <option>UTC-7 (Mountain / Denver)</option>
+                  <option>UTC-8 (Pacific / Los Angeles)</option>
                 </select>
               </div>
               <div className="space-y-1.5">
@@ -181,19 +178,16 @@ export default function SettingsPage() {
               </Button>
             </div>
             <div className="space-y-2">
-              {TEAM_MEMBERS.map(m => (
-                <div key={m.email} className="flex items-center gap-3 p-4 bg-card/40 border border-border/40 rounded-xl">
-                  <div className="h-9 w-9 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xs font-bold shrink-0">{m.avatar}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm">{m.name}</p>
-                    <p className="text-[11px] text-muted-foreground">{m.email}</p>
-                  </div>
-                  <Badge className={m.role === "Admin" ? "bg-red-500/10 text-red-400 border-red-500/20" : "bg-blue-500/10 text-blue-400 border-blue-500/20"}>
-                    {m.role}
-                  </Badge>
-                  <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7">Edit</Button>
+              <div className="flex items-center gap-3 p-4 bg-card/40 border border-border/40 rounded-xl">
+                <div className="h-9 w-9 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xs font-bold shrink-0">{initials}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm">{profile.name || user?.displayName || "Account Member"}</p>
+                  <p className="text-[11px] text-muted-foreground">{profile.email || user?.email || ""}</p>
                 </div>
-              ))}
+                <Badge className="bg-red-500/10 text-red-400 border-red-500/20">
+                  {profile.title || "Admin"}
+                </Badge>
+              </div>
             </div>
           </div>
         );

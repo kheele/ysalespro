@@ -2,10 +2,10 @@ import { LeadStage, LeadTemperature, OutreachChannel, NotificationType, Notifica
 
 export type GetLeadsParams = {
   stage?: LeadStage;
-  temperature?: LeadTemperature;
+  lead_temperature?: LeadTemperature;
   search?: string;
-  assigned_to?: string;
-  organization_name?: string;
+  assigned_user?: string;
+  company_name?: string;
 };
 
 export type GetTasksParams = {

@@ -205,6 +205,10 @@ function OutreachPageContent() {
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [assignedFilter, setAssignedFilter] = React.useState("all");
 
+  const availableReps = React.useMemo(() => {
+    return Array.from(new Set(activities.map(a => a.assigned_to).filter(Boolean))) as string[];
+  }, [activities]);
+
   // Compose modal
   const [composeOpen, setComposeOpen] = React.useState(false);
   const [form, setForm] = React.useState({
@@ -217,7 +221,7 @@ function OutreachPageContent() {
     message: "",
     next_followup: "",
     followup_days: "3",
-    assigned_to: "Alex Rivers",
+    assigned_to: "",
   });
 
   const { user } = useAuth();
@@ -357,9 +361,9 @@ function OutreachPageContent() {
                 className="bg-muted/40 border border-border/60 rounded-md px-2.5 py-1.5 text-xs outline-none text-foreground shrink-0"
               >
                 <option value="all">All Reps</option>
-                <option value="Alex Rivers">Alex Rivers</option>
-                <option value="Sarah Connor">Sarah Connor</option>
-                <option value="David Kim">David Kim</option>
+                {availableReps.map((rep) => (
+                  <option key={rep} value={rep}>{rep}</option>
+                ))}
               </select>
 
               <Button
@@ -500,12 +504,12 @@ function OutreachPageContent() {
             {/* Assigned To */}
             <div className="space-y-1.5">
               <Label>Assigned To</Label>
-              <select value={form.assigned_to} onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))}
-                className="w-full bg-muted/40 border border-border/60 rounded-md px-3 py-2 text-xs outline-none text-foreground">
-                <option>Alex Rivers</option>
-                <option>Sarah Connor</option>
-                <option>David Kim</option>
-              </select>
+              <Input
+                value={form.assigned_to}
+                placeholder={user?.displayName || user?.email?.split("@")[0] || "Assignee"}
+                onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))}
+                className="bg-muted/40 text-xs"
+              />
             </div>
 
             <DialogFooter className="pt-2">

@@ -9,88 +9,73 @@ import { CommandPalette } from "@/components/layout/command-palette";
 import * as industryServices from "@/services/public/industryServices";
 import * as organizationServices from "@/services/public/organizationServices";
 import { getLeadsActionByToken } from "@/services/private/leadServices";
-import type { Industry, Organization, Lead } from "@/lib/types";
+import type { Industry, Organization, Lead, IndustrySignal } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  Area,
-  AreaChart,
-  BarChart,
-  Bar,
-} from "recharts";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { CompanyTableRow } from "@/app/companies/_components/company-table-row";
 import {
   Building2,
-  Globe,
   Factory,
-  TrendingUp,
-  DollarSign,
   ChevronLeft,
-  ExternalLink,
   Users,
-  ShieldAlert,
   BarChart3,
-  Layers,
-  FileCode2,
   Flame,
   Target,
   Snowflake,
   Thermometer,
   ArrowRight,
+  Activity,
+  ArrowLeft,
+  Search,
 } from "lucide-react";
+import { IndustryMarketIntelligence } from "@/app/industries/_components/industry-market-intelligence";
 
 export default function IndustryDetailPage() {
   const { user } = useAuth();
   const params = useParams();
   const router = useRouter();
-  const indId = (params?.id as string) || "ind-1";
+  const indId = params?.id as string | undefined;
 
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [industry, setIndustry] = React.useState<Industry | null>(null);
   const [organizations, setOrganizations] = React.useState<Organization[]>([]);
+  const [orgTotal, setOrgTotal] = React.useState(0);
+  const [orgPage, setOrgPage] = React.useState(1);
+  const [orgPageSize, setOrgPageSize] = React.useState(30);
+  const [orgSearch, setOrgSearch] = React.useState("");
+  const [orgsLoading, setOrgsLoading] = React.useState(false);
   const [leads, setLeads] = React.useState<Lead[]>([]);
+  const [signals, setSignals] = React.useState<IndustrySignal[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    if (!user) return;
+    if (!user || !indId) {
+      setLoading(false);
+      return;
+    }
     (async () => {
       setLoading(true);
       try {
         const token = await user.getIdToken(true);
-        const [indData, orgData, leadData] = await Promise.all([
+        const [indData, leadData] = await Promise.all([
           industryServices.getIndustryById(indId),
-          organizationServices.getOrganizations({ limit: 50 }),
           getLeadsActionByToken(token),
         ]);
         setIndustry(indData);
+        setSignals(indData?.industry_signal_list || []);
 
-        const orgsList = orgData?.organizations || [];
         const leadsList = Array.isArray(leadData) ? leadData : [];
-
-        // Filter organizations that match this industry
         if (indData) {
-          const industryWord = indData.name.split(" ")[0].toLowerCase();
-          const relatedOrgs = orgsList.filter(
-            (o) =>
-              o.industry?.toLowerCase().includes(industryWord) ||
-              (o as any).primary_industry?.toLowerCase().includes(industryWord)
-          );
-          setOrganizations(relatedOrgs.length > 0 ? relatedOrgs : orgsList.slice(0, 3));
-
+          const industryName = indData.name.toLowerCase();
           const relatedLeads = leadsList.filter(
-            (l) =>
-              l.industry?.toLowerCase().includes(industryWord) ||
-              relatedOrgs.some((o) => o.name === (l.company_name || l.organization_name))
+            (l) => l.industry?.toLowerCase() === industryName
           );
-          setLeads(relatedLeads.length > 0 ? relatedLeads : leadsList.slice(0, 3));
+          setLeads(relatedLeads);
         }
       } catch (err) {
         console.error("Failed to load industry details:", err);
@@ -100,7 +85,30 @@ export default function IndustryDetailPage() {
     })();
   }, [indId, user]);
 
-  if (loading || !industry) {
+  const loadOrganizations = React.useCallback(async () => {
+    if (!indId) return;
+    setOrgsLoading(true);
+    try {
+      const orgData = await organizationServices.getOrganizations({
+        industry_id: indId,
+        search: orgSearch.trim() || undefined,
+        page: orgPage,
+        pageSize: orgPageSize,
+      });
+      setOrganizations(orgData?.organizations || []);
+      setOrgTotal(orgData?.total || 0);
+    } catch (err) {
+      console.error("Failed to load organizations for industry:", err);
+    } finally {
+      setOrgsLoading(false);
+    }
+  }, [indId, orgSearch, orgPage, orgPageSize]);
+
+  React.useEffect(() => {
+    loadOrganizations();
+  }, [loadOrganizations]);
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-background text-foreground flex">
         <SalesProSidebar />
@@ -112,14 +120,46 @@ export default function IndustryDetailPage() {
     );
   }
 
+  if (!industry) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex">
+        <SalesProSidebar onOpenCommandPalette={() => setCommandOpen(true)} />
+        <div className="flex-1 flex flex-col min-w-0">
+          <SalesProHeader
+            title="Industry Not Found"
+            subtitle={indId ? `No industry record found matching ID #${indId}` : "Invalid industry ID provided"}
+            onOpenCommandPalette={() => setCommandOpen(true)}
+          />
+          <main className="flex-1 p-6 flex flex-col items-center justify-center text-center space-y-4">
+            <Building2 className="h-12 w-12 text-muted-foreground/40" />
+            <div>
+              <h2 className="text-base font-bold">Industry Not Found</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                The requested industry could not be located in the database.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/industries")}
+              className="text-xs gap-1.5"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Back to Industries
+            </Button>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   // Lead pipeline stats
-  const hotLeads = leads.filter((l) => l.temperature === "Hot" || l.pipeline_stage === "Hot");
-  const warmLeads = leads.filter((l) => l.temperature === "Warm" || l.pipeline_stage === "Warm");
-  const coldLeads = leads.filter((l) => l.temperature === "Cold" || l.pipeline_stage === "Cold");
-  const totalPipeline = leads.reduce((sum, l) => sum + (Number(l.deal_value) || 0), 0);
-  const avgProbability = leads.length
-    ? Math.round(leads.reduce((s, l) => s + (l.probability || 0), 0) / leads.length)
+  const hotLeads = leads.filter((l) => l.lead_temperature?.toUpperCase() === "HOT" || l.stage === "Hot");
+  const warmLeads = leads.filter((l) => l.lead_temperature?.toUpperCase() === "WARM" || l.stage === "Warm");
+  const coldLeads = leads.filter((l) => l.lead_temperature?.toUpperCase() === "COLD" || l.stage === "Cold");
+  const avgScore = leads.length
+    ? Math.round(leads.reduce((s, l) => s + (l.lead_score || 0), 0) / leads.length)
     : 0;
+  const totalFollowups = leads.reduce((s, l) => s + (l.followup_count || 0), 0);
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
@@ -128,7 +168,7 @@ export default function IndustryDetailPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <SalesProHeader
           title={industry.name}
-          subtitle={`Hasura aa_s_industries · NAICS ${industry.naics_code || "518210"} · SIC ${industry.sic_code || "7374"}`}
+          subtitle={`Industry Profile · Hasura aa_s_industries #${industry.id}`}
           onOpenCommandPalette={() => setCommandOpen(true)}
         />
 
@@ -143,7 +183,7 @@ export default function IndustryDetailPage() {
             <ChevronLeft className="h-4 w-4" /> Back to Industries
           </Button>
 
-          {/* --- Industry Header Banner --- */}
+          {/* Industry Header Banner */}
           <Card className="backdrop-blur-xl p-6">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
@@ -153,271 +193,237 @@ export default function IndustryDetailPage() {
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <h1 className="text-2xl font-extrabold tracking-tight">{industry.name}</h1>
-                    <Badge className="bg-indigo-500/10 text-indigo-400 text-xs">
-                      {industry.category}
-                    </Badge>
-                    <Badge className="bg-emerald-500/10 text-emerald-400 text-xs gap-1.5 font-mono">
-                      <TrendingUp className="h-3 w-3" /> {industry.market_growth} YoY
-                    </Badge>
+                    {industry.active !== undefined && (
+                      <Badge
+                        className={`text-xs font-mono ${industry.active
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                          : "bg-muted/40 text-muted-foreground border-border/40"
+                          }`}
+                      >
+                        {industry.active ? "Active" : "Inactive"}
+                      </Badge>
+                    )}
+                    {signals.length > 0 && (
+                      <Badge className="bg-indigo-500/10 text-indigo-400 text-xs gap-1.5 font-mono">
+                        <Activity className="h-3 w-3" /> {signals.length} Signals
+                      </Badge>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1.5 max-w-xl">{industry.description}</p>
+                  {industry.description && (
+                    <p className="text-xs text-muted-foreground mt-1.5 max-w-xl">{industry.description}</p>
+                  )}
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-3 text-center shrink-0">
                 <div className="p-3 rounded-xl bg-muted/40 text-xs font-mono">
-                  <div className="text-lg font-extrabold text-emerald-400">{industry.market_size}</div>
-                  <div className="text-[10px] uppercase text-muted-foreground mt-0.5">Market Cap</div>
+                  <div className="text-lg font-extrabold text-foreground">
+                    {(industry.organization_count || 0).toLocaleString()}
+                  </div>
+                  <div className="text-[10px] uppercase text-muted-foreground mt-0.5">Accounts</div>
                 </div>
                 <div className="p-3 rounded-xl bg-muted/40 text-xs font-mono">
-                  <div className="text-lg font-extrabold text-indigo-300">{industry.avg_deal_size}</div>
-                  <div className="text-[10px] uppercase text-muted-foreground mt-0.5">Avg Deal</div>
+                  <div className="text-lg font-extrabold text-indigo-300">
+                    {(industry.campaign_target_count || 0).toLocaleString()}
+                  </div>
+                  <div className="text-[10px] uppercase text-muted-foreground mt-0.5">Campaign Targets</div>
                 </div>
               </div>
             </div>
           </Card>
 
-          {/* --- SECTION 1: Industry Details --- */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <Card className="p-5 col-span-2 space-y-4">
-              <h3 className="text-sm font-bold flex items-center gap-2">
-                <Layers className="h-4 w-4 text-indigo-400" /> Industry Details
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                <div className="p-3 rounded-lg bg-muted/30">
-                  <div className="text-[10px] text-muted-foreground uppercase mb-1">NAICS Code</div>
-                  <div className="font-bold font-mono text-indigo-300">{industry.naics_code || "518210"}</div>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/30">
-                  <div className="text-[10px] text-muted-foreground uppercase mb-1">SIC Code</div>
-                  <div className="font-bold font-mono text-purple-300">{industry.sic_code || "7374"}</div>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/30">
-                  <div className="text-[10px] text-muted-foreground uppercase mb-1">Risk Level</div>
-                  <Badge
-                    className={
-                      industry.risk_level === "Low"
-                        ? "bg-emerald-500/10 text-emerald-400"
-                        : industry.risk_level === "High"
-                          ? "bg-red-500/10 text-red-400"
-                          : "bg-amber-500/10 text-amber-400"
-                    }
-                  >
-                    {industry.risk_level || "Low"} Risk
-                  </Badge>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/30">
-                  <div className="text-[10px] text-muted-foreground uppercase mb-1">Companies</div>
-                  <div className="font-bold font-mono">{industry.organization_count || 120} Accounts</div>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/30">
-                  <div className="text-[10px] text-muted-foreground uppercase mb-1">Sector Pipeline</div>
-                  <div className="font-bold font-mono text-emerald-400">{industry.total_pipeline_value}</div>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/30">
-                  <div className="text-[10px] text-muted-foreground uppercase mb-1">Category</div>
-                  <div className="font-bold">{industry.category}</div>
-                </div>
-              </div>
-            </Card>
+          {/* Tabbed Detail Views */}
+          <Tabs defaultValue="intelligence" className="w-full space-y-5">
+            <TabsList className="bg-card p-1 rounded-xl h-auto flex flex-wrap justify-start items-center gap-1 border border-border/40">
+              <TabsTrigger
+                value="intelligence"
+                className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-xs py-2 px-3.5 gap-2"
+              >
+                <Activity className="h-3.5 w-3.5" /> Market Intelligence ({signals.length})
+              </TabsTrigger>
+              <TabsTrigger
+                value="organizations"
+                className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-xs py-2 px-3.5 gap-2"
+              >
+                <Building2 className="h-3.5 w-3.5" /> Related Organizations ({orgTotal})
+              </TabsTrigger>
+              <TabsTrigger
+                value="leads"
+                className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-xs py-2 px-3.5 gap-2"
+              >
+                <Target className="h-3.5 w-3.5" /> Lead Performance ({leads.length})
+              </TabsTrigger>
+            </TabsList>
 
-            {/* Company Count Breakdown */}
-            <Card className="p-5 space-y-3">
-              <h3 className="text-sm font-bold flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-purple-400" /> Number of Companies
-              </h3>
-              <div className="space-y-2">
-                {[
-                  { label: "Enterprise (1000+ employees)", count: Math.round((industry.organization_count || 120) * 0.2), color: "bg-indigo-500" },
-                  { label: "Mid-Market (100-999)", count: Math.round((industry.organization_count || 120) * 0.45), color: "bg-purple-500" },
-                  { label: "SMB (< 100 employees)", count: Math.round((industry.organization_count || 120) * 0.35), color: "bg-pink-500" },
-                ].map((tier) => (
-                  <div key={tier.label} className="space-y-1 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">{tier.label}</span>
-                      <span className="font-bold font-mono">{tier.count}</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-muted/50">
-                      <div
-                        className={`h-1.5 rounded-full ${tier.color}`}
-                        style={{ width: `${Math.round((tier.count / (industry.organization_count || 120)) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
+            {/* TAB 1: Market Intelligence */}
+            <TabsContent value="intelligence" className="space-y-6">
+              <IndustryMarketIntelligence signals={signals} industryName={industry.name} />
+            </TabsContent>
 
-          {/* --- SECTION 2: Related Organizations --- */}
-          <Card className="p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold flex items-center gap-2">
-                <Users className="h-4 w-4 text-indigo-400" /> Related Organizations
-              </h3>
-              <Link href="/companies" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
-                View All <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-border/40 text-muted-foreground text-[11px] uppercase">
-                    <th className="pb-2 pr-4">Company</th>
-                    <th className="pb-2 pr-4">City</th>
-                    <th className="pb-2 pr-4">Employees</th>
-                    <th className="pb-2 pr-4">Revenue</th>
-                    <th className="pb-2 pr-4">Status</th>
-                    <th className="pb-2" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/30">
-                  {organizations.map((org) => (
-                    <tr key={org.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="py-2.5 pr-4 font-semibold">
-                        <div className="flex items-center gap-2">
-                          <div className="h-6 w-6 rounded bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-mono text-[9px] font-bold shrink-0">
-                            {org.name.substring(0, 2).toUpperCase()}
-                          </div>
-                          {org.name}
-                        </div>
-                      </td>
-                      <td className="py-2.5 pr-4 text-muted-foreground">{org.city || "—"}</td>
-                      <td className="py-2.5 pr-4 font-mono text-muted-foreground">
-                        {org.employee_count?.toLocaleString() || "—"}
-                      </td>
-                      <td className="py-2.5 pr-4 font-mono text-emerald-400 font-semibold">
-                        {org.revenue || "—"}
-                      </td>
-                      <td className="py-2.5 pr-4">
-                        <Badge
-                          className={
-                            org.status === "Customer" || org.lead_status === "Hot"
-                              ? "bg-emerald-500/10 text-emerald-400"
-                              : "bg-amber-500/10 text-amber-400"
-                          }
-                        >
-                          {org.status || org.lead_status || "Prospect"}
-                        </Badge>
-                      </td>
-                      <td className="py-2.5">
-                        <Link
-                          href={`/companies/${org.id}`}
-                          className="text-indigo-400 hover:text-indigo-300 text-[11px] flex items-center gap-1"
-                        >
-                          Profile <ArrowRight className="h-3 w-3" />
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-
-          {/* --- SECTION 3: Lead Performance --- */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <Card className="p-5 space-y-4">
-              <h3 className="text-sm font-bold flex items-center gap-2">
-                <Target className="h-4 w-4 text-pink-400" /> Lead Performance (This Sector)
-              </h3>
-
-              {/* Pipeline Stage Breakdown */}
-              <div className="space-y-3">
-                {[
-                  { stage: "Hot", count: hotLeads.length, icon: <Flame className="h-4 w-4 text-red-400" />, color: "bg-red-500", badge: "bg-red-500/10 text-red-400" },
-                  { stage: "Warm", count: warmLeads.length, icon: <Thermometer className="h-4 w-4 text-amber-400" />, color: "bg-amber-500", badge: "bg-amber-500/10 text-amber-400" },
-                  { stage: "Cold", count: coldLeads.length, icon: <Snowflake className="h-4 w-4 text-blue-400" />, color: "bg-blue-500", badge: "bg-blue-500/10 text-blue-400" },
-                ].map((stage) => (
-                  <div key={stage.stage} className="flex items-center justify-between text-xs p-3 rounded-lg bg-muted/30">
-                    <div className="flex items-center gap-2">
-                      {stage.icon}
-                      <span className="font-semibold">{stage.stage} Leads</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge className={stage.badge}>{stage.count} accounts</Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="p-3 rounded-lg bg-muted/30 text-xs grid grid-cols-2 gap-2">
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase">Total Pipeline Value</p>
-                  <p className="font-bold font-mono text-emerald-400 text-base">${totalPipeline.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase">Avg Win Probability</p>
-                  <p className="font-bold font-mono text-indigo-300 text-base">{avgProbability}%</p>
-                </div>
-              </div>
-            </Card>
-
-            {/* Recharts Lead Pipeline Bar */}
-            <Card className="p-5 space-y-3">
-              <h3 className="text-sm font-bold flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-indigo-400" /> Pipeline Deal Values ($)
-              </h3>
-              <div className="h-44 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={leads.length > 0 ? leads.map(l => ({ name: (l.organization_name || l.company_name || "Lead").split(" ")[0], value: Number(l.deal_value || 0) })) : [{ name: "Sample", value: 50000 }]}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                    <XAxis dataKey="name" stroke="#71717a" fontSize={10} tickLine={false} />
-                    <YAxis stroke="#71717a" fontSize={10} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: "#18181b", borderColor: "#27272a", borderRadius: "8px", fontSize: "11px" }}
-                      formatter={(v: number) => [`$${v.toLocaleString()}`, "Deal Value"]}
-                    />
-                    <Bar dataKey="value" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          </div>
-
-          {/* --- SECTION 4: Growth Analytics --- */}
-          <Card className="p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-emerald-400" /> Growth Analytics & Market Velocity
-              </h3>
-              <Badge className="bg-emerald-500/10 text-emerald-400 text-xs font-mono">
-                {industry.market_growth} YoY → {industry.market_size} TAM
-              </Badge>
-            </div>
-
-            {/* Growth Line Chart */}
-            <div className="h-52 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={industry.historical_growth || []}>
-                  <defs>
-                    <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="marketGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                  <XAxis dataKey="year" stroke="#71717a" fontSize={10} tickLine={false} />
-                  <YAxis yAxisId="left" stroke="#71717a" fontSize={10} tickLine={false} tickFormatter={(v) => `${v}%`} />
-                  <YAxis yAxisId="right" orientation="right" stroke="#71717a" fontSize={10} tickLine={false} tickFormatter={(v) => `$${v}B`} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#18181b", borderColor: "#27272a", borderRadius: "8px", fontSize: "11px" }}
-                    formatter={(v: number, name: string) => [name === "rate" ? `${v}%` : `$${v}B`, name === "rate" ? "Growth Rate" : "Market Size"]}
+            {/* TAB 2: Related Organizations */}
+            <TabsContent value="organizations" className="space-y-4">
+              {/* Filtering / Search Header */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card p-4 rounded-xl backdrop-blur-md border border-border/40">
+                <div className="relative flex-1 w-full">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder={`Search ${orgTotal.toLocaleString()} organizations in ${industry.name} by name, domain, or city...`}
+                    value={orgSearch}
+                    onChange={(e) => {
+                      setOrgSearch(e.target.value);
+                      setOrgPage(1);
+                    }}
+                    className="pl-8 bg-muted/40 text-xs h-8"
                   />
-                  <Area yAxisId="left" type="monotone" dataKey="rate" stroke="#10b981" fill="url(#growthGradient)" strokeWidth={2} dot={{ fill: "#10b981", r: 3 }} />
-                  <Area yAxisId="right" type="monotone" dataKey="marketSize" stroke="#6366f1" fill="url(#marketGradient)" strokeWidth={2} dot={{ fill: "#6366f1", r: 3 }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {orgTotal.toLocaleString()} {orgTotal === 1 ? "Organization" : "Organizations"}
+                  </span>
+                  <Link href="/companies" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 ml-2">
+                    View All Companies <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              </div>
 
-            <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-400" /> Growth Rate (%)</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-indigo-400" /> Market Size ($B)</span>
-            </div>
-          </Card>
+              {/* Table */}
+              <Card className="border-border/50 bg-card overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-muted/40 text-muted-foreground uppercase font-mono text-[10px] border-b border-border/50">
+                      <tr>
+                        <th className="p-3">ID</th>
+                        <th className="p-3">Company</th>
+                        <th className="p-3">Industries</th>
+                        <th className="p-3">Location</th>
+                        <th className="p-3">Employees</th>
+                        <th className="p-3">Annual Revenue</th>
+                        <th className="p-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/40 font-medium">
+                      {orgsLoading ? (
+                        <tr>
+                          <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                            Loading organizations...
+                          </td>
+                        </tr>
+                      ) : organizations.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                            No organizations found in {industry.name}.
+                          </td>
+                        </tr>
+                      ) : (
+                        organizations.map((c) => <CompanyTableRow key={c.id} company={c} />)
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+
+              {/* Bottom Pagination Footer */}
+              <DataTablePagination
+                page={orgPage}
+                pageSize={orgPageSize}
+                total={orgTotal}
+                onPageChange={setOrgPage}
+                onPageSizeChange={setOrgPageSize}
+                pageSizeOptions={[10, 30, 50, 100]}
+                itemLabel="organizations"
+              />
+            </TabsContent>
+
+            {/* TAB 3: Lead Performance */}
+            <TabsContent value="leads" className="space-y-5">
+              {leads.length === 0 ? (
+                <div className="p-8 text-center text-xs text-muted-foreground bg-card rounded-xl border border-border/40">
+                  No active pipeline leads currently recorded for {industry.name}.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <Card className="p-5 space-y-4">
+                    <h3 className="text-sm font-bold flex items-center gap-2">
+                      <Target className="h-4 w-4 text-pink-400" /> Pipeline Temperature Breakdown
+                    </h3>
+
+                    <div className="space-y-3">
+                      {[
+                        {
+                          stage: "Hot",
+                          count: hotLeads.length,
+                          icon: <Flame className="h-4 w-4 text-red-400" />,
+                          badge: "bg-red-500/10 text-red-400 border-red-500/20",
+                        },
+                        {
+                          stage: "Warm",
+                          count: warmLeads.length,
+                          icon: <Thermometer className="h-4 w-4 text-amber-400" />,
+                          badge: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+                        },
+                        {
+                          stage: "Cold",
+                          count: coldLeads.length,
+                          icon: <Snowflake className="h-4 w-4 text-blue-400" />,
+                          badge: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+                        },
+                      ].map((stage) => (
+                        <div key={stage.stage} className="flex items-center justify-between text-xs p-3 rounded-lg bg-muted/30">
+                          <div className="flex items-center gap-2">
+                            {stage.icon}
+                            <span className="font-semibold">{stage.stage} Leads</span>
+                          </div>
+                          <Badge className={stage.badge}>{stage.count} accounts</Badge>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-muted/30 text-xs grid grid-cols-2 gap-2 font-mono">
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase">Avg Lead Score</p>
+                        <p className="font-bold text-emerald-400 text-base">{avgScore}/100</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase">Total Follow-ups</p>
+                        <p className="font-bold text-indigo-300 text-base">{totalFollowups}</p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  <Card className="p-5 space-y-3">
+                    <h3 className="text-sm font-bold flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-indigo-400" /> Lead Score by Account
+                    </h3>
+                    <div className="space-y-3 pt-2">
+                      {leads.slice(0, 6).map((lead) => {
+                        const score = lead.lead_score || 0;
+                        const name = lead.company_name || lead.person_name || "Lead Account";
+                        return (
+                          <div key={lead.id} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-semibold truncate max-w-[200px]">{name}</span>
+                              <span className="font-mono text-indigo-400 font-bold">{score}/100</span>
+                            </div>
+                            <div className="h-2 w-full bg-muted/40 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${score >= 80
+                                  ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                                  : score >= 50
+                                    ? "bg-gradient-to-r from-indigo-500 to-purple-500"
+                                    : "bg-gradient-to-r from-amber-500 to-rose-500"
+                                  }`}
+                                style={{ width: `${Math.max(5, Math.min(100, score))}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </main>
       </div>
 

@@ -23,14 +23,9 @@ export function DecisionMakerRow({ person }: DecisionMakerRowProps) {
     <tr className="hover:bg-muted/40 transition-colors group">
       {/* Avatar */}
       <td className="p-3.5">
-        <img
-          src={
-            person.avatar_url ||
-            "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80"
-          }
-          alt={person.name}
-          className="h-8 w-8 rounded-full object-cover border border-indigo-500/30"
-        />
+        <div className="h-8 w-8 rounded-full bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 flex items-center justify-center font-bold text-xs shrink-0">
+          {person.name.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase() || "P"}
+        </div>
       </td>
 
       {/* Name + Verified */}

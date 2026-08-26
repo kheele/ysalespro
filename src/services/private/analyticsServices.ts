@@ -34,7 +34,7 @@ export async function getOrganizationGrowthTrendActionByToken(token: string): Pr
     const totalOrgs = orgsRes?.total || 0;
     const leads = Array.isArray(leadsList) ? leadsList : [];
     const totalLeads = leads.length;
-    const totalRevenue = leads.reduce((sum: number, l) => sum + Number(l.deal_value || 0), 0);
+    const totalScore = leads.reduce((sum: number, l) => sum + Number(l.lead_score || 0), 0);
 
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
     return months.map((month, idx) => {
@@ -43,7 +43,7 @@ export async function getOrganizationGrowthTrendActionByToken(token: string): Pr
         month,
         organizations: Math.round(totalOrgs * factor),
         leads: Math.round(totalLeads * factor),
-        revenue: Math.round(totalRevenue * factor),
+        revenue: Math.round(totalScore * factor),
       };
     });
   } catch (err) {
@@ -134,12 +134,12 @@ export async function getLeadPipelineDataActionByToken(token: string): Promise<P
     };
 
     for (const l of leadsList) {
-      const stage = l.pipeline_stage || l.stage || l.lead_temperature || 'Cold';
+      const stage = l.stage || (l.lead_temperature === 'HOT' ? 'Hot' : l.lead_temperature === 'WARM' ? 'Warm' : 'Cold');
       if (!stages[stage]) {
         stages[stage] = { count: 0, value: 0 };
       }
       stages[stage].count += 1;
-      stages[stage].value += Number(l.deal_value || 0);
+      stages[stage].value += Number(l.lead_score || 0);
     }
 
     return Object.entries(stages).map(([stage, data]) => ({

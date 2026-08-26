@@ -102,7 +102,7 @@ export default function TasksPage() {
         status: "To Do",
         due_date: newDate,
         due_time: newTime,
-        assigned_to: "Alex Rivers",
+        assigned_to: user.displayName || user.email?.split("@")[0] || "",
         related_lead_name: newLead || undefined,
         related_company: newCompany || undefined,
         notes: newNotes || undefined,

@@ -50,7 +50,6 @@ export interface DecisionMaker {
   email_status?: string | null;
   lead_list?: any[];
   timeline_event_list?: any[];
-  avatar_url?: string;
   verified?: boolean;
   decision_power?: string;
   score_factors?: { fit_score?: number; intent_score?: number; activity_score?: number; timing_score?: number;[key: string]: any };
@@ -213,15 +212,40 @@ export interface Organization {
   activities?: OrganizationActivity[];
 }
 
+export interface IndustrySignal {
+  id: number;
+  industry_id: number;
+  country?: string | null;
+  metric: string;
+  unit?: string | null;
+  data_type?: string | null;
+  period_start?: string | null;
+  period_end?: string | null;
+  yoy?: number | null;
+  mom?: number | null;
+  qoq?: number | null;
+  trend?: string | null;
+  sales_signal?: string | null;
+  summary?: string | null;
+  source_name?: string | null;
+  source_url?: string | null;
+  published_at?: string | null;
+  retrieved_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  industry?: Industry | null;
+}
+
 export interface Industry {
   id: string | number;
   name: string;
   active?: boolean;
-  category?: string;
   organization_count?: number;
   campaign_target_count?: number;
   campaign_target_list?: any[];
   organization_list?: any[];
+  industry_signal_count?: number;
+  industry_signal_list?: IndustrySignal[];
   market_growth?: string;
   market_size?: string;
   avg_deal_size?: string;
@@ -337,8 +361,8 @@ export type LeadTemperature = 'COLD' | 'WARM' | 'HOT' | 'Cold' | 'Warm' | 'Hot';
 export type LeadStage = 'New' | 'Cold' | 'Contacted' | 'Warm Engaged' | 'Hot Qualified' | 'Demo Scheduled' | 'Closed Won' | 'Lost' | 'Engaged' | 'Qualified' | 'Unresponsive' | 'Warm' | 'Hot' | 'Customer';
 
 export interface Lead {
-  id: number | string;
-  account_company_id?: number;
+  id: number;
+  account_company_id: number;
   person_id?: number | null;
   person_name?: string | null;
   company_name?: string | null;
@@ -346,7 +370,6 @@ export interface Lead {
   lead_temperature?: LeadTemperature | string | null;
   lead_score?: number | null;
   stage?: LeadStage | string | null;
-  status?: string;
   last_contact?: string | null;
   next_followup?: string | null;
   assigned_user?: string | null;
@@ -359,20 +382,6 @@ export interface Lead {
   followup_item_list?: any[];
   outreach_activity_list?: any[];
   task_list?: any[];
-  // UI & compatibility aliases
-  contact_name?: string;
-  contact_title?: string;
-  contact_email?: string;
-  contact_avatar?: string;
-  organization_name?: string;
-  organization_id?: number | string;
-  temperature?: string;
-  score?: number;
-  deal_value?: number | string;
-  probability?: number;
-  pipeline_stage?: LeadStage;
-  assigned_to?: string;
-  tags?: string[];
 }
 
 // ─── Outreach & Campaign Models ──────────────────────────────────────────────

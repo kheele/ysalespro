@@ -14,7 +14,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
-import { Factory, BarChart3, PieChart as PieIcon, Building2, Target } from "lucide-react";
+import { Factory, TrendingUp, PieChart as PieIcon, Activity } from "lucide-react";
 import type { Industry } from "@/lib/types";
 
 const COLORS = ["#6366f1", "#a855f7", "#ec4899", "#10b981", "#f59e0b", "#3b82f6"];
@@ -31,6 +31,13 @@ export function IndustryStats({ industries, total }: IndustryStatsProps) {
 
   const totalTargets = React.useMemo(() => {
     return industries.reduce((acc, curr) => acc + (curr.campaign_target_count || 0), 0);
+  }, [industries]);
+
+  const totalSignals = React.useMemo(() => {
+    return industries.reduce(
+      (acc, curr) => acc + (curr.industry_signal_count || curr.industry_signal_list?.length || 0),
+      0
+    );
   }, [industries]);
 
   const topIndustry = React.useMemo(() => {
@@ -52,13 +59,34 @@ export function IndustryStats({ industries, total }: IndustryStatsProps) {
     }));
   }, [industries]);
 
-  const targetsBarData = React.useMemo(() => {
-    return industries.slice(0, 6).map((ind) => ({
-      name: ind.name.length > 12 ? `${ind.name.slice(0, 10)}...` : ind.name,
-      fullName: ind.name,
-      targets: ind.campaign_target_count || 0,
-      accounts: ind.organization_count || 0,
-    }));
+  const growthBarData = React.useMemo(() => {
+    return industries.filter((ind) => {
+      const topSignal = ind.industry_signal_list?.[0];
+      return topSignal?.yoy !== null && topSignal?.yoy !== undefined
+    }).sort((a, b) => {
+      const a_topSignal = a.industry_signal_list?.[0];
+      const a_yoy = a_topSignal?.yoy !== null && a_topSignal?.yoy !== undefined
+        ? a_topSignal.yoy
+        : a.industry_signal_list?.find((s) => s.yoy !== null && s.yoy !== undefined)?.yoy ?? 0;
+
+      const b_topSignal = b.industry_signal_list?.[0];
+      const b_yoy = b_topSignal?.yoy !== null && b_topSignal?.yoy !== undefined
+        ? b_topSignal.yoy
+        : b.industry_signal_list?.find((s) => s.yoy !== null && s.yoy !== undefined)?.yoy ?? 0;
+
+      return a_yoy < b_yoy ? 1 : a_yoy > b_yoy ? -1 : 0;
+    }).slice(0, 6).map((ind) => {
+      const topSignal = ind.industry_signal_list?.[0];
+      const yoy = topSignal?.yoy !== null && topSignal?.yoy !== undefined
+        ? topSignal.yoy
+        : ind.industry_signal_list?.find((s) => s.yoy !== null && s.yoy !== undefined)?.yoy ?? 0;
+
+      return {
+        name: ind.name.length > 12 ? `${ind.name.slice(0, 10)}...` : ind.name,
+        fullName: ind.name,
+        growth: yoy,
+      };
+    });
   }, [industries]);
 
   return (
@@ -89,6 +117,14 @@ export function IndustryStats({ industries, total }: IndustryStatsProps) {
               {totalTargets.toLocaleString()} Accounts
             </span>
           </div>
+          {totalSignals > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Market Signals:</span>
+              <span className="font-bold font-mono text-purple-400 flex items-center gap-1">
+                <Activity className="h-3 w-3" /> {totalSignals} Telemetry Indicators
+              </span>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -96,7 +132,7 @@ export function IndustryStats({ industries, total }: IndustryStatsProps) {
       <Card className="backdrop-blur-xl p-5">
         <div className="flex items-center justify-between text-xs font-bold mb-3">
           <span className="flex items-center gap-1.5">
-            <PieIcon className="h-3.5 w-3.5 text-purple-400" /> Account Distribution
+            <PieIcon className="h-3.5 w-3.5 text-purple-400" /> Companies Distribution
           </span>
           <span className="text-muted-foreground text-[11px]">Accounts per Sector</span>
         </div>
@@ -130,20 +166,20 @@ export function IndustryStats({ industries, total }: IndustryStatsProps) {
         </div>
       </Card>
 
-      {/* Recharts Bar Chart - Campaign Targets */}
+      {/* Recharts Bar Chart - YoY Market Growth (%) */}
       <Card className="backdrop-blur-xl p-5">
         <div className="flex items-center justify-between text-xs font-bold mb-3">
           <span className="flex items-center gap-1.5">
-            <BarChart3 className="h-3.5 w-3.5 text-indigo-400" /> Campaign Targets by Sector
+            <TrendingUp className="h-3.5 w-3.5 text-emerald-400" /> YoY Market Growth (%)
           </span>
-          <span className="text-muted-foreground text-[11px]">Target Count</span>
+          <span className="text-muted-foreground text-[11px]">Sector Growth</span>
         </div>
         <div className="h-36 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={targetsBarData}>
+            <BarChart data={growthBarData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
               <XAxis dataKey="name" stroke="#71717a" fontSize={10} tickLine={false} />
-              <YAxis stroke="#71717a" fontSize={10} tickLine={false} />
+              <YAxis stroke="#71717a" fontSize={10} tickLine={false} unit="%" />
               <Tooltip
                 contentStyle={{
                   backgroundColor: "#18181b",
@@ -151,8 +187,9 @@ export function IndustryStats({ industries, total }: IndustryStatsProps) {
                   borderRadius: "8px",
                   fontSize: "11px",
                 }}
+                formatter={(value: any) => [`${value}%`, "YoY Growth"]}
               />
-              <Bar dataKey="targets" name="Campaign Targets" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="growth" name="YoY Growth (%)" fill="#10b981" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

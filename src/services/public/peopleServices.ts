@@ -53,14 +53,14 @@ function mapDbDecisionMaker(p: any): DecisionMaker {
 
   const orgName = p.company_name || p.company?.name || "";
   const orgId = p.company_id || p.company?.id;
-  const title = p.job_title || "Executive";
+  const title = p.job_title || "";
   const computedLocation = p.location || [p.city, p.state, p.country].filter(Boolean).join(", ") || "";
 
   const timeline = (p.timeline_event_list || []).map((e: any) => ({
     id: e.id,
     type: e.type || "note",
-    title: e.title || "Activity",
-    timestamp: e.date ? new Date(e.date).toLocaleDateString() : (e.created_at ? new Date(e.created_at).toLocaleDateString() : "Recent"),
+    title: e.title || "",
+    timestamp: e.date ? new Date(e.date).toLocaleDateString() : (e.created_at ? new Date(e.created_at).toLocaleDateString() : ""),
     description: e.details || "",
     date: e.date,
     details: e.details,

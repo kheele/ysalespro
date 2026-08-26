@@ -29,9 +29,9 @@ export async function getKPIsActionByToken(token: string): Promise<DashboardKPIs
     const totalPeople = peopleRes?.total || 0;
 
     const leadsList = Array.isArray(leads) ? leads : [];
-    const cold = leadsList.filter(l => (l.status || l.stage) === 'Cold' || l.pipeline_stage === 'Cold').length;
-    const warm = leadsList.filter(l => (l.status || l.stage) === 'Warm' || l.pipeline_stage === 'Warm').length;
-    const hot = leadsList.filter(l => (l.status || l.stage) === 'Hot' || l.pipeline_stage === 'Hot' || l.pipeline_stage === 'Customer').length;
+    const cold = leadsList.filter(l => l.stage === 'Cold' || l.lead_temperature?.toUpperCase() === 'COLD').length;
+    const warm = leadsList.filter(l => l.stage === 'Warm' || l.lead_temperature?.toUpperCase() === 'WARM').length;
+    const hot = leadsList.filter(l => l.stage === 'Hot' || l.stage === 'Customer' || l.lead_temperature?.toUpperCase() === 'HOT').length;
 
     const activities = Array.isArray(outreachList) ? outreachList : [];
     const emailsSent = activities.filter(a => a.channel === "Email" || !a.channel).length;

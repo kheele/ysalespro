@@ -19,35 +19,35 @@ export async function getFollowUpsActionByToken(
 
     let list: FollowUpItem[] = leadsList.map((lead, idx) => {
       const id = String(lead.id || `fup-${idx + 101}`);
-      const status = lead.lead_temperature === 'Hot' ? 'Escalated' : (lead.next_followup ? 'Scheduled' : 'Pending Today');
+      const status = lead.lead_temperature === 'HOT' || lead.stage === 'Hot' ? 'Escalated' : (lead.next_followup ? 'Scheduled' : 'Pending Today');
 
       return {
         id,
         lead_id: typeof lead.id === 'number' ? lead.id : undefined,
-        lead_name: lead.person_name || lead.contact_name || 'Contact',
-        person_name: lead.person_name || lead.contact_name || 'Contact',
-        person_title: lead.contact_title || 'Decision Maker',
-        company_name: lead.company_name || lead.organization_name || 'Enterprise Account',
-        industry: lead.industry || 'General',
-        lead_temperature: (lead.lead_temperature as any) || (lead.temperature as any) || 'Warm',
+        lead_name: lead.person_name || lead.person?.name || '',
+        person_name: lead.person_name || lead.person?.name || '',
+        person_title: lead.person?.job_title || '',
+        company_name: lead.company_name || '',
+        industry: lead.industry || '',
+        lead_temperature: (lead.lead_temperature as any) || 'COLD',
         status: status as any,
-        sequence_step: 2,
-        step_number: 2,
-        total_sequence_steps: 4,
-        total_steps: 4,
-        followup_count: lead.followup_count || 1,
-        follow_up_count: lead.followup_count || 1,
-        last_contact_date: lead.last_contact ? new Date(lead.last_contact).toISOString().split('T')[0] : '2026-08-10',
-        next_followup_date: lead.next_followup ? new Date(lead.next_followup).toISOString().split('T')[0] : '2026-08-20',
-        next_follow_up_date: lead.next_followup ? new Date(lead.next_followup).toISOString().split('T')[0] : '2026-08-20',
-        assigned_user: lead.assigned_user || lead.assigned_to || 'Alex Rivers',
-        assigned_rep: lead.assigned_user || lead.assigned_to || 'Alex Rivers',
+        sequence_step: 1,
+        step_number: 1,
+        total_sequence_steps: 1,
+        total_steps: 1,
+        followup_count: lead.followup_count || 0,
+        follow_up_count: lead.followup_count || 0,
+        last_contact_date: lead.last_contact ? new Date(lead.last_contact).toISOString().split('T')[0] : '',
+        next_followup_date: lead.next_followup ? new Date(lead.next_followup).toISOString().split('T')[0] : '',
+        next_follow_up_date: lead.next_followup ? new Date(lead.next_followup).toISOString().split('T')[0] : '',
+        assigned_user: lead.assigned_user || '',
+        assigned_rep: lead.assigned_user || '',
         channel: 'Email',
-        subject: `Following up on our conversation regarding ${lead.company_name || 'your solution'}`,
-        sequence_name: 'Outbound Enterprise Sequence',
-        days_since_last_contact: 3,
+        subject: lead.company_name ? `Follow-up: ${lead.company_name}` : 'Follow-up',
+        sequence_name: '',
+        days_since_last_contact: 0,
         is_overdue: status === 'Scheduled' || status === 'Pending Today',
-        message_preview: 'Hi, wanted to quickly check in on our proposal and see if you had any questions.',
+        message_preview: '',
       };
     });
 

@@ -177,6 +177,10 @@ export default function FollowUpPage() {
     }
   };
 
+  const availableReps = React.useMemo(() => {
+    return Array.from(new Set(items.map(i => i.assigned_rep || i.assigned_user).filter(Boolean))) as string[];
+  }, [items]);
+
   const overdueCount = items.filter(i => i.is_overdue && i.status === "Scheduled").length;
   const hotCount = items.filter(i => i.lead_temperature === "HOT").length;
   const scheduledToday = items.filter(i => i.status === "Scheduled").length;
@@ -293,9 +297,9 @@ export default function FollowUpPage() {
               <select value={repFilter} onChange={e => setRepFilter(e.target.value)}
                 className="bg-muted/40 border border-border/60 rounded-md px-3 py-1.5 text-xs outline-none text-foreground h-9">
                 <option value="all">All Reps</option>
-                <option value="Alex Rivers">Alex Rivers</option>
-                <option value="Sarah Connor">Sarah Connor</option>
-                <option value="David Kim">David Kim</option>
+                {availableReps.map((rep) => (
+                  <option key={rep} value={rep}>{rep}</option>
+                ))}
               </select>
             </div>
           </div>

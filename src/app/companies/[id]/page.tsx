@@ -42,13 +42,14 @@ import {
   FileText,
   User,
   Target,
+  ArrowLeft,
 } from "lucide-react";
 
 export default function CompanyProfilePage() {
   const { user } = useAuth();
   const params = useParams();
   const router = useRouter();
-  const orgId = (params?.id as string) || "org-1";
+  const orgId = params?.id as string | undefined;
 
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [org, setOrg] = React.useState<Organization | null>(null);
@@ -61,7 +62,10 @@ export default function CompanyProfilePage() {
   const [newNoteContent, setNewNoteContent] = React.useState("");
 
   const loadOrgDetails = React.useCallback(async () => {
-    if (!user) return;
+    if (!user || !orgId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const token = await user.getIdToken(true);
@@ -79,7 +83,7 @@ export default function CompanyProfilePage() {
       const tList = Array.isArray(taskData) ? taskData : [];
 
       setPeople(pList.filter(p => p.company_name === orgName || String(p.company_id) === String(orgId)));
-      setLeads(lList.filter(l => (l.company_name === orgName || l.organization_name === orgName) || String(l.organization_id) === String(orgId)));
+      setLeads(lList.filter(l => l.company_name === orgName));
       setTasks(tList.filter(t => t.related_company === orgName || String(t.related_lead_id) === String(orgId)));
     } catch (e) {
       console.error("Failed to load organization details:", e);
@@ -100,13 +104,45 @@ export default function CompanyProfilePage() {
     loadOrgDetails();
   };
 
-  if (loading || !org) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-background text-foreground flex">
         <SalesProSidebar />
         <div className="flex-1 p-8 space-y-6">
           <div className="h-12 bg-card/40 border border-border/40 rounded-xl animate-pulse" />
           <div className="h-64 bg-card/40 border border-border/40 rounded-xl animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!org) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex">
+        <SalesProSidebar onOpenCommandPalette={() => setCommandOpen(true)} />
+        <div className="flex-1 flex flex-col min-w-0">
+          <SalesProHeader
+            title="Company Not Found"
+            subtitle={orgId ? `No organization found matching ID #${orgId}` : "Invalid company ID provided"}
+            onOpenCommandPalette={() => setCommandOpen(true)}
+          />
+          <main className="flex-1 p-6 flex flex-col items-center justify-center text-center space-y-4">
+            <Building2 className="h-12 w-12 text-muted-foreground/40" />
+            <div>
+              <h2 className="text-base font-bold">Company Profile Not Found</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                The requested company account could not be located in the database.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/companies")}
+              className="text-xs gap-1.5"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Back to Companies
+            </Button>
+          </main>
         </div>
       </div>
     );
@@ -347,7 +383,9 @@ export default function CompanyProfilePage() {
                   people.map((person) => (
                     <Card key={person.id} className="border-border/50 bg-card p-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <img src={person.avatar_url} alt={person.name} className="h-10 w-10 rounded-full border border-indigo-500/30" />
+                        <div className="h-10 w-10 rounded-full bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 flex items-center justify-center font-bold text-xs shrink-0">
+                          {person.name.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase() || "P"}
+                        </div>
                         <div>
                           <h4 className="text-xs font-bold">{person.name}</h4>
                           <p className="text-[11px] text-indigo-400">{person.title}</p>
@@ -372,12 +410,15 @@ export default function CompanyProfilePage() {
                   leads.map((lead) => (
                     <Card key={lead.id} className="border-border/50 bg-card p-4 flex items-center justify-between text-xs">
                       <div>
-                        <span className="font-bold text-foreground">{lead.pipeline_stage} Stage</span>
-                        <p className="text-muted-foreground text-[11px]">Contact: {lead.contact_name} ({lead.contact_title})</p>
+                        <span className="font-bold text-foreground">{lead.stage || "Cold"} Stage</span>
+                        <p className="text-muted-foreground text-[11px]">
+                          Contact: {lead.person_name || lead.person?.name || "Lead Contact"}
+                          {lead.person?.job_title ? ` (${lead.person.job_title})` : ""}
+                        </p>
                       </div>
                       <div className="text-right font-mono">
-                        <span className="font-bold text-emerald-400 text-sm">${lead.deal_value?.toLocaleString()}</span>
-                        <Badge className="ml-2 bg-indigo-600/20 text-indigo-300">{lead.status}</Badge>
+                        <span className="font-bold text-indigo-300 text-sm">Score: {lead.lead_score ?? 0}/100</span>
+                        <Badge className="ml-2 bg-indigo-600/20 text-indigo-300">{lead.lead_temperature || "COLD"}</Badge>
                       </div>
                     </Card>
                   ))

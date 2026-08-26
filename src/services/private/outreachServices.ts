@@ -7,9 +7,9 @@ import { getAccountCompanyIdFromClaims } from '@/lib/auth-utils';
 
 function mapDbOutreach(item: any): OutreachActivity {
   const channelName = (item.channel as OutreachChannel) || "Email";
-  const name = item.lead_name || "Lead";
-  const company = item.company_name || "Company";
-  const subj = item.subject_or_type || "Outreach";
+  const name = item.lead_name || "";
+  const company = item.company_name || "";
+  const subj = item.subject_or_type || "";
 
   return {
     id: item.id,
@@ -22,7 +22,7 @@ function mapDbOutreach(item: any): OutreachActivity {
     lead_name: name,
     company_name: company,
     recipient_org: company,
-    recipient_title: item.recipient_title || "Decision Maker",
+    recipient_title: item.recipient_title || "",
     recipient_email: item.recipient_email || "",
     subject_or_type: subj,
     subject: subj,

@@ -1,11 +1,39 @@
 'use server';
 
 import { sendGraphQL, getGraphQLOne } from "@/graphql";
-import { Industry } from "@/lib/types";
+import { Industry, IndustrySignal } from "@/lib/types";
 import { toTitleCase } from "@/lib/utils";
+
+function mapDbIndustrySignal(s: any): IndustrySignal {
+  if (!s) return null as any;
+
+  return {
+    id: s.id,
+    industry_id: s.industry_id,
+    country: s.country ?? null,
+    metric: s.metric || "",
+    unit: s.unit ?? null,
+    data_type: s.data_type ?? null,
+    period_start: s.period_start ?? null,
+    period_end: s.period_end ?? null,
+    yoy: s.yoy !== null && s.yoy !== undefined ? Number(s.yoy) : null,
+    mom: s.mom !== null && s.mom !== undefined ? Number(s.mom) : null,
+    qoq: s.qoq !== null && s.qoq !== undefined ? Number(s.qoq) : null,
+    trend: s.trend ?? null,
+    sales_signal: s.sales_signal ?? null,
+    summary: s.summary ?? null,
+    source_name: s.source_name ?? null,
+    source_url: s.source_url ?? null,
+    published_at: s.published_at ?? null,
+    retrieved_at: s.retrieved_at ?? null,
+  };
+}
 
 function mapDbIndustry(i: any): Industry {
   if (!i) return null as any;
+
+  const signals = (i.industry_signal_list || []).map(mapDbIndustrySignal).filter(Boolean);
+  const signalCount = i.industry_signal_list_aggregate?.aggregate?.count ?? signals.length;
 
   return {
     id: i.id,
@@ -13,6 +41,8 @@ function mapDbIndustry(i: any): Industry {
     active: i.active,
     organization_count: i.organization_list_aggregate?.aggregate?.count || 0,
     campaign_target_count: i.campaign_target_list_aggregate?.aggregate?.count || 0,
+    industry_signal_count: signalCount,
+    industry_signal_list: signals,
   };
 }
 
@@ -49,6 +79,33 @@ export async function getIndustries(params?: {
               count
             }
           }
+          industry_signal_list_aggregate {
+            aggregate {
+              count
+            }
+          }
+          industry_signal_list(order_by: { published_at: desc_nulls_last, id: desc }) {
+            id
+            industry_id
+            country
+            metric
+            unit
+            data_type
+            period_start
+            period_end
+            yoy
+            mom
+            qoq
+            trend
+            sales_signal
+            summary
+            source_name
+            source_url
+            published_at
+            retrieved_at
+            created_at
+            updated_at
+          }
         }
         aa_s_industries_aggregate(where: $where) {
           aggregate {
@@ -62,7 +119,7 @@ export async function getIndustries(params?: {
       query,
       variables: {
         where: Object.keys(where).length > 0 ? where : undefined,
-        limit: params?.limit || 15,
+        limit: params?.limit === 0 ? undefined : (params?.limit ?? 15),
         offset: params?.offset || 0,
       },
       operationName: "GetIndustries",
@@ -106,6 +163,33 @@ export async function getIndustryById(id: string | number): Promise<Industry | n
             aggregate {
               count
             }
+          }
+          industry_signal_list_aggregate {
+            aggregate {
+              count
+            }
+          }
+          industry_signal_list(order_by: { published_at: desc_nulls_last, id: desc }) {
+            id
+            industry_id
+            country
+            metric
+            unit
+            data_type
+            period_start
+            period_end
+            yoy
+            mom
+            qoq
+            trend
+            sales_signal
+            summary
+            source_name
+            source_url
+            published_at
+            retrieved_at
+            created_at
+            updated_at
           }
         }
       }
