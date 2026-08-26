@@ -44,9 +44,10 @@ function mapDbCampaign(c: any): Campaign {
       }))
     : DEFAULT_SEQUENCE;
 
-  const industries: string[] = Array.isArray(c.target_industry_list) && c.target_industry_list.length > 0
+  const rawIndustries: string[] = Array.isArray(c.target_industry_list) && c.target_industry_list.length > 0
     ? c.target_industry_list.map((ti: any) => ti.industry?.name || ti.industry_name || (ti.industry_id ? `Industry #${ti.industry_id}` : "All")).filter(Boolean)
     : ["All"];
+  const industries = Array.from(new Set(rawIndustries));
 
   const targetCompanies = c.target_companies_count ?? 0;
   const targetPeople = c.target_people_count ?? 0;
@@ -157,7 +158,7 @@ export async function getCampaignsActionByToken(
           unsubscribes
           created_at
           updated_at
-          sequence_step_list {
+          sequence_step_list(distinct_on: [id], order_by: [{ id: asc }]) {
             id
             day
             step_number
@@ -166,7 +167,7 @@ export async function getCampaignsActionByToken(
             preview
             is_active
           }
-          target_industry_list {
+          target_industry_list(distinct_on: [industry_id], order_by: [{ industry_id: asc }]) {
             id
             industry_id
             industry {
@@ -174,7 +175,7 @@ export async function getCampaignsActionByToken(
               name
             }
           }
-          outreach_activity_list {
+          outreach_activity_list(distinct_on: [id], order_by: [{ id: desc }]) {
             id
             lead_id
             date
@@ -192,7 +193,7 @@ export async function getCampaignsActionByToken(
     `;
     const res = await listGraphQL({ query: q, variables: { where }, operationName: "GetCampaigns" });
     const list = Array.isArray(res) ? res : [];
-    return list.map(mapDbCampaign);
+    return list.map(mapDbCampaign).filter(Boolean);
   } catch (err) {
     console.error("Hasura getCampaignsActionByToken error:", err);
     throw err;
@@ -237,7 +238,7 @@ export async function getCampaignByIdActionByToken(
           unsubscribes
           created_at
           updated_at
-          sequence_step_list {
+          sequence_step_list(distinct_on: [id], order_by: [{ id: asc }]) {
             id
             day
             step_number
@@ -246,7 +247,7 @@ export async function getCampaignByIdActionByToken(
             preview
             is_active
           }
-          target_industry_list {
+          target_industry_list(distinct_on: [industry_id], order_by: [{ industry_id: asc }]) {
             id
             industry_id
             industry {
@@ -254,7 +255,7 @@ export async function getCampaignByIdActionByToken(
               name
             }
           }
-          outreach_activity_list {
+          outreach_activity_list(distinct_on: [id], order_by: [{ id: desc }]) {
             id
             lead_id
             date

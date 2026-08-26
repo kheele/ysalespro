@@ -44,7 +44,11 @@ export async function getNotificationsActionByToken(
 
     const query = `
       query GetNotifications($where: aa_s_notifications_bool_exp) {
-        aa_s_notifications(where: $where, order_by: [{ id: desc }]) {
+        aa_s_notifications(
+          distinct_on: [id]
+          where: $where
+          order_by: [{ id: desc }]
+        ) {
           id
           title
           message

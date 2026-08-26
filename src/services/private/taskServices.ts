@@ -71,7 +71,11 @@ export async function getTasksActionByToken(
 
     const query = `
       query GetTasks($where: aa_s_tasks_bool_exp) {
-        aa_s_tasks(where: $where, order_by: [{ created_at: desc }]) {
+        aa_s_tasks(
+          distinct_on: [id]
+          where: $where
+          order_by: [{ id: desc }]
+        ) {
           id
           title
           type

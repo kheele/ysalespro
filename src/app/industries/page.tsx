@@ -55,7 +55,7 @@ export default function IndustriesPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <SalesProHeader
           title="Industry Classification & Intelligence"
-          subtitle="Main data source: Hasura aa_s_industries, NAICS & SIC mappings"
+          subtitle="Comprehensive industry breakdown, market signals & NAICS/SIC mappings"
           onOpenCommandPalette={() => setCommandOpen(true)}
         />
 

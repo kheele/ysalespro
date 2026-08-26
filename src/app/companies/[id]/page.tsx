@@ -155,7 +155,7 @@ export default function CompanyProfilePage() {
       <div className="flex-1 flex flex-col min-w-0">
         <SalesProHeader
           title={org.name}
-          subtitle={`Company Profile & Account Intelligence (Hasura aa_s_organizations ID: ${org.id})`}
+          subtitle={`Company Profile & Account Intelligence · Organization #${org.id}`}
           onOpenCommandPalette={() => setCommandOpen(true)}
         />
 
@@ -224,14 +224,10 @@ export default function CompanyProfilePage() {
             </Card>
           </div>
 
-          {/* 10 Profile Tabs Container */}
+          {/* 6 Profile Tabs Container */}
           <Tabs defaultValue="overview" className="w-full">
             <TabsList className="bg-muted/40 border border-border/40 p-1 overflow-x-auto flex w-full justify-start text-xs font-semibold">
               <TabsTrigger value="overview" className="gap-1.5 text-xs"><Building2 className="h-3.5 w-3.5" /> Overview</TabsTrigger>
-              <TabsTrigger value="industries" className="gap-1.5 text-xs"><Factory className="h-3.5 w-3.5" /> Industries ({org.industry_list?.length || 1})</TabsTrigger>
-              <TabsTrigger value="keywords" className="gap-1.5 text-xs"><Sparkles className="h-3.5 w-3.5" /> Keywords ({org.keywords_list?.length || 0})</TabsTrigger>
-              <TabsTrigger value="languages" className="gap-1.5 text-xs"><Globe className="h-3.5 w-3.5" /> Languages ({org.language_list?.length || 0})</TabsTrigger>
-              <TabsTrigger value="classifications" className="gap-1.5 text-xs"><FileCode2 className="h-3.5 w-3.5" /> Classifications</TabsTrigger>
               <TabsTrigger value="people" className="gap-1.5 text-xs"><Users className="h-3.5 w-3.5" /> People ({people.length})</TabsTrigger>
               <TabsTrigger value="leads" className="gap-1.5 text-xs"><Target className="h-3.5 w-3.5" /> Leads ({leads.length})</TabsTrigger>
               <TabsTrigger value="notes" className="gap-1.5 text-xs"><MessageSquare className="h-3.5 w-3.5" /> Notes ({org.notes?.length || 0})</TabsTrigger>
@@ -276,7 +272,7 @@ export default function CompanyProfilePage() {
               <Card className="border-border/50 bg-card">
                 <CardHeader className="p-5 pb-3">
                   <CardTitle className="text-base font-bold">AI Business Intelligence Overview</CardTitle>
-                  <CardDescription className="text-xs">Enriched metadata synthesized from Hasura GraphQL telemetry</CardDescription>
+                  <CardDescription className="text-xs">Enriched account metadata and verified industry intelligence</CardDescription>
                 </CardHeader>
                 <CardContent className="p-5 pt-0 text-xs space-y-3 leading-relaxed text-muted-foreground">
                   <p>
@@ -288,95 +284,116 @@ export default function CompanyProfilePage() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            {/* TAB 2: INDUSTRIES */}
-            <TabsContent value="industries" className="mt-4 space-y-4">
-              <Card className="border-border/50 bg-card p-5 space-y-4">
-                <h3 className="text-sm font-bold">Related Industries (aa_s_organization_industries)</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {org.industry_list && org.industry_list.length > 0 ? (
-                    org.industry_list.map((ind) => (
-                      <div key={ind.id} className="p-3 rounded-lg bg-muted/30 border border-border/40 flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <Factory className="h-4 w-4 text-purple-400" />
-                          <span className="font-bold text-foreground">{ind.industry?.name || org.primary_industry || org.industry}</span>
-                        </div>
-                        <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-400">Sector</Badge>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-3 rounded-lg bg-muted/30 border border-border/40 text-xs font-bold">
-                      {org.primary_industry || org.industry || "-"}
-                    </div>
-                  )}
-                </div>
-              </Card>
-            </TabsContent>
-
-            {/* TAB 3: KEYWORDS */}
-            <TabsContent value="keywords" className="mt-4 space-y-4">
-              <Card className="border-border/50 bg-card p-5 space-y-4">
-                <h3 className="text-sm font-bold">Tagged Keywords & Tech Stack (aa_s_organization_keywords)</h3>
-                <div className="flex flex-wrap gap-2">
-                  {org.keywords_list?.map((k) => (
-                    <Badge key={k.id} className="bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-1 text-xs font-mono">
-                      #{k.keyword?.name}
-                    </Badge>
-                  )) || <span className="text-xs text-muted-foreground">No keywords tagged yet.</span>}
-                </div>
-              </Card>
-            </TabsContent>
-
-            {/* TAB 4: LANGUAGES */}
-            <TabsContent value="languages" className="mt-4 space-y-4">
-              <Card className="border-border/50 bg-card p-5 space-y-4">
-                <h3 className="text-sm font-bold">Supported Languages (aa_s_organization_languages)</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {org.language_list?.map((l) => (
-                    <div key={l.id} className="p-3 rounded-lg bg-muted/30 border border-border/40 flex items-center gap-2 text-xs font-semibold">
-                      <Globe className="h-4 w-4 text-indigo-400" />
-                      <span>{l.language?.name}</span>
-                    </div>
-                  )) || <span className="text-xs text-muted-foreground">English</span>}
-                </div>
-              </Card>
-            </TabsContent>
-
-            {/* TAB 5: CLASSIFICATIONS */}
-            <TabsContent value="classifications" className="mt-4 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Consolidated Industry & Languages Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Industries */}
                 <Card className="border-border/50 bg-card p-5 space-y-3">
-                  <h3 className="text-xs font-bold uppercase text-indigo-400 flex items-center gap-2">
-                    <Layers className="h-4 w-4" /> NAICS Industry Codes
+                  <h3 className="text-sm font-bold flex items-center gap-2">
+                    <Factory className="h-4 w-4 text-purple-400" /> Related Industries ({org.industry_list?.length || 1})
                   </h3>
-                  {org.naics_code_list?.map((n) => (
-                    <div key={n.id} className="p-3 rounded-lg bg-muted/30 border border-border/40 text-xs">
-                      <div className="flex items-center justify-between font-mono">
-                        <span className="font-bold text-indigo-300">Code {n.code}</span>
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {org.industry_list && org.industry_list.length > 0 ? (
+                      org.industry_list.map((ind) => (
+                        <div key={ind.id} className="p-2.5 rounded-lg bg-muted/30 border border-border/40 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <Factory className="h-3.5 w-3.5 text-purple-400" />
+                            <span className="font-semibold text-foreground">{ind.industry?.name || org.primary_industry || org.industry}</span>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-400">Sector</Badge>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-2.5 rounded-lg bg-muted/30 border border-border/40 text-xs font-semibold">
+                        {org.primary_industry || org.industry || "-"}
                       </div>
-                      <p className="text-muted-foreground text-[11px] mt-1">{n.title}</p>
-                    </div>
-                  )) || <p className="text-xs text-muted-foreground">NAICS 518210 - Data Processing & Hosting</p>}
+                    )}
+                  </div>
                 </Card>
 
+                {/* Supported Languages */}
                 <Card className="border-border/50 bg-card p-5 space-y-3">
-                  <h3 className="text-xs font-bold uppercase text-purple-400 flex items-center gap-2">
-                    <FileCode2 className="h-4 w-4" /> SIC Industry Codes
+                  <h3 className="text-sm font-bold flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-indigo-400" /> Supported Languages ({org.language_list?.length || 0})
                   </h3>
-                  {org.sic_code_list?.map((s) => (
-                    <div key={s.id} className="p-3 rounded-lg bg-muted/30 border border-border/40 text-xs">
-                      <div className="flex items-center justify-between font-mono">
-                        <span className="font-bold text-purple-300">Code {s.code}</span>
-                      </div>
-                      <p className="text-muted-foreground text-[11px] mt-1">{s.title}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {org.language_list && org.language_list.length > 0 ? (
+                      org.language_list.map((l) => (
+                        <div key={l.id} className="p-2.5 rounded-lg bg-muted/30 border border-border/40 flex items-center gap-2 text-xs font-semibold">
+                          <Globe className="h-3.5 w-3.5 text-indigo-400" />
+                          <span>{l.language?.name}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground">English</span>
+                    )}
+                  </div>
+                </Card>
+              </div>
+
+              {/* Consolidated keywords & Classifications Grid */}
+              <div className="grid grid-cols-1 gap-6">
+                {/* Classifications (NAICS & SIC) */}
+                <Card className="border-border/50 bg-card p-5 space-y-3">
+                  <h3 className="text-sm font-bold flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-emerald-400" /> Industry Classifications (NAICS & SIC)
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-bold uppercase text-indigo-400 flex items-center gap-1.5">
+                        <Layers className="h-3 w-3" /> NAICS Codes
+                      </span>
+                      {org.naics_code_list && org.naics_code_list.length > 0 ? (
+                        org.naics_code_list.map((n) => (
+                          <div key={n.id} className="p-2 rounded-lg bg-muted/30 border border-border/40 text-xs">
+                            <span className="font-bold text-indigo-300 font-mono">Code {n.code}</span>
+                            <p className="text-muted-foreground text-[10px] mt-0.5">{n.title}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">No NAICS codes assigned</p>
+                      )}
                     </div>
-                  )) || <p className="text-xs text-muted-foreground">SIC 7374 - Computer Processing Services</p>}
+
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-bold uppercase text-purple-400 flex items-center gap-1.5">
+                        <FileCode2 className="h-3 w-3" /> SIC Codes
+                      </span>
+                      {org.sic_code_list && org.sic_code_list.length > 0 ? (
+                        org.sic_code_list.map((s) => (
+                          <div key={s.id} className="p-2 rounded-lg bg-muted/30 border border-border/40 text-xs">
+                            <span className="font-bold text-purple-300 font-mono">Code {s.code}</span>
+                            <p className="text-muted-foreground text-[10px] mt-0.5">{s.title}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">No SIC codes assigned</p>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Keywords & Tech Stack */}
+                <Card className="border-border/50 bg-card p-5 space-y-3">
+                  <h3 className="text-sm font-bold flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-indigo-400" /> Tagged Keywords & Tech Stack ({org.keywords_list?.length || 0})
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {org.keywords_list && org.keywords_list.length > 0 ? (
+                      org.keywords_list.map((k) => (
+                        <Badge key={k.id} variant="outline" className="text-[10px] bg-purple-500/10 text-purple-400">
+                          #{k.keyword?.name}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No keywords tagged yet.</span>
+                    )}
+                  </div>
                 </Card>
               </div>
             </TabsContent>
 
-            {/* TAB 6: PEOPLE */}
+            {/* TAB 2: PEOPLE */}
             <TabsContent value="people" className="mt-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {people.length > 0 ? (
@@ -403,7 +420,7 @@ export default function CompanyProfilePage() {
               </div>
             </TabsContent>
 
-            {/* TAB 7: LEADS */}
+            {/* TAB 3: LEADS */}
             <TabsContent value="leads" className="mt-4 space-y-4">
               <div className="space-y-3">
                 {leads.length > 0 ? (
@@ -428,7 +445,7 @@ export default function CompanyProfilePage() {
               </div>
             </TabsContent>
 
-            {/* TAB 8: NOTES */}
+            {/* TAB 4: NOTES */}
             <TabsContent value="notes" className="mt-4 space-y-4">
               <Card className="border-border/50 bg-card p-5 space-y-4">
                 <form onSubmit={handleAddNote} className="space-y-3">
@@ -457,7 +474,7 @@ export default function CompanyProfilePage() {
               </Card>
             </TabsContent>
 
-            {/* TAB 9: TASKS */}
+            {/* TAB 5: TASKS */}
             <TabsContent value="tasks" className="mt-4 space-y-4">
               <div className="space-y-3">
                 {tasks.length > 0 ? (
@@ -476,7 +493,7 @@ export default function CompanyProfilePage() {
               </div>
             </TabsContent>
 
-            {/* TAB 10: ACTIVITIES */}
+            {/* TAB 6: ACTIVITIES */}
             <TabsContent value="activities" className="mt-4 space-y-4">
               <div className="space-y-3">
                 {org.activities?.map((act) => (

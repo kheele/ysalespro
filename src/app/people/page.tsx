@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { DecisionMakerRow } from "./_components/decision-maker-row";
+import { IndustrySelect } from "@/components/ui/industry-select";
 import {
   Search,
   Users,
@@ -136,7 +137,7 @@ export default function PeoplePage() {
       <div className="flex-1 flex flex-col min-w-0">
         <SalesProHeader
           title="People & Decision Maker Intelligence"
-          subtitle="Hasura aa_s_decision_makers · Verified business contacts & buyer intent scoring"
+          subtitle="Verified business contacts, direct dials & buyer intent scoring"
           onOpenCommandPalette={() => setCommandOpen(true)}
         />
 
@@ -168,19 +169,11 @@ export default function PeoplePage() {
                 <SlidersHorizontal className="h-3.5 w-3.5" /> Filters:
               </span>
 
-              {/* Industry Dropdown */}
-              <select
+              {/* Industry Dropdown (Searchable Reusable Component) */}
+              <IndustrySelect
                 value={filterIndustry}
-                onChange={(e) => { setFilterIndustry(e.target.value); setCurrentPage(1); }}
-                className="bg-muted/40 border border-border/60 rounded-md px-2.5 py-1.5 text-xs outline-none text-foreground"
-              >
-                <option value="all">All Industries</option>
-                {industries.map((ind) => (
-                  <option key={ind.id} value={ind.name}>
-                    {ind.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => { setFilterIndustry(v); setCurrentPage(1); }}
+              />
 
               {/* Company Dropdown */}
               <select

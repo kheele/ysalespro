@@ -32,6 +32,7 @@ import {
   Activity,
   ArrowLeft,
   Search,
+  DollarSign,
 } from "lucide-react";
 import { IndustryMarketIntelligence } from "@/app/industries/_components/industry-market-intelligence";
 
@@ -48,6 +49,8 @@ export default function IndustryDetailPage() {
   const [orgPage, setOrgPage] = React.useState(1);
   const [orgPageSize, setOrgPageSize] = React.useState(30);
   const [orgSearch, setOrgSearch] = React.useState("");
+  const [orgEmployeeFilter, setOrgEmployeeFilter] = React.useState("all");
+  const [orgRevenueFilter, setOrgRevenueFilter] = React.useState("all");
   const [orgsLoading, setOrgsLoading] = React.useState(false);
   const [leads, setLeads] = React.useState<Lead[]>([]);
   const [signals, setSignals] = React.useState<IndustrySignal[]>([]);
@@ -92,6 +95,8 @@ export default function IndustryDetailPage() {
       const orgData = await organizationServices.getOrganizations({
         industry_id: indId,
         search: orgSearch.trim() || undefined,
+        employee_range: orgEmployeeFilter === "all" ? undefined : orgEmployeeFilter,
+        revenue_range: orgRevenueFilter === "all" ? undefined : orgRevenueFilter,
         page: orgPage,
         pageSize: orgPageSize,
       });
@@ -102,7 +107,7 @@ export default function IndustryDetailPage() {
     } finally {
       setOrgsLoading(false);
     }
-  }, [indId, orgSearch, orgPage, orgPageSize]);
+  }, [indId, orgSearch, orgEmployeeFilter, orgRevenueFilter, orgPage, orgPageSize]);
 
   React.useEffect(() => {
     loadOrganizations();
@@ -168,7 +173,7 @@ export default function IndustryDetailPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <SalesProHeader
           title={industry.name}
-          subtitle={`Industry Profile · Hasura aa_s_industries #${industry.id}`}
+          subtitle={`Industry Profile · ${industry.organization_count || 0} Organizations · ${industry.industry_signal_count || 0} Market Signals`}
           onOpenCommandPalette={() => setCommandOpen(true)}
         />
 
@@ -263,7 +268,7 @@ export default function IndustryDetailPage() {
             {/* TAB 2: Related Organizations */}
             <TabsContent value="organizations" className="space-y-4">
               {/* Filtering / Search Header */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card p-4 rounded-xl backdrop-blur-md border border-border/40">
+              <div className="flex flex-col lg:flex-row items-center justify-between gap-3 bg-card p-4 rounded-xl backdrop-blur-md border border-border/40">
                 <div className="relative flex-1 w-full">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
@@ -273,14 +278,55 @@ export default function IndustryDetailPage() {
                       setOrgSearch(e.target.value);
                       setOrgPage(1);
                     }}
-                    className="pl-8 bg-muted/40 text-xs h-8"
+                    className="pl-8 bg-muted/40 text-xs h-9"
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {orgTotal.toLocaleString()} {orgTotal === 1 ? "Organization" : "Organizations"}
-                  </span>
-                  <Link href="/companies" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 ml-2">
+
+                <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+                  {/* Number of Employees Filter */}
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-lg border border-border/40">
+                    <Users className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                    <span>Employees:</span>
+                    <select
+                      value={orgEmployeeFilter}
+                      onChange={(e) => {
+                        setOrgEmployeeFilter(e.target.value);
+                        setOrgPage(1);
+                      }}
+                      className="bg-transparent text-foreground text-xs outline-none cursor-pointer"
+                    >
+                      <option value="all" className="bg-card text-foreground">All Sizes</option>
+                      <option value="1-10" className="bg-card text-foreground">1 - 10</option>
+                      <option value="11-50" className="bg-card text-foreground">11 - 50</option>
+                      <option value="51-200" className="bg-card text-foreground">51 - 200</option>
+                      <option value="201-500" className="bg-card text-foreground">201 - 500</option>
+                      <option value="501-1000" className="bg-card text-foreground">501 - 1,000</option>
+                      <option value="1000+" className="bg-card text-foreground">1,000+</option>
+                    </select>
+                  </div>
+
+                  {/* Annual Revenue Filter */}
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-lg border border-border/40">
+                    <DollarSign className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                    <span>Revenue:</span>
+                    <select
+                      value={orgRevenueFilter}
+                      onChange={(e) => {
+                        setOrgRevenueFilter(e.target.value);
+                        setOrgPage(1);
+                      }}
+                      className="bg-transparent text-foreground text-xs outline-none cursor-pointer"
+                    >
+                      <option value="all" className="bg-card text-foreground">All Revenues</option>
+                      <option value="<1M" className="bg-card text-foreground">&lt; $1M</option>
+                      <option value="1M-10M" className="bg-card text-foreground">$1M - $10M</option>
+                      <option value="10M-50M" className="bg-card text-foreground">$10M - $50M</option>
+                      <option value="50M-100M" className="bg-card text-foreground">$50M - $100M</option>
+                      <option value="100M+" className="bg-card text-foreground">$100M+</option>
+                    </select>
+                  </div>
+
+                  <Link href="/companies" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 ml-2 shrink-0">
                     View All Companies <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 </div>

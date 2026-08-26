@@ -37,7 +37,7 @@ function mapDbOrganization(o: any): Organization {
     founded_year: o.founded_year ?? null,
     status: o.status || (o.show_intent ? "Active" : "Prospect"),
     lead_status: o.lead_status || (o.intent_strength === "High" ? "Hot" : o.intent_strength === "Medium" ? "Warm" : "Cold"),
-    score: o.score ?? (o.alexa_ranking ? Math.max(60, Math.min(99, Math.round(100 - Math.log10(Math.max(1, o.alexa_ranking)) * 6))) : 88),
+    score: o.score !== undefined && o.score !== null ? Number(o.score) : null,
     last_activity: o.last_activity || (o.updated_at ? new Date(o.updated_at).toLocaleDateString() : "Recently"),
     created_at: o.created_at,
     updated_at: o.updated_at,
@@ -260,35 +260,35 @@ export async function getOrganizations(params?: GetOrganizationsParams): Promise
           intent_signal_account
           created_at
           updated_at
-          industry_list(order_by: [{ industry: {name: asc} }]) {
+          industry_list(distinct_on: [industry_id], order_by: [{ industry_id: asc }]) {
             id
             industry {
               id
               name
             }
           }
-          keywords_list(order_by: [{ keyword: {name: asc} }]) {
+          keywords_list(distinct_on: [keyword_id], order_by: [{ keyword_id: asc }]) {
             id
             keyword {
               name
             }
           }
-          language_list(order_by: [{ language: {name: asc} }]) {
+          language_list(distinct_on: [language_id], order_by: [{ language_id: asc }]) {
             id
             language {
               name
             }
           }
-          naics_code_list(order_by: [{ naics_code: asc }]) {
+          naics_code_list(distinct_on: [naics_code], order_by: [{ naics_code: asc }]) {
             id
             naics_code
           }
-          sic_code_list(order_by: [{ sic_code: asc }]) {
+          sic_code_list(distinct_on: [sic_code], order_by: [{ sic_code: asc }]) {
             id
             sic_code
           }
         }
-        aa_s_organizations_aggregate(where: $where) {
+        aa_s_organizations_aggregate(distinct_on: [id], where: $where) {
           aggregate {
             count
           }
@@ -394,34 +394,34 @@ export async function getOrganizationById(id: string | number): Promise<Organiza
           intent_signal_account
           created_at
           updated_at
-          industry_list(order_by: [{ industry: {name: asc} }]) {
+          industry_list(distinct_on: [industry_id], order_by: [{ industry_id: asc }]) {
             id
             industry {
               id
               name
             }
           }
-          keywords_list(order_by: [{ keyword: {name: asc} }]) {
+          keywords_list(distinct_on: [keyword_id], order_by: [{ keyword_id: asc }]) {
             id
             keyword {
               name
             }
           }
-          language_list(order_by: [{ language: {name: asc} }]) {
+          language_list(distinct_on: [language_id], order_by: [{ language_id: asc }]) {
             id
             language {
               name
             }
           }
-          naics_code_list(order_by: [{ naics_code: asc }]) {
+          naics_code_list(distinct_on: [naics_code], order_by: [{ naics_code: asc }]) {
             id
             naics_code
           }
-          sic_code_list(order_by: [{ sic_code: asc }]) {
+          sic_code_list(distinct_on: [sic_code], order_by: [{ sic_code: asc }]) {
             id
             sic_code
           }
-          people_list(order_by: [{ name: asc }]) {
+          people_list(distinct_on: [id], order_by: [{ id: asc }]) {
             id
             name
             job_title

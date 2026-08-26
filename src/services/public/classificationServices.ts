@@ -14,12 +14,12 @@ function mapDbCode(key: "naics_code" | "sic_code", title: "NAICS Code" | "SIC Co
         naics_code: n.naics_code || "",
         code: n.naics_code || "",
         title: n.naics_code || title,
-      }))(c)),
+      }))(c as NAICSCode)),
       ...(key === "sic_code" && ((s: SICCode) => ({
         sic_code: s.sic_code || "",
         code: s.sic_code || "",
         title: s.sic_code || title,
-      }))(c)),
+      }))(c as SICCode)),
       organization_count: 1,
       organization: c.organization,
     };
@@ -34,7 +34,12 @@ export async function getNAICSCodes(params?: {
   try {
     const query = `
       query GetNAICS($limit: Int, $offset: Int) {
-        aa_s_organization_naics_codes(limit: $limit, offset: $offset) {
+        aa_s_organization_naics_codes(
+          distinct_on: [naics_code]
+          order_by: [{ naics_code: asc }]
+          limit: $limit
+          offset: $offset
+        ) {
           id
           organization_id
           naics_code
@@ -54,7 +59,6 @@ export async function getNAICSCodes(params?: {
       operationName: "GetNAICS",
     });
     const rawList = Array.isArray(res) ? res : [];
-
     return rawList.map(mapDbCode("naics_code", "NAICS Code")).filter(Boolean);
   } catch (err) {
     console.error("Hasura NAICS error:", err);
@@ -70,7 +74,12 @@ export async function getSICCodes(params?: {
   try {
     const query = `
       query GetSIC($limit: Int, $offset: Int) {
-        aa_s_organization_sic_codes(limit: $limit, offset: $offset) {
+        aa_s_organization_sic_codes(
+          distinct_on: [sic_code]
+          order_by: [{ sic_code: asc }]
+          limit: $limit
+          offset: $offset
+        ) {
           id
           organization_id
           sic_code
@@ -90,7 +99,6 @@ export async function getSICCodes(params?: {
       operationName: "GetSIC",
     });
     const rawList = Array.isArray(res) ? res : [];
-
     return rawList.map(mapDbCode("sic_code", "SIC Code")).filter(Boolean);
   } catch (err) {
     console.error("Hasura SIC error:", err);

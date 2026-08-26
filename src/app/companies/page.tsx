@@ -11,9 +11,10 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
-import { Search, Filter, SlidersHorizontal, Users, DollarSign } from "lucide-react";
+import { Search, SlidersHorizontal, Users, DollarSign } from "lucide-react";
 import { CompanyBanner } from "./_components/company-banner";
 import { CompanyTableRow } from "./_components/company-table-row";
+import { IndustrySelect } from "@/components/ui/industry-select";
 
 const DEFAULT_PAGE_SIZE = 30;
 
@@ -23,24 +24,11 @@ export default function CompaniesPage() {
   const [industryFilter, setIndustryFilter] = React.useState("all");
   const [employeeFilter, setEmployeeFilter] = React.useState("all");
   const [revenueFilter, setRevenueFilter] = React.useState("all");
-  const [industries, setIndustries] = React.useState<Industry[]>([]);
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(DEFAULT_PAGE_SIZE);
   const [companies, setCompanies] = React.useState<Organization[]>([]);
   const [total, setTotal] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
-
-  // Load real industries from backend
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const res = await industryServices.getIndustries({ limit: 0 });
-        setIndustries(res?.industries || []);
-      } catch (err) {
-        console.error("Failed to load industries from backend:", err);
-      }
-    })();
-  }, []);
 
   const loadCompanies = React.useCallback(async () => {
     setLoading(true);
@@ -97,23 +85,11 @@ export default function CompaniesPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-              {/* Industry Filter (Loaded from backend) */}
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-lg border border-border/40">
-                <Filter className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
-                <span>Industry:</span>
-                <select
-                  value={industryFilter}
-                  onChange={(e) => setIndustryFilter(e.target.value)}
-                  className="bg-transparent text-foreground text-xs outline-none cursor-pointer max-w-[150px] truncate"
-                >
-                  <option value="all">All Industries</option>
-                  {industries.map((ind) => (
-                    <option key={ind.id} value={ind.name} className="bg-card text-foreground">
-                      {ind.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Industry Filter (Searchable Reusable Component) */}
+              <IndustrySelect
+                value={industryFilter}
+                onChange={setIndustryFilter}
+              />
 
               {/* Number of Employees Filter */}
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-lg border border-border/40">

@@ -91,7 +91,11 @@ export async function getOutreachActivitiesActionByToken(
 
     const query = `
       query GetOutreach($where: aa_s_outreach_activities_bool_exp) {
-        aa_s_outreach_activities(where: $where, order_by: [{ created_at: desc }]) {
+        aa_s_outreach_activities(
+          distinct_on: [id]
+          where: $where
+          order_by: [{ id: desc }]
+        ) {
           id
           account_company_id
           lead_id

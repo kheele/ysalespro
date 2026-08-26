@@ -61,30 +61,31 @@ export async function getIndustries(params?: {
     const query = `
       query GetIndustries($where: aa_s_industries_bool_exp, $limit: Int, $offset: Int) {
         aa_s_industries(
+          distinct_on: [name]
           where: $where
-          order_by: { name: asc }
+          order_by: [{ name: asc }]
           limit: $limit
           offset: $offset
         ) {
           id
           name
           active
-          organization_list_aggregate {
+          organization_list_aggregate(distinct_on: [organization_id]) {
             aggregate {
               count
             }
           }
-          campaign_target_list_aggregate {
+          campaign_target_list_aggregate(distinct_on: [campaign_id]) {
             aggregate {
               count
             }
           }
-          industry_signal_list_aggregate {
+          industry_signal_list_aggregate(distinct_on: [id]) {
             aggregate {
               count
             }
           }
-          industry_signal_list(order_by: { published_at: desc_nulls_last, id: desc }) {
+          industry_signal_list(distinct_on: [id], order_by: [{ id: desc }, { published_at: desc_nulls_last }]) {
             id
             industry_id
             country
@@ -107,7 +108,7 @@ export async function getIndustries(params?: {
             updated_at
           }
         }
-        aa_s_industries_aggregate(where: $where) {
+        aa_s_industries_aggregate(distinct_on: [name], where: $where) {
           aggregate {
             count
           }
@@ -128,13 +129,14 @@ export async function getIndustries(params?: {
 
     const {
       aa_s_industries: rawList,
-      aa_s_industries_aggregate: { aggregate: { count: total } }
+      aa_s_industries_aggregate: aggregateRes,
     } = res || {
       aa_s_industries: [],
-      aa_s_industries_aggregate: { aggregate: { count: 0 } }
+      aa_s_industries_aggregate: { aggregate: { count: 0 } },
     };
 
-    const items: Industry[] = rawList.map(mapDbIndustry).filter(Boolean);
+    const items: Industry[] = (rawList || []).map(mapDbIndustry).filter(Boolean);
+    const total = aggregateRes?.aggregate?.count || items.length;
 
     return { industries: items, total };
   } catch (err) {
@@ -154,22 +156,22 @@ export async function getIndustryById(id: string | number): Promise<Industry | n
           id
           name
           active
-          organization_list_aggregate {
+          organization_list_aggregate(distinct_on: [organization_id]) {
             aggregate {
               count
             }
           }
-          campaign_target_list_aggregate {
+          campaign_target_list_aggregate(distinct_on: [campaign_id]) {
             aggregate {
               count
             }
           }
-          industry_signal_list_aggregate {
+          industry_signal_list_aggregate(distinct_on: [id]) {
             aggregate {
               count
             }
           }
-          industry_signal_list(order_by: { published_at: desc_nulls_last, id: desc }) {
+          industry_signal_list(distinct_on: [id], order_by: [{ id: desc }, { published_at: desc_nulls_last }]) {
             id
             industry_id
             country

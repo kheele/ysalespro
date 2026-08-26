@@ -34,10 +34,10 @@ const DECISION_MAKER_FIELDS = `
     primary_domain
     logo_url
   }
-  lead_list {
+  lead_list(distinct_on: [id], order_by: [{ id: desc }]) {
     id
   }
-  timeline_event_list {
+  timeline_event_list(distinct_on: [id], order_by: [{ id: desc }]) {
     id
     person_id
     type
@@ -92,8 +92,8 @@ function mapDbDecisionMaker(p: any): DecisionMaker {
     has_phone: !!p.has_phone,
     email_status: p.email_status || null,
     lead_list: p.lead_list || [],
-    timeline,
-    timeline_event_list: p.timeline_event_list || [],
+    timeline: timeline,
+    timeline_event_list: timeline,
     created_at: p.created_at,
     updated_at: p.updated_at,
   };
@@ -188,7 +188,7 @@ export async function getDecisionMakers(params?: {
         ) {
           ${DECISION_MAKER_FIELDS}
         }
-        aa_s_people_aggregate(where: $where) {
+        aa_s_people_aggregate(distinct_on: [id], where: $where) {
           aggregate {
             count
           }

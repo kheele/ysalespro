@@ -29,20 +29,21 @@ export async function getKeywords(params?: {
     const query = `
       query GetKeywords($where: aa_s_keywords_bool_exp, $limit: Int, $offset: Int) {
         aa_s_keywords(
+          distinct_on: [name]
           where: $where
-          order_by: { name: asc }
+          order_by: [{ name: asc }]
           limit: $limit
           offset: $offset
         ) {
           id
           name
-          organization_list_aggregate {
+          organization_list_aggregate(distinct_on: [organization_id]) {
             aggregate {
               count
             }
           }
         }
-        aa_s_keywords_aggregate(where: $where) {
+        aa_s_keywords_aggregate(distinct_on: [name], where: $where) {
           aggregate {
             count
           }
@@ -63,15 +64,16 @@ export async function getKeywords(params?: {
 
     const {
       aa_s_keywords: rawList,
-      aa_s_keywords_aggregate: { aggregate: { count: total } }
+      aa_s_keywords_aggregate: aggregateRes,
     } = res || {
       aa_s_keywords: [],
-      aa_s_keywords_aggregate: { aggregate: { count: 0 } }
+      aa_s_keywords_aggregate: { aggregate: { count: 0 } },
     };
 
-    const items: Keyword[] = rawList.map(mapDbKeyword).filter(Boolean);
+    const mapped = (rawList || []).map(mapDbKeyword).filter(Boolean);
+    const totalCount = aggregateRes?.aggregate?.count || mapped.length;
 
-    return { keywords: items, total };
+    return { keywords: mapped, total: totalCount };
   } catch (err) {
     console.error("Hasura keywordServices error:", err);
     return { keywords: [], total: 0 };
@@ -88,7 +90,7 @@ export async function getKeywordById(id: string | number): Promise<Keyword | nul
         aa_s_keywords_by_pk(id: $id) {
           id
           name
-          organization_list_aggregate {
+          organization_list_aggregate(distinct_on: [organization_id]) {
             aggregate {
               count
             }

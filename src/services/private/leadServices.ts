@@ -130,7 +130,7 @@ export async function getLeadsActionByToken(
     });
 
     const list = Array.isArray(res) ? res : [];
-    return list.map(mapDbLead);
+    return list.map(mapDbLead).filter(Boolean);
   } catch (err) {
     console.error("Hasura getLeadsActionByToken error:", err);
     throw err;

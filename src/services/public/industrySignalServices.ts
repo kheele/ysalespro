@@ -103,7 +103,7 @@ export async function getIndustrySignals(params?: {
             active
           }
         }
-        aa_s_industry_signals_aggregate(where: $where) {
+        aa_s_industry_signals_aggregate(distinct_on: [id], where: $where) {
           aggregate {
             count
           }

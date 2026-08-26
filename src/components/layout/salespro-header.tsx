@@ -3,35 +3,24 @@
 import * as React from "react";
 import {
   Bell,
-  Search,
   Plus,
-  Moon,
-  Sun,
-  User,
-  LogOut,
-  Flame,
-  CheckCircle2,
-  Sparkles,
-  Command,
+  Menu,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { useTheme } from "next-themes";
 import { getNotificationsActionByToken, markAsReadActionByToken } from "@/services/private/notificationServices";
 import type { NotificationItem } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
-
-import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { SidebarContent } from "@/components/layout/salespro-sidebar";
+import { UserNav } from "@/components/layout/user-nav";
 
 interface SalesProHeaderProps {
   title: string;
@@ -48,37 +37,9 @@ export function SalesProHeader({
   onAddCompanyClick,
   onNewCampaignClick,
 }: SalesProHeaderProps) {
-  const { user, dbUser, signOut } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = React.useState(0);
-
-  const displayName = React.useMemo(() => {
-    if (dbUser?.fname) {
-      return `${dbUser.fname} ${dbUser.lname || ""}`.trim();
-    }
-    if (user?.displayName) return user.displayName;
-    if (user?.email) return user.email.split("@")[0];
-    return "User";
-  }, [dbUser, user]);
-
-  const userRoleOrCompany = React.useMemo(() => {
-    return dbUser?.account_company?.name || dbUser?.role || "Enterprise Member";
-  }, [dbUser]);
-
-  const initials = React.useMemo(() => {
-    if (dbUser?.fname) {
-      return `${dbUser.fname[0] || ""}${dbUser.lname?.[0] || ""}`.toUpperCase();
-    }
-    if (user?.displayName) {
-      const parts = user.displayName.split(" ");
-      return `${parts[0]?.[0] || ""}${parts[1]?.[0] || ""}`.toUpperCase();
-    }
-    if (user?.email) {
-      return user.email.substring(0, 2).toUpperCase();
-    }
-    return "SP";
-  }, [dbUser, user]);
 
   React.useEffect(() => {
     async function loadNotifications() {
@@ -147,18 +108,6 @@ export function SalesProHeader({
           </Button>
         )}
 
-        {/* Dark/Light Theme Toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9 text-muted-foreground hover:text-foreground"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        >
-          <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-          <span className="sr-only">Toggle theme</span>
-        </Button>
-
         {/* Notifications Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -198,32 +147,8 @@ export function SalesProHeader({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* User Profile */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-9 gap-2 px-2 text-xs font-medium border border-border/40">
-              <div className="h-6 w-6 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-[10px]">
-                {initials}
-              </div>
-              <span className="hidden md:inline font-semibold">{displayName}</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel className="text-xs">
-              <p className="font-bold">{displayName}</p>
-              <p className="text-[10px] text-muted-foreground font-normal">{userRoleOrCompany}</p>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild className="text-xs gap-2 cursor-pointer">
-              <a href="/settings">
-                <User className="h-3.5 w-3.5" /> Profile Settings
-              </a>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => signOut()} className="text-xs gap-2 text-red-400 cursor-pointer">
-              <LogOut className="h-3.5 w-3.5" /> Sign Out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* User Profile Avatar */}
+        <UserNav />
       </div>
     </header>
   );
