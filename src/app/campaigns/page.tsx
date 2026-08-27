@@ -9,6 +9,14 @@ import {
   createCampaignActionByToken,
   updateCampaignStatusActionByToken,
 } from "@/services/private/campaignServices";
+import {
+  optimizeCampaignSequenceAction,
+  predictOptimalTimingAction,
+  generateCampaignStrategyAction,
+} from "@/services/private/aiMessageServices";
+import type { OptimizeSequenceOutput } from "@/ai/schemas/sequence-optimizer";
+import type { PredictOptimalTimingOutput } from "@/ai/schemas/optimal-timing";
+import type { GenerateCampaignStrategyOutput } from "@/ai/schemas/campaign-generator";
 import * as industryServices from "@/services/public/industryServices";
 import * as organizationServices from "@/services/public/organizationServices";
 import * as peopleServices from "@/services/public/peopleServices";
@@ -38,7 +46,7 @@ import {
   Search, Plus, Play, Pause, CheckCircle2, XCircle, FileEdit,
   Mail, Users, Target, Zap, Clock, ChevronRight, Settings2, BarChart3,
   Trash2, GripVertical, AlertCircle, CalendarDays, StopCircle,
-  ListChecks, ArrowRight, ArrowLeft, Rocket, Loader2,
+  ListChecks, ArrowRight, ArrowLeft, Rocket, Loader2, Sparkles, Lightbulb, Check,
 } from "lucide-react";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -220,6 +228,134 @@ function CampaignBuilderModal({ open, onClose, onSave }: {
   const [rules, setRules] = React.useState<CampaignRules>(DEFAULT_RULES);
   const [schedule, setSchedule] = React.useState<CampaignSchedule>(DEFAULT_SCHEDULE);
 
+  // AI Campaign Strategy Generator State
+  const [generatingStrategy, setGeneratingStrategy] = React.useState(false);
+  const [strategyPrompt, setStrategyPrompt] = React.useState("");
+
+  // AI Sequence Optimizer State
+  const [optimizing, setOptimizing] = React.useState(false);
+  const [optimizeModalOpen, setOptimizeModalOpen] = React.useState(false);
+  const [optimizeResult, setOptimizeResult] = React.useState<OptimizeSequenceOutput | null>(null);
+
+  // AI Smart Timing Predictor State
+  const [timingLoading, setTimingLoading] = React.useState(false);
+  const [timingModalOpen, setTimingModalOpen] = React.useState(false);
+  const [timingResult, setTimingResult] = React.useState<PredictOptimalTimingOutput | null>(null);
+
+  const handleGenerateCampaignStrategy = async () => {
+    if (!strategyPrompt.trim()) return;
+    setGeneratingStrategy(true);
+    try {
+      const res = await generateCampaignStrategyAction({
+        campaign_goal: strategyPrompt,
+        target_industry: audience.industries[0] || undefined,
+      });
+      if (res) {
+        setName(res.campaign_name);
+        setDescription(res.description);
+        if (res.recommended_audience_filters?.suggested_industries?.length) {
+          setAudience(a => ({
+            ...a,
+            industries: Array.from(new Set([...a.industries, ...res.recommended_audience_filters.suggested_industries])),
+          }));
+        }
+        if (res.sequence_steps?.length) {
+          setSequence(res.sequence_steps.map((st, idx) => ({
+            id: `step-${idx + 1}`,
+            step_number: st.step_number,
+            day: st.day,
+            type: (st.type as SequenceStepType) || "Follow-up",
+            subject: st.subject,
+            body: st.body,
+            enabled: true,
+          })));
+        }
+        if (res.recommended_rules) {
+          setRules(r => ({ ...r, ...res.recommended_rules }));
+        }
+        if (res.recommended_schedule) {
+          setSchedule(s => ({
+            ...s,
+            send_days: (res.recommended_schedule.send_days as any) || s.send_days,
+            send_time_from: res.recommended_schedule.send_time_from || s.send_time_from,
+            send_time_to: res.recommended_schedule.send_time_to || s.send_time_to,
+          }));
+        }
+      }
+    } catch (err) {
+      console.error("Failed to generate campaign strategy:", err);
+    } finally {
+      setGeneratingStrategy(false);
+    }
+  };
+
+  const handleRunAIOptimize = async () => {
+    setOptimizing(true);
+    try {
+      const res = await optimizeCampaignSequenceAction({
+        campaign_name: name || "Outbound Sequence",
+        industry: audience.industries[0] || "Enterprise B2B",
+        target_audience: audience.people.length > 0 ? "Targeted Decision Makers" : "Industry Executives",
+        current_steps: sequence.map((s, idx) => ({
+          step_number: s.step_number || (idx + 1),
+          day: s.day,
+          type: s.type,
+          subject: s.subject,
+          body: s.body,
+        })),
+      });
+      setOptimizeResult(res);
+      setOptimizeModalOpen(true);
+    } catch (err) {
+      console.error("AI Sequence Optimize failed:", err);
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
+  const handleApplyOptimizedSteps = () => {
+    if (!optimizeResult?.optimized_steps) return;
+    setSequence(optimizeResult.optimized_steps.map((st, idx) => ({
+      id: `step-${idx + 1}`,
+      step_number: st.step_number,
+      day: st.day,
+      type: (st.type as SequenceStepType) || "Follow-up",
+      subject: st.subject,
+      body: st.body,
+      enabled: true,
+    })));
+    setOptimizeModalOpen(false);
+  };
+
+  const handlePredictTiming = async () => {
+    setTimingLoading(true);
+    try {
+      const res = await predictOptimalTimingAction({
+        industry: audience.industries[0] || "Enterprise",
+        seniority: "VP",
+        timezone: schedule.timezone,
+      });
+      setTimingResult(res);
+      setTimingModalOpen(true);
+    } catch (err) {
+      console.error("Predict timing failed:", err);
+    } finally {
+      setTimingLoading(false);
+    }
+  };
+
+  const handleApplyTimingSchedule = (win: { time_range: string }) => {
+    const [from, to] = win.time_range.split(" - ");
+    if (from && to) {
+      setSchedule(s => ({
+        ...s,
+        send_time_from: from.trim(),
+        send_time_to: to.trim(),
+      }));
+    }
+    setTimingModalOpen(false);
+  };
+
   const updateStep = (id: string, field: keyof SequenceStep, val: any) =>
     setSequence(s => s.map(st => st.id === id ? { ...st, [field]: val } : st));
 
@@ -292,6 +428,34 @@ function CampaignBuilderModal({ open, onClose, onSave }: {
           {/* ─── STEP 1: AUDIENCE ─── */}
           {step === 1 && (
             <div className="space-y-5">
+              {/* AI Auto-Generate Strategy Bar */}
+              <div className="p-3.5 bg-gradient-to-r from-indigo-500/15 via-purple-500/15 to-indigo-500/10 border border-indigo-500/30 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-indigo-300 flex items-center gap-1.5 text-xs">
+                    <Sparkles className="h-3.5 w-3.5 text-indigo-400" /> AI Strategy Generator
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">Auto-generates title, audience & 4-step sequence</span>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="e.g. Book 15-min discovery calls with FinTech CTOs on compliance automation..."
+                    value={strategyPrompt}
+                    onChange={e => setStrategyPrompt(e.target.value)}
+                    className="bg-card/80 border-border/60 text-xs h-8"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleGenerateCampaignStrategy}
+                    disabled={generatingStrategy || !strategyPrompt.trim()}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-8 px-3 shrink-0 font-semibold gap-1.5"
+                  >
+                    {generatingStrategy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    {generatingStrategy ? "Building Strategy..." : "Generate Strategy"}
+                  </Button>
+                </div>
+              </div>
+
               <div className="space-y-1.5">
                 <Label className="text-xs">Campaign Name <span className="text-red-400">*</span></Label>
                 <Input placeholder="e.g. Q3 Enterprise CTO Outreach" value={name}
@@ -373,12 +537,19 @@ function CampaignBuilderModal({ open, onClose, onSave }: {
           {/* ─── STEP 2: SEQUENCE ─── */}
           {step === 2 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">Define the emails and timing. Sequence auto-stops on reply or meeting.</p>
-                <Button type="button" size="sm" variant="outline" onClick={addStep}
-                  className="h-7 text-[11px] gap-1 border-border/60 shrink-0">
-                  <Plus className="h-3 w-3" /> Add Step
-                </Button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button type="button" size="sm" variant="outline" onClick={handleRunAIOptimize} disabled={optimizing}
+                    className="h-7 text-[11px] gap-1.5 border-indigo-500/40 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20">
+                    {optimizing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3 text-indigo-400" />}
+                    {optimizing ? "Optimizing..." : "AI Optimize"}
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={addStep}
+                    className="h-7 text-[11px] gap-1 border-border/60 shrink-0">
+                    <Plus className="h-3 w-3" /> Add Step
+                  </Button>
+                </div>
               </div>
 
               {/* Sequence Timeline */}
@@ -500,7 +671,14 @@ function CampaignBuilderModal({ open, onClose, onSave }: {
 
               {/* Sending Window */}
               <div className="space-y-3">
-                <Label className="text-xs">Send on days</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Send on days</Label>
+                  <Button type="button" size="sm" variant="outline" onClick={handlePredictTiming} disabled={timingLoading}
+                    className="h-6 text-[10px] gap-1.5 border-indigo-500/40 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20">
+                    {timingLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3 text-indigo-400" />}
+                    {timingLoading ? "Analyzing..." : "AI Best Send Times"}
+                  </Button>
+                </div>
                 <div className="flex gap-2 flex-wrap">
                   {(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const).map(d => {
                     const active = schedule.send_days.includes(d);
@@ -599,6 +777,122 @@ function CampaignBuilderModal({ open, onClose, onSave }: {
             </Button>
           </div>
         </div>
+
+        {/* ─── AI Sequence Optimizer Modal ─── */}
+        <Dialog open={optimizeModalOpen} onOpenChange={setOptimizeModalOpen}>
+          <DialogContent className="max-w-2xl bg-card border-border/60 max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-sm font-bold flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-indigo-400" /> AI Sequence Copilot (Vanessa Van Edwards Science-Based Optimization)
+                </span>
+                {optimizeResult && (
+                  <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-xs">
+                    Grade {optimizeResult.overall_grade} · {optimizeResult.overall_score}/100
+                  </Badge>
+                )}
+              </DialogTitle>
+            </DialogHeader>
+
+            {optimizeResult && (
+              <div className="space-y-4 text-xs pt-2">
+                {/* Metrics Lift Forecast */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-center">
+                    <div className="text-lg font-black text-indigo-400 font-mono">+{optimizeResult.predicted_open_rate_boost_pct}%</div>
+                    <div className="text-[10px] text-muted-foreground">Predicted Open Rate Lift</div>
+                  </div>
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-center">
+                    <div className="text-lg font-black text-emerald-400 font-mono">+{optimizeResult.predicted_reply_rate_boost_pct}%</div>
+                    <div className="text-[10px] text-muted-foreground">Predicted Reply Rate Lift</div>
+                  </div>
+                </div>
+
+                {/* Recommendations */}
+                <div className="space-y-1.5 p-3 bg-muted/20 border border-border/40 rounded-xl">
+                  <p className="font-bold text-foreground flex items-center gap-1.5 text-[11px]">
+                    <Lightbulb className="h-3.5 w-3.5 text-amber-400" /> Behavioral Psychology Insights
+                  </p>
+                  <ul className="space-y-1 text-muted-foreground text-[11px] list-disc list-inside">
+                    {optimizeResult.key_recommendations.map((rec, i) => (
+                      <li key={i}>{rec}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Optimized Steps Preview */}
+                <div className="space-y-3">
+                  <p className="font-bold text-foreground text-[11px]">Optimized Steps Preview ({optimizeResult.optimized_steps.length} steps):</p>
+                  <div className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
+                    {optimizeResult.optimized_steps.map((st) => (
+                      <div key={st.step_number} className="p-3 bg-card border border-border/50 rounded-xl space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold text-indigo-300">Step {st.step_number} (Day {st.day}) · {st.type}</span>
+                          <span className="text-[10px] text-muted-foreground italic">{st.rationale}</span>
+                        </div>
+                        <div className="font-semibold text-foreground bg-muted/30 px-2 py-1 rounded text-[11px]">
+                          {st.subject}
+                        </div>
+                        <div className="text-muted-foreground text-[11px] whitespace-pre-wrap line-clamp-3 bg-muted/10 p-2 rounded">
+                          {st.body}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-border/30">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setOptimizeModalOpen(false)}>
+                    Keep Current
+                  </Button>
+                  <Button type="button" size="sm" onClick={handleApplyOptimizedSteps} className="bg-indigo-600 hover:bg-indigo-500 text-white gap-1.5">
+                    <Check className="h-3.5 w-3.5" /> Apply AI Optimized Steps
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* ─── AI Smart Timing Modal ─── */}
+        <Dialog open={timingModalOpen} onOpenChange={setTimingModalOpen}>
+          <DialogContent className="max-w-lg bg-card border-border/60">
+            <DialogHeader>
+              <DialogTitle className="text-sm font-bold flex items-center gap-2">
+                <Clock className="h-4 w-4 text-indigo-400" /> AI Optimal Send Timing (Chronotype Intelligence)
+              </DialogTitle>
+            </DialogHeader>
+
+            {timingResult && (
+              <div className="space-y-4 text-xs pt-2">
+                <div className="p-3 bg-muted/20 border border-border/40 rounded-xl space-y-1">
+                  <p className="font-bold text-foreground text-[11px]">Persona Engagement Habit Insights:</p>
+                  <ul className="space-y-1 text-muted-foreground text-[11px] list-disc list-inside">
+                    {timingResult.persona_behavioral_insights.map((ins, i) => (
+                      <li key={i}>{ins}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="font-bold text-foreground text-[11px]">Recommended Peak Email Windows:</p>
+                  {timingResult.top_send_windows.map((win, i) => (
+                    <div key={i} className="p-3 bg-card border border-border/50 rounded-xl flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-bold text-indigo-300">{win.day_of_week} · {win.time_range} ({win.timezone})</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">{win.rationale}</div>
+                      </div>
+                      <Button type="button" size="sm" variant="outline" onClick={() => handleApplyTimingSchedule(win)}
+                        className="h-7 text-[10px] gap-1 shrink-0 border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/20">
+                        Use Window
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );

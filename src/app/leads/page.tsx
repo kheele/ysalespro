@@ -10,6 +10,14 @@ import {
   updateLeadStageActionByToken,
   createLeadActionByToken,
 } from "@/services/private/leadServices";
+import {
+  generatePreCallBriefAction,
+  classifyInboundReplyAction,
+  scoreAndQualifyLeadAction,
+} from "@/services/private/aiMessageServices";
+import type { GeneratePreCallBriefOutput } from "@/ai/schemas/precall-brief";
+import type { ClassifyInboundReplyOutput } from "@/ai/schemas/inbound-reply";
+import type { ScoreAndQualifyLeadOutput } from "@/ai/schemas/lead-qualification";
 import type { Lead, LeadStage, LeadTemperature } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
@@ -17,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -37,6 +46,16 @@ import {
   Repeat,
   Building2,
   Calendar,
+  Sparkles,
+  Shield,
+  Lightbulb,
+  Loader2,
+  HelpCircle,
+  Volume2,
+  Target,
+  Copy,
+  Check,
+  MessageSquare,
 } from "lucide-react";
 
 // ─── Visual Tokens ─────────────────────────────────────────────────────────
@@ -83,7 +102,19 @@ function ScoreBar({ score }: { score?: number | null }) {
 }
 
 // ─── Kanban Card ───────────────────────────────────────────────────────────
-function KanbanCard({ lead, onMove }: { lead: Lead; onMove: (id: string | number, stage: LeadStage) => void }) {
+function KanbanCard({
+  lead,
+  onMove,
+  onOpenBrief,
+  onOpenTriage,
+  onOpenQualify,
+}: {
+  lead: Lead;
+  onMove: (id: string | number, stage: LeadStage) => void;
+  onOpenBrief: (lead: Lead) => void;
+  onOpenTriage: (lead: Lead) => void;
+  onOpenQualify: (lead: Lead) => void;
+}) {
   const stage = (lead.stage || "Cold") as LeadStage;
   const sc = STAGE_COLORS[stage] || STAGE_COLORS.Cold;
   const idx = PIPELINE_STAGES.indexOf(stage);
@@ -132,6 +163,34 @@ function KanbanCard({ lead, onMove }: { lead: Lead; onMove: (id: string | number
 
       <ScoreBar score={lead.lead_score} />
 
+      {/* AI Quick Actions */}
+      <div className="grid grid-cols-3 gap-1 pt-1 border-t border-border/20">
+        <button
+          type="button"
+          onClick={() => onOpenQualify(lead)}
+          className="flex items-center justify-center gap-0.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-[9px] font-semibold transition-colors"
+          title="AI Score & Qualify Lead"
+        >
+          <Target className="h-2.5 w-2.5 text-amber-400" /> Qualify
+        </button>
+        <button
+          type="button"
+          onClick={() => onOpenBrief(lead)}
+          className="flex items-center justify-center gap-0.5 py-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 text-[9px] font-semibold transition-colors"
+          title="AI Pre-Call Intelligence Brief"
+        >
+          <Sparkles className="h-2.5 w-2.5 text-indigo-400" /> Brief
+        </button>
+        <button
+          type="button"
+          onClick={() => onOpenTriage(lead)}
+          className="flex items-center justify-center gap-0.5 py-1 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 text-[9px] font-semibold transition-colors"
+          title="AI Inbound Reply Triage"
+        >
+          <MessageSquare className="h-2.5 w-2.5 text-purple-400" /> Triage
+        </button>
+      </div>
+
       <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-border/20 text-muted-foreground">
         <span>{lead.next_followup ? `Next: ${new Date(lead.next_followup).toLocaleDateString()}` : `Score: ${lead.lead_score || 0}`}</span>
         <span>↩ #{lead.followup_count || 0}</span>
@@ -174,6 +233,118 @@ export default function LeadsPage() {
   // Add Lead Modal
   const [addOpen, setAddOpen] = React.useState(false);
   const [newLead, setNewLead] = React.useState({ person_name: "", company_name: "", industry: "" });
+
+  // AI Pre-Call Brief State
+  const [briefLoading, setBriefLoading] = React.useState(false);
+  const [briefModalOpen, setBriefModalOpen] = React.useState(false);
+  const [briefData, setBriefData] = React.useState<GeneratePreCallBriefOutput | null>(null);
+  const [briefTargetLead, setBriefTargetLead] = React.useState<Lead | null>(null);
+
+  // AI Lead Scoring & Qualification State
+  const [qualifyLoading, setQualifyLoading] = React.useState(false);
+  const [qualifyModalOpen, setQualifyModalOpen] = React.useState(false);
+  const [qualifyResult, setQualifyResult] = React.useState<ScoreAndQualifyLeadOutput | null>(null);
+  const [qualifyTargetLead, setQualifyTargetLead] = React.useState<Lead | null>(null);
+
+  const handleOpenQualify = async (lead: Lead) => {
+    setQualifyTargetLead(lead);
+    setQualifyLoading(true);
+    setQualifyModalOpen(true);
+    try {
+      const res = await scoreAndQualifyLeadAction({
+        person_name: lead.person_name || lead.person?.name || "Decision Maker",
+        job_title: lead.person?.job_title || "Executive",
+        company_name: lead.company_name || "Enterprise Account",
+        industry: lead.industry || "Enterprise B2B",
+        company_size: "Mid-Market",
+        stage: lead.stage || undefined,
+        followup_count: lead.followup_count ?? undefined,
+        last_contact_days_ago: lead.last_contact ? Math.round((Date.now() - new Date(lead.last_contact).getTime()) / 86400000) : undefined,
+      });
+      setQualifyResult(res);
+    } catch (err) {
+      console.error("Failed to qualify lead:", err);
+    } finally {
+      setQualifyLoading(false);
+    }
+  };
+
+  const handleApplyAIQualification = () => {
+    if (!qualifyResult || !qualifyTargetLead) return;
+    setLeads((prev) =>
+      prev.map((l) =>
+        l.id === qualifyTargetLead.id
+          ? {
+              ...l,
+              lead_score: qualifyResult.lead_score,
+              lead_temperature: qualifyResult.lead_temperature,
+            }
+          : l
+      )
+    );
+    setQualifyModalOpen(false);
+  };
+
+  const handleOpenBrief = async (lead: Lead) => {
+    setBriefTargetLead(lead);
+    setBriefLoading(true);
+    setBriefModalOpen(true);
+    try {
+      const res = await generatePreCallBriefAction({
+        prospect: {
+          name: lead.person_name || lead.person?.name || "Decision Maker",
+          title: lead.person?.job_title || "Executive",
+        },
+        company: {
+          name: lead.company_name || "Enterprise Account",
+          industry: lead.industry || "Enterprise B2B",
+        },
+        call_goal: `Advance lead qualification (${lead.stage || "Warm"} Stage)`,
+      });
+      setBriefData(res);
+    } catch (err) {
+      console.error("Failed to generate pre-call brief:", err);
+    } finally {
+      setBriefLoading(false);
+    }
+  };
+
+  // AI Inbound Reply Triage State
+  const [triageOpen, setTriageOpen] = React.useState(false);
+  const [triageMessage, setTriageMessage] = React.useState("");
+  const [triageSubject, setTriageSubject] = React.useState("");
+  const [triageProspect, setTriageProspect] = React.useState("");
+  const [triageCompany, setTriageCompany] = React.useState("");
+  const [triageLoading, setTriageLoading] = React.useState(false);
+  const [triageResult, setTriageResult] = React.useState<ClassifyInboundReplyOutput | null>(null);
+  const [triageCopied, setTriageCopied] = React.useState(false);
+
+  const handleOpenTriage = (lead?: Lead) => {
+    if (lead) {
+      setTriageProspect(lead.person_name || lead.person?.name || "");
+      setTriageCompany(lead.company_name || "");
+      setTriageSubject(`Re: Discovery Follow-Up — ${lead.company_name || ""}`);
+    }
+    setTriageOpen(true);
+  };
+
+  const handleRunTriage = async () => {
+    if (!triageMessage.trim()) return;
+    setTriageLoading(true);
+    try {
+      const res = await classifyInboundReplyAction({
+        inbound_message: triageMessage,
+        subject: triageSubject || undefined,
+        prospect_name: triageProspect || undefined,
+        company_name: triageCompany || undefined,
+      });
+      setTriageResult(res);
+    } catch (err) {
+      console.error("AI Triage failed:", err);
+    } finally {
+      setTriageLoading(false);
+    }
+  };
 
   const { user } = useAuth();
   const load = React.useCallback(async () => {
@@ -304,14 +475,25 @@ export default function LeadsPage() {
               ))}
             </select>
 
-            {/* Add Lead */}
-            <Button
-              size="sm"
-              onClick={() => setAddOpen(true)}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 font-semibold h-9 shrink-0"
-            >
-              <Plus className="h-3.5 w-3.5" /> Add Lead
-            </Button>
+            {/* Actions */}
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleOpenTriage()}
+                className="border-indigo-500/40 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 text-xs gap-1.5 font-semibold h-9"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-indigo-400" /> AI Triage Reply
+              </Button>
+
+              <Button
+                size="sm"
+                onClick={() => setAddOpen(true)}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 font-semibold h-9"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add Lead
+              </Button>
+            </div>
           </div>
 
           {/* =================== KANBAN VIEW =================== */}
@@ -336,7 +518,14 @@ export default function LeadsPage() {
                     <div className="space-y-2.5">
                       {stageLeads.length > 0 ? (
                         stageLeads.map((lead) => (
-                          <KanbanCard key={lead.id} lead={lead} onMove={handleMove} />
+                          <KanbanCard
+                            key={lead.id}
+                            lead={lead}
+                            onMove={handleMove}
+                            onOpenBrief={handleOpenBrief}
+                            onOpenTriage={handleOpenTriage}
+                            onOpenQualify={handleOpenQualify}
+                          />
                         ))
                       ) : (
                         <div className="h-20 rounded-xl flex items-center justify-center text-[10px] text-muted-foreground/40 border border-dashed border-border/30">
@@ -455,22 +644,49 @@ export default function LeadsPage() {
                             <td className="p-3.5 text-muted-foreground text-[11px] whitespace-nowrap">
                               {lead.assigned_user || "—"}
                             </td>
-                            {/* Move Buttons */}
-                            <td className="p-3.5">
-                              {(() => {
-                                const idx = PIPELINE_STAGES.indexOf(stage);
-                                const next = PIPELINE_STAGES[idx + 1];
-                                return next ? (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => handleMove(lead.id, next)}
-                                    className={`text-[10px] h-7 gap-0.5 opacity-0 group-hover:opacity-100 ${sc.text}`}
-                                  >
-                                    → {next}
-                                  </Button>
-                                ) : null;
-                              })()}
+                            {/* Actions */}
+                            <td className="p-3.5 whitespace-nowrap">
+                              <div className="flex items-center gap-1.5 justify-end">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleOpenQualify(lead)}
+                                  className="text-[10px] h-7 px-2 gap-1 text-amber-300 hover:bg-amber-500/15"
+                                  title="AI Score & Qualify"
+                                >
+                                  <Target className="h-3 w-3 text-amber-400" /> Qualify
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleOpenBrief(lead)}
+                                  className="text-[10px] h-7 px-2 gap-1 text-indigo-300 hover:bg-indigo-500/15"
+                                >
+                                  <Sparkles className="h-3 w-3 text-indigo-400" /> Brief
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleOpenTriage(lead)}
+                                  className="text-[10px] h-7 px-2 gap-1 text-purple-300 hover:bg-purple-500/15"
+                                >
+                                  <MessageSquare className="h-3 w-3 text-purple-400" /> Triage
+                                </Button>
+                                {(() => {
+                                  const idx = PIPELINE_STAGES.indexOf(stage);
+                                  const next = PIPELINE_STAGES[idx + 1];
+                                  return next ? (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleMove(lead.id, next)}
+                                      className={`text-[10px] h-7 gap-0.5 opacity-0 group-hover:opacity-100 ${sc.text}`}
+                                    >
+                                      → {next}
+                                    </Button>
+                                  ) : null;
+                                })()}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -549,6 +765,302 @@ export default function LeadsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── AI Pre-Call Research Brief Modal ─── */}
+      <Dialog open={briefModalOpen} onOpenChange={setBriefModalOpen}>
+        <DialogContent className="max-w-2xl bg-card border-border/60 max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-indigo-400" /> AI Pre-Call Intelligence Brief (Vanessa Van Edwards People Skills)
+              </span>
+              {briefTargetLead && (
+                <Badge variant="outline" className="bg-indigo-500/10 text-indigo-300 border-indigo-500/20 text-xs">
+                  {briefTargetLead.person_name || briefTargetLead.company_name}
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          {briefLoading ? (
+            <div className="py-16 text-center space-y-3">
+              <Loader2 className="h-8 w-8 animate-spin text-indigo-400 mx-auto" />
+              <p className="text-xs text-muted-foreground font-semibold">Synthesizing behavioral intelligence & talking points...</p>
+            </div>
+          ) : briefData ? (
+            <div className="space-y-4 text-xs pt-1">
+              {/* Executive Summary & Motivator */}
+              <div className="p-3.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] font-bold text-indigo-300">
+                  <span className="flex items-center gap-1.5"><Target className="h-3.5 w-3.5 text-indigo-400" /> Executive Situational Brief</span>
+                  <span className="font-mono text-[10px]">Optimal Duration: ~{briefData.optimal_duration_minutes} mins</span>
+                </div>
+                <p className="text-muted-foreground leading-relaxed text-[11px]">
+                  {briefData.executive_summary}
+                </p>
+              </div>
+
+              {/* Recommended Vocal Demeanor */}
+              <div className="p-3 bg-muted/30 border border-border/40 rounded-xl flex items-center gap-2.5 text-[11px]">
+                <Volume2 className="h-4 w-4 text-purple-400 shrink-0" />
+                <span className="text-muted-foreground">
+                  <strong className="text-foreground">Vocal & Behavioral Demeanor:</strong> {briefData.recommended_tone}
+                </span>
+              </div>
+
+              {/* 3 Key Talking Points */}
+              <div className="space-y-2">
+                <p className="font-bold text-foreground flex items-center gap-1.5 text-[11px]">
+                  <Lightbulb className="h-3.5 w-3.5 text-amber-400" /> Key Value Propositions & Proof Points
+                </p>
+                <div className="grid grid-cols-1 gap-2">
+                  {briefData.key_talking_points.map((tp, idx) => (
+                    <div key={idx} className="p-3 bg-card border border-border/50 rounded-xl space-y-1">
+                      <div className="font-bold text-indigo-300 text-[11px]">{tp.topic}</div>
+                      <div className="text-foreground text-[11px] font-medium">{tp.talking_point}</div>
+                      <div className="text-[10px] text-emerald-400 font-mono">Proof: {tp.proof_point}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Likely Objections & Rebuttals */}
+              <div className="space-y-2">
+                <p className="font-bold text-foreground flex items-center gap-1.5 text-[11px]">
+                  <Shield className="h-3.5 w-3.5 text-red-400" /> Anticipated Objections & Validation-First Rebuttals
+                </p>
+                <div className="space-y-2">
+                  {briefData.likely_objections.map((obj, idx) => (
+                    <div key={idx} className="p-3 bg-red-500/5 border border-red-500/15 rounded-xl space-y-1">
+                      <div className="font-bold text-red-300 text-[11px]">Objection: "{obj.objection}"</div>
+                      <div className="text-muted-foreground text-[11px] leading-relaxed">
+                        <strong className="text-foreground">Science-backed Counter:</strong> {obj.rebuttal}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* High-Dopamine Discovery Questions */}
+              <div className="space-y-1.5 p-3 bg-muted/20 border border-border/40 rounded-xl">
+                <p className="font-bold text-foreground flex items-center gap-1.5 text-[11px]">
+                  <HelpCircle className="h-3.5 w-3.5 text-blue-400" /> High-Dopamine Discovery Questions
+                </p>
+                <ul className="space-y-1 text-muted-foreground text-[11px] list-disc list-inside">
+                  {briefData.high_impact_questions.map((q, idx) => (
+                    <li key={idx}>{q}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <Button type="button" size="sm" onClick={() => setBriefModalOpen(false)} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs">
+                  Ready to Connect
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── AI Inbound Reply Triage Modal ─── */}
+      <Dialog open={triageOpen} onOpenChange={setTriageOpen}>
+        <DialogContent className="max-w-2xl bg-card border-border/60 max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-indigo-400" /> AI Inbound Reply Triage (Vanessa Van Edwards Empathetic Response)
+              </span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 text-xs pt-1">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-[10px] uppercase font-semibold text-muted-foreground">Prospect Name</Label>
+                <Input placeholder="e.g. David Miller" value={triageProspect} onChange={e => setTriageProspect(e.target.value)} className="bg-muted/40 text-xs h-8 mt-1" />
+              </div>
+              <div>
+                <Label className="text-[10px] uppercase font-semibold text-muted-foreground">Company</Label>
+                <Input placeholder="e.g. Apex Global" value={triageCompany} onChange={e => setTriageCompany(e.target.value)} className="bg-muted/40 text-xs h-8 mt-1" />
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-[10px] uppercase font-semibold text-muted-foreground">Prospect Email / Message Content</Label>
+              <Textarea
+                placeholder="Paste the received email body or LinkedIn reply here..."
+                value={triageMessage}
+                onChange={e => setTriageMessage(e.target.value)}
+                className="bg-muted/40 text-xs min-h-[90px] mt-1"
+              />
+            </div>
+
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleRunTriage}
+              disabled={triageLoading || !triageMessage.trim()}
+              className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 w-full font-semibold h-9"
+            >
+              {triageLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {triageLoading ? "Analyzing Sentiment & Intent..." : "Analyze & Draft Empathetic Reply"}
+            </Button>
+
+            {triageResult && (
+              <div className="space-y-3 pt-2 border-t border-border/40">
+                {/* Intent & Sentiment Badges */}
+                <div className="flex items-center justify-between gap-2 p-3 bg-muted/30 border border-border/40 rounded-xl">
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-indigo-500/10 text-indigo-300 uppercase font-mono text-[10px]">
+                      Intent: {triageResult.intent}
+                    </Badge>
+                    <Badge className="bg-emerald-500/10 text-emerald-300 font-mono text-[10px]">
+                      Sentiment: {triageResult.sentiment} ({triageResult.sentiment_score}/100)
+                    </Badge>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground font-mono">
+                    Action: {triageResult.recommended_action}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-muted/20 border border-border/30 rounded-xl space-y-1">
+                  <p className="font-bold text-foreground text-[11px]">Executive Summary:</p>
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">{triageResult.summary}</p>
+                  {triageResult.return_date && (
+                    <p className="text-amber-400 font-mono text-[10px] pt-1">
+                      Parsed Return Date: {triageResult.return_date}
+                    </p>
+                  )}
+                </div>
+
+                {/* Draft Reply */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] uppercase font-bold text-foreground">AI Drafted Empathetic Response (Ready to Send)</Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        navigator.clipboard.writeText(triageResult.draft_reply);
+                        setTriageCopied(true);
+                        setTimeout(() => setTriageCopied(false), 2000);
+                      }}
+                      className="h-6 text-[10px] gap-1 text-indigo-300"
+                    >
+                      {triageCopied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                      {triageCopied ? "Copied!" : "Copy Reply"}
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={triageResult.draft_reply}
+                    readOnly
+                    className="bg-card border-border/60 text-xs min-h-[110px] leading-relaxed text-foreground font-sans"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── AI Lead Scoring & Qualification Modal ─── */}
+      <Dialog open={qualifyModalOpen} onOpenChange={setQualifyModalOpen}>
+        <DialogContent className="max-w-2xl bg-card border-border/60 max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <Target className="h-4 w-4 text-amber-400" /> AI Lead Scoring & Buying Readiness (Vanessa Van Edwards Methodology)
+              </span>
+              {qualifyTargetLead && (
+                <Badge variant="outline" className="bg-amber-500/10 text-amber-300 border-amber-500/20 text-xs">
+                  {qualifyTargetLead.person_name || qualifyTargetLead.company_name}
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          {qualifyLoading ? (
+            <div className="py-16 text-center space-y-3">
+              <Loader2 className="h-8 w-8 animate-spin text-amber-400 mx-auto" />
+              <p className="text-xs text-muted-foreground font-semibold">Evaluating ICP fit, buying authority, and intent score...</p>
+            </div>
+          ) : qualifyResult ? (
+            <div className="space-y-4 text-xs pt-1">
+              {/* Score & Temperature Gauges */}
+              <div className="grid grid-cols-4 gap-3 text-center">
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                  <div className="text-xl font-black text-amber-400 font-mono">{qualifyResult.lead_score}/100</div>
+                  <div className="text-[10px] text-muted-foreground">Lead Score</div>
+                </div>
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+                  <div className="text-xl font-black text-red-400 font-mono">{qualifyResult.lead_temperature}</div>
+                  <div className="text-[10px] text-muted-foreground">Temperature</div>
+                </div>
+                <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                  <div className="text-xl font-black text-indigo-400 font-mono">{qualifyResult.buying_readiness_grade}</div>
+                  <div className="text-[10px] text-muted-foreground">Readiness Grade</div>
+                </div>
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                  <div className="text-xl font-black text-emerald-400 font-mono">{qualifyResult.fit_score}%</div>
+                  <div className="text-[10px] text-muted-foreground">ICP Fit Score</div>
+                </div>
+              </div>
+
+              {/* Qualification Rationale */}
+              <div className="p-3.5 bg-muted/20 border border-border/40 rounded-xl space-y-1.5">
+                <p className="font-bold text-foreground text-[11px] flex items-center gap-1.5">
+                  <Lightbulb className="h-3.5 w-3.5 text-amber-400" /> Executive Qualification Analysis
+                </p>
+                <p className="text-muted-foreground leading-relaxed text-[11px]">
+                  {qualifyResult.qualification_rationale}
+                </p>
+              </div>
+
+              {/* Strengths & Risks */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-emerald-500/5 border border-emerald-500/15 rounded-xl space-y-1.5">
+                  <p className="font-bold text-emerald-300 text-[10px] uppercase">Key Positive Indicators</p>
+                  <ul className="text-muted-foreground text-[11px] list-disc list-inside space-y-1">
+                    {qualifyResult.key_strengths.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="p-3 bg-red-500/5 border border-red-500/15 rounded-xl space-y-1.5">
+                  <p className="font-bold text-red-300 text-[10px] uppercase">Risks & Potential Friction</p>
+                  <ul className="text-muted-foreground text-[11px] list-disc list-inside space-y-1">
+                    {qualifyResult.key_risks_or_blockers.map((r, i) => (
+                      <li key={i}>{r}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Next Action & Recommended Channel */}
+              <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="font-bold text-indigo-300 text-[11px]">Recommended Next Action:</div>
+                  <div className="text-muted-foreground text-[11px]">{qualifyResult.recommended_next_action}</div>
+                </div>
+                <Badge className="bg-indigo-500/20 text-indigo-300 font-mono text-[10px] shrink-0">
+                  Channel: {qualifyResult.optimal_outreach_channel}
+                </Badge>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-border/30">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setQualifyModalOpen(false)}>
+                  Close
+                </Button>
+                <Button type="button" size="sm" onClick={handleApplyAIQualification} className="bg-amber-600 hover:bg-amber-500 text-white gap-1.5 text-xs font-semibold">
+                  <Check className="h-3.5 w-3.5" /> Apply AI Score to Lead
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
 

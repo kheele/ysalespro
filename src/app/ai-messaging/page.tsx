@@ -19,6 +19,7 @@ import type {
   DecisionMaker,
   Organization,
 } from "@/lib/types";
+import type { OptimizeSequenceOutput } from "@/ai/schemas/sequence-optimizer";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,10 +27,16 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Sparkles, Mail, Phone, Linkedin, Copy, Check,
   ChevronRight, User, Building2, RefreshCw,
   Send, ArrowRight, MessageSquare, FileText,
-  Zap,
+  Zap, Lightbulb, Loader2,
 } from "lucide-react";
 
 // ─── Message Type Metadata ────────────────────────────────────────────────────
@@ -152,6 +159,60 @@ function AiMessagingContent() {
   const [activeFilter, setActiveFilter] = React.useState(0);
   const [editableMessages, setEditableMessages] = React.useState<GeneratedMessage[]>([]);
   const [painPoints, setPainPoints] = React.useState<string[]>([]);
+
+  // AI Sequence Copilot State
+  const [optimizingSeq, setOptimizingSeq] = React.useState(false);
+  const [optimizeModalOpen, setOptimizeModalOpen] = React.useState(false);
+  const [optimizeResult, setOptimizeResult] = React.useState<OptimizeSequenceOutput | null>(null);
+
+  const handleOptimizeCurrentSequence = async () => {
+    setOptimizingSeq(true);
+    try {
+      const emailSteps = [
+        {
+          step_number: 1,
+          day: 0,
+          type: "Introduction",
+          subject: editableMessages.find((m) => m.type === "email_subject")?.content || `Quick question — ${company.name || "partnership"}`,
+          body: editableMessages.find((m) => m.type === "initial_email")?.content || "",
+        },
+        {
+          step_number: 2,
+          day: 3,
+          type: "Follow-up",
+          subject: `Re: ${company.name || "Quick question"}`,
+          body: editableMessages.find((m) => m.type === "followup_1")?.content || "",
+        },
+        {
+          step_number: 3,
+          day: 7,
+          type: "Case Study",
+          subject: `Case Study for ${company.name || "your team"}`,
+          body: editableMessages.find((m) => m.type === "followup_2")?.content || "",
+        },
+        {
+          step_number: 4,
+          day: 14,
+          type: "Final Message",
+          subject: `Closing the loop — ${company.name || ""}`,
+          body: editableMessages.find((m) => m.type === "final")?.content || "",
+        },
+      ].filter((s) => s.body.trim().length > 0);
+
+      const res = await aiMessageServices.optimizeCampaignSequenceAction({
+        campaign_name: `${company.name || "Target Account"} Outreach Sequence`,
+        industry: company.industry || "Technology",
+        target_audience: `${person.seniority || "Executive"} Leader in ${person.department || "Operations"}`,
+        current_steps: emailSteps,
+      });
+      setOptimizeResult(res);
+      setOptimizeModalOpen(true);
+    } catch (err) {
+      console.error("Sequence Copilot optimization failed:", err);
+    } finally {
+      setOptimizingSeq(false);
+    }
+  };
 
   // Real Database Records
   const [people, setPeople] = React.useState<DecisionMaker[]>([]);
@@ -607,7 +668,7 @@ function AiMessagingContent() {
                     </div>
 
                     {/* Filter Tabs */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {FILTERS.map((f, i) => (
                         <button key={f.label} onClick={() => setActiveFilter(i)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${activeFilter === i ? "bg-indigo-600 text-white border-indigo-600" : "bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/60"}`}>
@@ -617,10 +678,22 @@ function AiMessagingContent() {
                           </span>
                         </button>
                       ))}
-                      <button onClick={handleGenerate} disabled={loading}
-                        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border/40 bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all disabled:opacity-50">
-                        <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> Regenerate
-                      </button>
+                      <div className="ml-auto flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleOptimizeCurrentSequence}
+                          disabled={optimizingSeq}
+                          className="h-8 px-2.5 text-xs gap-1.5 border-indigo-500/40 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20"
+                        >
+                          {optimizingSeq ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3 text-indigo-400" />}
+                          {optimizingSeq ? "Optimizing..." : "AI Sequence Copilot"}
+                        </Button>
+                        <button onClick={handleGenerate} disabled={loading}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border/40 bg-muted/30 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all disabled:opacity-50 h-8">
+                          <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> Regenerate
+                        </button>
+                      </div>
                     </div>
 
                     {/* Message Cards */}
@@ -669,6 +742,79 @@ function AiMessagingContent() {
           </div>
         </main>
       </div>
+
+      {/* ─── AI Sequence Copilot Modal ─── */}
+      <Dialog open={optimizeModalOpen} onOpenChange={setOptimizeModalOpen}>
+        <DialogContent className="max-w-2xl bg-card border-border/60 max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-indigo-400" /> AI Sequence Copilot (Vanessa Van Edwards Science-Based Optimization)
+              </span>
+              {optimizeResult && (
+                <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-xs">
+                  Grade {optimizeResult.overall_grade} · {optimizeResult.overall_score}/100
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          {optimizeResult && (
+            <div className="space-y-4 text-xs pt-2">
+              {/* Metrics Lift Forecast */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-center">
+                  <div className="text-lg font-black text-indigo-400 font-mono">+{optimizeResult.predicted_open_rate_boost_pct}%</div>
+                  <div className="text-[10px] text-muted-foreground">Predicted Open Rate Lift</div>
+                </div>
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-center">
+                  <div className="text-lg font-black text-emerald-400 font-mono">+{optimizeResult.predicted_reply_rate_boost_pct}%</div>
+                  <div className="text-[10px] text-muted-foreground">Predicted Reply Rate Lift</div>
+                </div>
+              </div>
+
+              {/* Recommendations */}
+              <div className="space-y-1.5 p-3 bg-muted/20 border border-border/40 rounded-xl">
+                <p className="font-bold text-foreground flex items-center gap-1.5 text-[11px]">
+                  <Lightbulb className="h-3.5 w-3.5 text-amber-400" /> Behavioral Psychology Insights
+                </p>
+                <ul className="space-y-1 text-muted-foreground text-[11px] list-disc list-inside">
+                  {optimizeResult.key_recommendations.map((rec, i) => (
+                    <li key={i}>{rec}</li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Optimized Steps Preview */}
+              <div className="space-y-3">
+                <p className="font-bold text-foreground text-[11px]">Optimized Steps Preview ({optimizeResult.optimized_steps.length} steps):</p>
+                <div className="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
+                  {optimizeResult.optimized_steps.map((st) => (
+                    <div key={st.step_number} className="p-3 bg-card border border-border/50 rounded-xl space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-indigo-300">Step {st.step_number} (Day {st.day}) · {st.type}</span>
+                        <span className="text-[10px] text-muted-foreground italic">{st.rationale}</span>
+                      </div>
+                      <div className="font-semibold text-foreground bg-muted/30 px-2 py-1 rounded text-[11px]">
+                        {st.subject}
+                      </div>
+                      <div className="text-muted-foreground text-[11px] whitespace-pre-wrap line-clamp-3 bg-muted/10 p-2 rounded">
+                        {st.body}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-border/30">
+                <Button type="button" size="sm" onClick={() => setOptimizeModalOpen(false)} className="bg-indigo-600 hover:bg-indigo-500 text-white gap-1.5 text-xs">
+                  Done
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
     </div>
