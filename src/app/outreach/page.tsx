@@ -10,6 +10,11 @@ import {
   logOutreachActionByToken,
 } from "@/services/private/outreachServices";
 import {
+  sendEmailOutreachActionByToken,
+  sendLinkedInOutreachActionByToken,
+} from "@/services/private/senderDispatchService";
+import { getConnectedAccountsActionByToken } from "@/services/private/connectedAccountsService";
+import {
   classifyInboundReplyAction,
   processCallTranscriptAction,
 } from "@/services/private/aiMessageServices";
@@ -19,6 +24,7 @@ import type { ProcessCallTranscriptOutput } from "@/ai/schemas/call-transcript";
 import type {
   OutreachActivity,
   OutreachChannel,
+  ConnectedAccount,
 } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -206,6 +212,7 @@ function ActivityCard({ activity }: { activity: OutreachActivity }) {
 
 // ─── Page ───────────────────────────────────────────────────────────────────
 function OutreachPageContent() {
+  const { user } = useAuth();
   const searchParams = useSearchParams();
   const prefilledEmail = searchParams?.get("email") || "";
   const prefilledOrg = searchParams?.get("organization") || "";
@@ -224,14 +231,37 @@ function OutreachPageContent() {
     return Array.from(new Set(activities.map(a => a.assigned_to).filter(Boolean))) as string[];
   }, [activities]);
 
+  // Connected Accounts State
+  const [connectedAccounts, setConnectedAccounts] = React.useState<ConnectedAccount[]>([]);
+  const [sendingOutreach, setSendingOutreach] = React.useState(false);
+  const [dispatchError, setDispatchError] = React.useState<string | null>(null);
+
+  const loadConnectedAccounts = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const token = await user.getIdToken(true);
+      const accs = await getConnectedAccountsActionByToken(token);
+      setConnectedAccounts(accs || []);
+    } catch (e) {
+      console.error("Failed to load connected accounts in outreach:", e);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    loadConnectedAccounts();
+  }, [loadConnectedAccounts]);
+
   // Compose modal
   const [composeOpen, setComposeOpen] = React.useState(false);
   const [form, setForm] = React.useState({
     channel: "Email" as OutreachChannel,
+    sendReal: true,
+    sender_account_id: "",
     recipient_name: "",
     recipient_org: prefilledOrg,
     recipient_email: prefilledEmail,
     recipient_title: "",
+    recipient_linkedin: "",
     subject: "",
     message: "",
     next_followup: "",
@@ -319,8 +349,7 @@ function OutreachPageContent() {
       console.error("Failed to create extracted tasks:", err);
     }
   };
-
-  const { user } = useAuth();
+ 
   const load = React.useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -345,25 +374,68 @@ function OutreachPageContent() {
   const handleCompose = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    setSendingOutreach(true);
+    setDispatchError(null);
     try {
       const token = await user.getIdToken(true);
-      await logOutreachActionByToken(token, {
-        channel: form.channel,
-        recipient_name: form.recipient_name,
-        recipient_org: form.recipient_org,
-        recipient_email: form.recipient_email,
-        recipient_title: form.recipient_title,
-        subject: form.subject,
-        message: form.message,
-        next_followup: form.next_followup,
-        followup_days: Number(form.followup_days),
-        assigned_to: form.assigned_to,
-      });
+      if (form.sendReal && form.channel === "Email") {
+        const res = await sendEmailOutreachActionByToken(token, {
+          to: form.recipient_email,
+          to_name: form.recipient_name,
+          subject: form.subject,
+          text: form.message,
+          account_id: form.sender_account_id || undefined,
+        });
+        if (!res.success) {
+          setDispatchError(res.error || "Email dispatch failed.");
+          setSendingOutreach(false);
+          return;
+        }
+      } else if (form.sendReal && form.channel === "LinkedIn") {
+        const res = await sendLinkedInOutreachActionByToken(token, {
+          recipient_name: form.recipient_name,
+          recipient_title: form.recipient_title,
+          recipient_org: form.recipient_org,
+          recipient_profile_url: form.recipient_linkedin || undefined,
+          message: form.message,
+          account_id: form.sender_account_id || undefined,
+        });
+        if (!res.success) {
+          setDispatchError(res.error || "LinkedIn message dispatch failed.");
+          setSendingOutreach(false);
+          return;
+        }
+      } else {
+        await logOutreachActionByToken(token, {
+          channel: form.channel,
+          recipient_name: form.recipient_name,
+          recipient_org: form.recipient_org,
+          recipient_email: form.recipient_email,
+          recipient_title: form.recipient_title,
+          subject: form.subject,
+          message: form.message,
+          next_followup: form.next_followup,
+          followup_days: Number(form.followup_days),
+          assigned_to: form.assigned_to,
+        });
+      }
       setComposeOpen(false);
-      setForm(f => ({ ...f, recipient_name: "", recipient_email: prefilledEmail, subject: "", message: "", next_followup: "" }));
+      setForm(f => ({
+        ...f,
+        recipient_name: "",
+        recipient_email: prefilledEmail,
+        recipient_linkedin: "",
+        subject: "",
+        message: "",
+        next_followup: "",
+        sender_account_id: "",
+      }));
       load();
-    } catch (e) {
-      console.error("Failed to log outreach activity:", e);
+    } catch (e: any) {
+      console.error("Failed to execute outreach activity:", e);
+      setDispatchError(e?.message || "Outreach action failed.");
+    } finally {
+      setSendingOutreach(false);
     }
   };
 
@@ -484,9 +556,9 @@ function OutreachPageContent() {
                 <Button
                   size="sm"
                   onClick={() => setComposeOpen(true)}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 font-semibold h-9"
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 font-semibold h-9 shadow-md shadow-indigo-500/20"
                 >
-                  <Plus className="h-3.5 w-3.5" /> Log Activity
+                  <Send className="h-3.5 w-3.5" /> Send / Log Outreach
                 </Button>
               </div>
             </div>
@@ -521,6 +593,42 @@ function OutreachPageContent() {
           </DialogHeader>
 
           <form onSubmit={handleCompose} className="space-y-4 text-xs pt-1">
+            {/* Mode Switch: Live Dispatch vs Historical Log */}
+            {(form.channel === "Email" || form.channel === "LinkedIn") && (
+              <div className="flex items-center justify-between p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                <div>
+                  <p className="font-semibold text-foreground text-xs">
+                    {form.sendReal ? "🚀 Live Delivery Mode" : "📝 Historical Log Mode"}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {form.sendReal
+                      ? `Dispatches real message via linked ${form.channel} account and logs it.`
+                      : "Logs activity to database without triggering external sending."}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 bg-muted/40 p-0.5 rounded-lg border border-border/40">
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, sendReal: true }))}
+                    className={`px-2 py-1 rounded text-[10px] font-semibold transition-all ${
+                      form.sendReal ? "bg-indigo-600 text-white" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Live Send
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, sendReal: false }))}
+                    className={`px-2 py-1 rounded text-[10px] font-semibold transition-all ${
+                      !form.sendReal ? "bg-indigo-600 text-white" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Log Only
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Channel Selector */}
             <div className="space-y-1.5">
               <Label>Channel</Label>
@@ -545,6 +653,40 @@ function OutreachPageContent() {
               </div>
             </div>
 
+            {/* Sender Account Selection if Live Send */}
+            {form.sendReal && (form.channel === "Email" || form.channel === "LinkedIn") && (
+              <div className="space-y-1.5 p-2.5 bg-muted/20 border border-border/40 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <Label className="text-[11px] font-semibold">
+                    Sending Mailbox / LinkedIn Profile
+                  </Label>
+                  <a href="/settings" target="_blank" className="text-[10px] text-indigo-400 hover:text-indigo-300">
+                    Manage Accounts →
+                  </a>
+                </div>
+                {connectedAccounts.filter(a => a.channel === form.channel && a.is_active).length > 0 ? (
+                  <select
+                    value={form.sender_account_id}
+                    onChange={e => setForm(f => ({ ...f, sender_account_id: e.target.value }))}
+                    className="w-full bg-card border border-border/60 rounded-lg px-2 py-1.5 text-xs text-foreground outline-none"
+                  >
+                    <option value="">Default Active Account</option>
+                    {connectedAccounts
+                      .filter(a => a.channel === form.channel && a.is_active)
+                      .map(a => (
+                        <option key={a.id} value={a.id}>
+                          {a.name} ({form.channel === "Email" ? a.email_config?.from_email : a.linkedin_config?.account_name}) {a.is_default ? "— (Default)" : ""}
+                        </option>
+                      ))}
+                  </select>
+                ) : (
+                  <div className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-300 text-[10px]">
+                    No active {form.channel} accounts connected. Please link an account in Settings &gt; Integrations.
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Contact Fields */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -566,9 +708,22 @@ function OutreachPageContent() {
                   onChange={e => setForm(f => ({ ...f, recipient_org: e.target.value }))} required />
               </div>
               <div className="space-y-1.5">
-                <Label>Email Address</Label>
-                <Input type="email" placeholder="contact@company.com" value={form.recipient_email}
-                  onChange={e => setForm(f => ({ ...f, recipient_email: e.target.value }))} />
+                <Label>{form.channel === "LinkedIn" ? "LinkedIn Profile URL" : "Email Address"}</Label>
+                {form.channel === "LinkedIn" ? (
+                  <Input
+                    placeholder="https://linkedin.com/in/sarahjenkins"
+                    value={form.recipient_linkedin}
+                    onChange={e => setForm(f => ({ ...f, recipient_linkedin: e.target.value }))}
+                  />
+                ) : (
+                  <Input
+                    type="email"
+                    placeholder="contact@company.com"
+                    value={form.recipient_email}
+                    onChange={e => setForm(f => ({ ...f, recipient_email: e.target.value }))}
+                    required={form.sendReal && form.channel === "Email"}
+                  />
+                )}
               </div>
             </div>
 
@@ -600,6 +755,7 @@ function OutreachPageContent() {
                 value={form.message}
                 onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
                 className="bg-muted/40 min-h-[100px] text-xs"
+                required
               />
             </div>
 
@@ -628,10 +784,31 @@ function OutreachPageContent() {
               />
             </div>
 
+            {dispatchError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-xs flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+                {dispatchError}
+              </div>
+            )}
+
             <DialogFooter className="pt-2">
               <Button type="button" variant="ghost" size="sm" onClick={() => setComposeOpen(false)}>Cancel</Button>
-              <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold gap-1.5">
-                <Send className="h-3.5 w-3.5" /> Log & Save
+              <Button
+                type="submit"
+                size="sm"
+                disabled={sendingOutreach}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold gap-1.5"
+              >
+                {sendingOutreach ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
+                {sendingOutreach
+                  ? "Dispatching..."
+                  : form.sendReal && (form.channel === "Email" || form.channel === "LinkedIn")
+                  ? "Send & Log Outreach"
+                  : "Log & Save"}
               </Button>
             </DialogFooter>
           </form>

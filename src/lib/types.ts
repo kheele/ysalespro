@@ -836,3 +836,86 @@ export interface AutomationExecutionResult {
   }>;
 }
 
+export type ChannelType = 'Email' | 'LinkedIn' | 'SMS' | 'Phone';
+export type EmailProviderType = 'smtp' | 'google_workspace' | 'resend' | 'sendgrid';
+export type LinkedInProviderType = 'linkedin_oauth' | 'linkedin_api' | 'webhook' | 'unipile';
+export type AccountConnectionStatus = 'active' | 'disconnected' | 'error' | 'rate_limited';
+
+export interface EmailAccountConfig {
+  provider: EmailProviderType;
+  host?: string;
+  port?: number;
+  secure?: boolean;
+  username?: string;
+  password?: string;
+  api_key?: string;
+  from_name: string;
+  from_email: string;
+  reply_to?: string;
+  daily_send_limit: number;
+}
+
+export interface LinkedInAccountConfig {
+  provider: LinkedInProviderType;
+  account_name: string;
+  vanity_name?: string;
+  profile_url?: string;
+  access_token?: string;
+  session_cookie?: string;
+  webhook_url?: string;
+  daily_connection_limit: number;
+  daily_message_limit: number;
+}
+
+export interface ConnectedAccount {
+  id: string;
+  account_company_id?: number;
+  name: string;
+  channel: ChannelType;
+  status: AccountConnectionStatus;
+  is_default: boolean;
+  is_active: boolean;
+  email_config?: EmailAccountConfig;
+  linkedin_config?: LinkedInAccountConfig;
+  sent_today: number;
+  created_at: string;
+  updated_at?: string;
+  last_used_at?: string;
+  last_error?: string;
+}
+
+export interface SendEmailPayload {
+  to: string;
+  to_name?: string;
+  subject: string;
+  html?: string;
+  text?: string;
+  account_id?: string;
+  lead_id?: string | number;
+  campaign_id?: string | number;
+  reply_to?: string;
+}
+
+export interface SendLinkedInPayload {
+  recipient_profile_url?: string;
+  recipient_name: string;
+  recipient_title?: string;
+  recipient_org?: string;
+  message: string;
+  message_type?: 'connect' | 'inmail' | 'dm';
+  account_id?: string;
+  lead_id?: string | number;
+  campaign_id?: string | number;
+}
+
+export interface DispatchResult {
+  success: boolean;
+  messageId?: string;
+  channel: ChannelType;
+  recipient: string;
+  status: 'Sent' | 'Delivered' | 'Failed';
+  error?: string;
+  timestamp: string;
+  outreach_activity_id?: string | number;
+}
+
