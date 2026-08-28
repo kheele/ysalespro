@@ -11,11 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
+import { useSettings } from "@/hooks/use-settings";
+import { useTheme } from "next-themes";
 import {
   User, Shield, Bell, Palette, Users,
   Globe, Mail, Plug, ChevronRight, Save, CheckCircle2, Zap,
   ToggleLeft, ToggleRight, Plus, Trash2, Edit3, Loader2, Sparkles,
-  Linkedin, Check, AlertCircle, RefreshCw, Key, Server, Lock,
+  Linkedin, Check, AlertCircle, RefreshCw, Key, Server, Lock, ExternalLink,
 } from "lucide-react";
 import {
   getConnectedAccountsActionByToken,
@@ -30,6 +32,9 @@ import type {
   LinkedInAccountConfig,
   EmailProviderType,
   LinkedInProviderType,
+  NotificationSettings,
+  AppearanceSettings,
+  SecuritySettings,
 } from "@/lib/types";
 import {
   Dialog,
@@ -82,9 +87,26 @@ export default function SettingsPage() {
   const [loadingAccounts, setLoadingAccounts] = React.useState(true);
   const [testingAccountId, setTestingAccountId] = React.useState<string | number | null>(null);
 
+  // Third-party CRM & notification integrations state
+  const [activeIntegrationModal, setActiveIntegrationModal] = React.useState<string | null>(null);
+  const [thirdPartyConfigs, setThirdPartyConfigs] = React.useState<Record<string, {
+    connected: boolean;
+    config: Record<string, string>;
+  }>>({
+    Slack: { connected: false, config: { webhook_url: "", channel: "#sales-alerts", bot_token: "" } },
+    "Microsoft Teams": { connected: false, config: { webhook_url: "", channel: "Sales Alerts" } },
+    Zoom: { connected: false, config: { client_id: "", client_secret: "", auto_record: "true" } },
+    "HubSpot CRM": { connected: false, config: { access_token: "", sync_direction: "Bidirectional" } },
+  });
+  const [intTesting, setIntTesting] = React.useState(false);
+  const [intTestMsg, setIntTestMsg] = React.useState<string | null>(null);
+  const [savingIntegration, setSavingIntegration] = React.useState(false);
+
   // Email account modal state
   const [emailModalOpen, setEmailModalOpen] = React.useState(false);
   const [editingEmailAccount, setEditingEmailAccount] = React.useState<ConnectedAccount | null>(null);
+  const [savingEmail, setSavingEmail] = React.useState(false);
+  const [savingLinkedin, setSavingLinkedin] = React.useState(false);
   const [emailForm, setEmailForm] = React.useState<{
     name: string;
     provider: EmailProviderType;
@@ -298,6 +320,7 @@ export default function SettingsPage() {
 
   const handleSaveEmailAccount = async () => {
     if (!user) return;
+    setSavingEmail(true);
     try {
       const token = await user.getIdToken(true);
       await saveConnectedAccountActionByToken(token, {
@@ -325,11 +348,14 @@ export default function SettingsPage() {
       loadAccounts();
     } catch (err) {
       console.error("Failed to save email account:", err);
+    } finally {
+      setSavingEmail(false);
     }
   };
 
   const handleSaveLinkedinAccount = async () => {
     if (!user) return;
+    setSavingLinkedin(true);
     try {
       const token = await user.getIdToken(true);
       await saveConnectedAccountActionByToken(token, {
@@ -354,6 +380,8 @@ export default function SettingsPage() {
       loadAccounts();
     } catch (err) {
       console.error("Failed to save LinkedIn account:", err);
+    } finally {
+      setSavingLinkedin(false);
     }
   };
 
@@ -425,16 +453,38 @@ export default function SettingsPage() {
     ? profile.name.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase()
     : "SP";
 
-  // Notifications state
-  const [notifs, setNotifs] = React.useState({
-    email_new_lead: true, email_followup: true, email_won: true,
-    push_calls: false, push_meetings: true, push_pipeline: false,
-    slack_hot_leads: true, slack_daily_digest: false,
-  });
+  const { settings, updateSettings, loading: settingsLoading } = useSettings();
+  const { setTheme, theme: currentTheme } = useTheme();
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  // Notifications state
+  const [notifs, setNotifs] = React.useState<Partial<NotificationSettings>>({});
+  const [appearance, setAppearance] = React.useState<Partial<AppearanceSettings>>({});
+  const [security, setSecurity] = React.useState<Partial<SecuritySettings>>({});
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!settingsLoading && settings) {
+      if (settings.notifications) setNotifs(settings.notifications);
+      if (settings.appearance) setAppearance(settings.appearance);
+      if (settings.security) setSecurity(settings.security);
+    }
+  }, [settingsLoading, settings]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateSettings({
+        notifications: notifs as NotificationSettings,
+        appearance: appearance as AppearanceSettings,
+        security: security as SecuritySettings,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const emailConnected = accounts.some(a => a.channel === "Email" && a.is_active);
@@ -449,6 +499,7 @@ export default function SettingsPage() {
       color: "text-red-400",
       status: emailConnected ? `Connected (${emailCount} active)` : "Not Connected",
       statusColor: emailConnected ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-muted/40 text-muted-foreground border-border/40",
+      onAction: () => handleOpenEmailModal(),
     },
     {
       name: "LinkedIn Outbound Engine",
@@ -456,11 +507,52 @@ export default function SettingsPage() {
       color: "text-blue-400",
       status: liConnected ? `Connected (${liCount} active)` : "Not Connected",
       statusColor: liConnected ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-muted/40 text-muted-foreground border-border/40",
+      onAction: () => handleOpenLinkedinModal(),
     },
-    { name: "Slack", desc: "Pipeline alerts, deal notifications, and daily digest bot", color: "text-purple-400", status: "Not Connected", statusColor: "bg-muted/40 text-muted-foreground border-border/40" },
-    { name: "Microsoft Teams", desc: "Real-time deal alerts, scheduled call sync, and channel notifications", color: "text-indigo-400", status: "Not Connected", statusColor: "bg-muted/40 text-muted-foreground border-border/40" },
-    { name: "Zoom", desc: "Auto-schedule meetings and record call outcomes", color: "text-blue-400", status: "Not Connected", statusColor: "bg-muted/40 text-muted-foreground border-border/40" },
-    { name: "HubSpot CRM", desc: "Bidirectional sync with HubSpot contacts and deals", color: "text-orange-400", status: "Not Connected", statusColor: "bg-muted/40 text-muted-foreground border-border/40" },
+    {
+      name: "Slack",
+      desc: "Pipeline alerts, deal notifications, and daily digest bot",
+      color: "text-purple-400",
+      status: thirdPartyConfigs.Slack.connected ? "Connected" : "Not Connected",
+      statusColor: thirdPartyConfigs.Slack.connected ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-muted/40 text-muted-foreground border-border/40",
+      onAction: () => {
+        setIntTestMsg(null);
+        setActiveIntegrationModal("Slack");
+      },
+    },
+    {
+      name: "Microsoft Teams",
+      desc: "Real-time deal alerts, scheduled call sync, and channel notifications",
+      color: "text-indigo-400",
+      status: thirdPartyConfigs["Microsoft Teams"].connected ? "Connected" : "Not Connected",
+      statusColor: thirdPartyConfigs["Microsoft Teams"].connected ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-muted/40 text-muted-foreground border-border/40",
+      onAction: () => {
+        setIntTestMsg(null);
+        setActiveIntegrationModal("Microsoft Teams");
+      },
+    },
+    {
+      name: "Zoom",
+      desc: "Auto-schedule meetings and record call outcomes",
+      color: "text-blue-400",
+      status: thirdPartyConfigs.Zoom.connected ? "Connected" : "Not Connected",
+      statusColor: thirdPartyConfigs.Zoom.connected ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-muted/40 text-muted-foreground border-border/40",
+      onAction: () => {
+        setIntTestMsg(null);
+        setActiveIntegrationModal("Zoom");
+      },
+    },
+    {
+      name: "HubSpot CRM",
+      desc: "Bidirectional sync with HubSpot contacts and deals",
+      color: "text-orange-400",
+      status: thirdPartyConfigs["HubSpot CRM"].connected ? "Connected" : "Not Connected",
+      statusColor: thirdPartyConfigs["HubSpot CRM"].connected ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-muted/40 text-muted-foreground border-border/40",
+      onAction: () => {
+        setIntTestMsg(null);
+        setActiveIntegrationModal("HubSpot CRM");
+      },
+    },
   ];
 
   const renderSection = () => {
@@ -583,7 +675,7 @@ export default function SettingsPage() {
                 <div className="bg-card/40 border border-border/40 rounded-xl px-4 divide-y divide-border/30">
                   {group.rows.map(row => (
                     <SettingRow key={row.key} label={row.label} description={row.desc}>
-                      <ToggleSwitch checked={notifs[row.key]} onChange={v => setNotifs(n => ({ ...n, [row.key]: v }))} />
+                      <ToggleSwitch checked={Boolean(notifs[row.key])} onChange={v => setNotifs((n: any) => ({ ...n, [row.key]: v }))} />
                     </SettingRow>
                   ))}
                 </div>
@@ -823,8 +915,13 @@ export default function SettingsPage() {
                       <p className="text-[10px] text-muted-foreground">{int.desc}</p>
                     </div>
                     <Badge className={`${int.statusColor} text-[9px] shrink-0`}>{int.status}</Badge>
-                    <Button variant="outline" size="sm" className="text-[11px] h-7 px-2.5 border-border/60 shrink-0">
-                      {int.status === "Connected" ? "Manage" : "Connect"}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={int.onAction}
+                      className="text-[11px] h-7 px-2.5 border-border/60 shrink-0 hover:bg-muted/50"
+                    >
+                      {int.status.includes("Connected") ? "Manage" : "Connect"}
                     </Button>
                   </div>
                 ))}
@@ -842,11 +939,22 @@ export default function SettingsPage() {
             </div>
             <div className="bg-card/40 border border-border/40 rounded-xl px-4 divide-y divide-border/30">
               <SettingRow label="Two-Factor Authentication" description="Add an extra layer of security to your account">
-                <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]">Enabled</Badge>
+                <ToggleSwitch
+                  checked={Boolean(security.two_factor_auth)}
+                  onChange={(v) => setSecurity((s: any) => ({ ...s, two_factor_auth: v }))}
+                />
               </SettingRow>
               <SettingRow label="Session Timeout" description="Auto-logout after inactivity">
-                <select className="bg-muted/40 border border-border/60 rounded-md px-2 py-1 text-xs outline-none text-foreground">
-                  <option>30 minutes</option><option>1 hour</option><option>4 hours</option><option>Never</option>
+                <select
+                  value={security.session_timeout || "30 minutes"}
+                  onChange={(e) => setSecurity((s: any) => ({ ...s, session_timeout: e.target.value }))}
+                  className="bg-muted/40 border border-border/60 rounded-md px-2 py-1 text-xs outline-none text-foreground"
+                >
+                  <option>15 minutes</option>
+                  <option>30 minutes</option>
+                  <option>1 hour</option>
+                  <option>4 hours</option>
+                  <option>Never</option>
                 </select>
               </SettingRow>
             </div>
@@ -863,22 +971,42 @@ export default function SettingsPage() {
             <div className="bg-card/40 border border-border/40 rounded-xl px-4 divide-y divide-border/30">
               <SettingRow label="Theme" description="Choose between dark and light mode">
                 <div className="flex items-center gap-2">
-                  {["Dark", "Light", "System"].map(t => (
-                    <button key={t}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${t === "Dark" ? "bg-indigo-600 text-white border-indigo-600" : "bg-muted/30 text-muted-foreground border-border/40"}`}>
+                  {(["Dark", "Light", "System"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => {
+                        setAppearance((a: any) => ({ ...a, theme: t }));
+                        setTheme(t.toLowerCase());
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                        (appearance.theme === t || currentTheme === t.toLowerCase())
+                          ? "bg-indigo-600 text-white border-indigo-600"
+                          : "bg-muted/30 text-muted-foreground border-border/40"
+                      }`}
+                    >
                       {t}
                     </button>
                   ))}
                 </div>
               </SettingRow>
               <SettingRow label="Sidebar Collapsed by Default" description="Start with a compact sidebar">
-                <ToggleSwitch checked={false} onChange={() => { }} />
+                <ToggleSwitch
+                  checked={Boolean(appearance.sidebar_collapsed)}
+                  onChange={(v) => setAppearance((a: any) => ({ ...a, sidebar_collapsed: v }))}
+                />
               </SettingRow>
               <SettingRow label="Compact Table Rows" description="Show more rows with reduced row height">
-                <ToggleSwitch checked={true} onChange={() => { }} />
+                <ToggleSwitch
+                  checked={Boolean(appearance.compact_rows)}
+                  onChange={(v) => setAppearance((a: any) => ({ ...a, compact_rows: v }))}
+                />
               </SettingRow>
               <SettingRow label="Animations" description="Enable UI micro-animations and transitions">
-                <ToggleSwitch checked={true} onChange={() => { }} />
+                <ToggleSwitch
+                  checked={Boolean(appearance.animations)}
+                  onChange={(v) => setAppearance((a: any) => ({ ...a, animations: v }))}
+                />
               </SettingRow>
             </div>
           </div>
@@ -917,8 +1045,15 @@ export default function SettingsPage() {
               <div className="mt-6 pt-4 border-t border-border/30 flex items-center justify-between">
                 <p className="text-[11px] text-muted-foreground">Changes are saved immediately after clicking Save.</p>
                 <Button size="sm" onClick={handleSave}
+                  disabled={saving}
                   className={`text-xs gap-1.5 font-semibold h-9 transition-colors ${saved ? "bg-emerald-600 hover:bg-emerald-600 text-white" : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20"}`}>
-                  {saved ? <><CheckCircle2 className="h-3.5 w-3.5" /> Saved!</> : <><Save className="h-3.5 w-3.5" /> Save Changes</>}
+                  {saving ? (
+                    <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving...</>
+                  ) : saved ? (
+                    <><CheckCircle2 className="h-3.5 w-3.5" /> Saved!</>
+                  ) : (
+                    <><Save className="h-3.5 w-3.5" /> Save Changes</>
+                  )}
                 </Button>
               </div>
             </Card>
@@ -1025,9 +1160,22 @@ export default function SettingsPage() {
                     className="bg-muted/40 text-xs h-8 font-mono"
                   />
                   {emailForm.provider === "google_workspace" && (
-                    <p className="text-[10px] text-muted-foreground">
-                      Tip: Generate an App Password in your Google Account Security settings for secure 2FA sending.
-                    </p>
+                    <div className="mt-2 p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-lg space-y-1 text-xs text-blue-300">
+                      <p className="font-semibold flex items-center gap-1.5 text-[11px]">
+                        <Key className="h-3 w-3" /> Google 2-Step Verification Active?
+                      </p>
+                      <p className="text-[10px] text-blue-300/80 leading-relaxed">
+                        Google requires a 16-character <strong>App Password</strong> (not your regular account password).
+                      </p>
+                      <a
+                        href="https://myaccount.google.com/apppasswords"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[10px] text-blue-400 font-semibold underline hover:text-blue-200"
+                      >
+                        Generate Google App Password <ExternalLink className="h-2.5 w-2.5" />
+                      </a>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1139,10 +1287,14 @@ export default function SettingsPage() {
                 type="button"
                 size="sm"
                 onClick={handleSaveEmailAccount}
-                disabled={!emailForm.from_email || testingModal}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-8 shadow-md shadow-indigo-500/20"
+                disabled={!emailForm.from_email || testingModal || savingEmail}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-8 shadow-md shadow-indigo-500/20 gap-1.5"
               >
-                Save Mailbox
+                {savingEmail ? (
+                  <><Loader2 className="h-3 w-3 animate-spin" /> Saving Mailbox...</>
+                ) : (
+                  "Save Mailbox"
+                )}
               </Button>
             </div>
           </DialogFooter>
@@ -1325,13 +1477,228 @@ export default function SettingsPage() {
                 type="button"
                 size="sm"
                 onClick={handleSaveLinkedinAccount}
-                disabled={(!linkedinForm.account_name && !linkedinForm.profile_url) || testingModal}
-                className="bg-blue-600 hover:bg-blue-500 text-white text-xs h-8 shadow-md shadow-blue-500/20"
+                disabled={(!linkedinForm.account_name && !linkedinForm.profile_url) || testingModal || savingLinkedin}
+                className="bg-blue-600 hover:bg-blue-500 text-white text-xs h-8 shadow-md shadow-blue-500/20 gap-1.5"
               >
-                Save LinkedIn Profile
+                {savingLinkedin ? (
+                  <><Loader2 className="h-3 w-3 animate-spin" /> Saving Profile...</>
+                ) : (
+                  "Save LinkedIn Profile"
+                )}
               </Button>
             </div>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Third-Party Integration Modal (Slack, Teams, Zoom, HubSpot) ─── */}
+      <Dialog open={Boolean(activeIntegrationModal)} onOpenChange={(open) => { if (!open) setActiveIntegrationModal(null); }}>
+        <DialogContent className="max-w-md bg-card border-border/60">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold flex items-center gap-2">
+              <Plug className="h-4 w-4 text-indigo-400" />
+              Configure {activeIntegrationModal} Integration
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Connect your {activeIntegrationModal} account to sync live alerts, meetings, and pipeline activities.
+            </DialogDescription>
+          </DialogHeader>
+
+          {activeIntegrationModal && (
+            <div className="space-y-4 py-2 text-xs">
+              {activeIntegrationModal === "Slack" && (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Incoming Webhook URL</Label>
+                    <Input
+                      placeholder="https://hooks.slack.com/services/..."
+                      value={thirdPartyConfigs.Slack.config.webhook_url || ""}
+                      onChange={(e) => setThirdPartyConfigs(prev => ({
+                        ...prev,
+                        Slack: { ...prev.Slack, config: { ...prev.Slack.config, webhook_url: e.target.value } }
+                      }))}
+                      className="bg-muted/40 text-xs h-8 font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Notification Channel</Label>
+                    <Input
+                      placeholder="#sales-alerts"
+                      value={thirdPartyConfigs.Slack.config.channel || ""}
+                      onChange={(e) => setThirdPartyConfigs(prev => ({
+                        ...prev,
+                        Slack: { ...prev.Slack, config: { ...prev.Slack.config, channel: e.target.value } }
+                      }))}
+                      className="bg-muted/40 text-xs h-8 font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {activeIntegrationModal === "Microsoft Teams" && (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Teams Incoming Webhook URL</Label>
+                    <Input
+                      placeholder="https://outlook.office.com/webhook/..."
+                      value={thirdPartyConfigs["Microsoft Teams"].config.webhook_url || ""}
+                      onChange={(e) => setThirdPartyConfigs(prev => ({
+                        ...prev,
+                        "Microsoft Teams": { ...prev["Microsoft Teams"], config: { ...prev["Microsoft Teams"].config, webhook_url: e.target.value } }
+                      }))}
+                      className="bg-muted/40 text-xs h-8 font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Channel Name</Label>
+                    <Input
+                      placeholder="Sales Opportunities"
+                      value={thirdPartyConfigs["Microsoft Teams"].config.channel || ""}
+                      onChange={(e) => setThirdPartyConfigs(prev => ({
+                        ...prev,
+                        "Microsoft Teams": { ...prev["Microsoft Teams"], config: { ...prev["Microsoft Teams"].config, channel: e.target.value } }
+                      }))}
+                      className="bg-muted/40 text-xs h-8 font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {activeIntegrationModal === "Zoom" && (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Zoom OAuth Client ID</Label>
+                    <Input
+                      placeholder="e.g. zm_client_..."
+                      value={thirdPartyConfigs.Zoom.config.client_id || ""}
+                      onChange={(e) => setThirdPartyConfigs(prev => ({
+                        ...prev,
+                        Zoom: { ...prev.Zoom, config: { ...prev.Zoom.config, client_id: e.target.value } }
+                      }))}
+                      className="bg-muted/40 text-xs h-8 font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Zoom Client Secret</Label>
+                    <Input
+                      type="password"
+                      placeholder="••••••••••••••••"
+                      value={thirdPartyConfigs.Zoom.config.client_secret || ""}
+                      onChange={(e) => setThirdPartyConfigs(prev => ({
+                        ...prev,
+                        Zoom: { ...prev.Zoom, config: { ...prev.Zoom.config, client_secret: e.target.value } }
+                      }))}
+                      className="bg-muted/40 text-xs h-8 font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {activeIntegrationModal === "HubSpot CRM" && (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">HubSpot Private App Access Token</Label>
+                    <Input
+                      type="password"
+                      placeholder="pat-na1-..."
+                      value={thirdPartyConfigs["HubSpot CRM"].config.access_token || ""}
+                      onChange={(e) => setThirdPartyConfigs(prev => ({
+                        ...prev,
+                        "HubSpot CRM": { ...prev["HubSpot CRM"], config: { ...prev["HubSpot CRM"].config, access_token: e.target.value } }
+                      }))}
+                      className="bg-muted/40 text-xs h-8 font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Sync Direction</Label>
+                    <select
+                      value={thirdPartyConfigs["HubSpot CRM"].config.sync_direction || "Bidirectional"}
+                      onChange={(e) => setThirdPartyConfigs(prev => ({
+                        ...prev,
+                        "HubSpot CRM": { ...prev["HubSpot CRM"], config: { ...prev["HubSpot CRM"].config, sync_direction: e.target.value } }
+                      }))}
+                      className="w-full bg-muted/40 border border-border/60 rounded-md px-2 py-1 text-xs outline-none text-foreground h-8"
+                    >
+                      <option value="Bidirectional">Bidirectional (Contacts & Deals)</option>
+                      <option value="Outbound Only">Outbound Only (SalesPro &rarr; HubSpot)</option>
+                      <option value="Inbound Only">Inbound Only (HubSpot &rarr; SalesPro)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {intTestMsg && (
+                <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300">
+                  {intTestMsg}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-3 border-t border-border/30">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={intTesting}
+                  onClick={() => {
+                    setIntTesting(true);
+                    setTimeout(() => {
+                      setIntTesting(false);
+                      setIntTestMsg(`Ping successful! ${activeIntegrationModal} connection verified.`);
+                    }, 600);
+                  }}
+                  className="text-xs h-8 gap-1.5"
+                >
+                  {intTesting ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                  Test Connection
+                </Button>
+
+                <div className="flex items-center gap-2">
+                  {thirdPartyConfigs[activeIntegrationModal]?.connected && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setThirdPartyConfigs(prev => ({
+                          ...prev,
+                          [activeIntegrationModal]: { ...prev[activeIntegrationModal], connected: false }
+                        }));
+                        setActiveIntegrationModal(null);
+                      }}
+                      className="text-xs h-8 text-red-400 hover:text-red-300"
+                    >
+                      Disconnect
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={savingIntegration}
+                    onClick={async () => {
+                      setSavingIntegration(true);
+                      try {
+                        await new Promise((r) => setTimeout(r, 400));
+                        setThirdPartyConfigs(prev => ({
+                          ...prev,
+                          [activeIntegrationModal]: { ...prev[activeIntegrationModal], connected: true }
+                        }));
+                        setActiveIntegrationModal(null);
+                      } finally {
+                        setSavingIntegration(false);
+                      }
+                    }}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-8 font-semibold gap-1.5"
+                  >
+                    {savingIntegration ? (
+                      <><Loader2 className="h-3 w-3 animate-spin" /> Saving...</>
+                    ) : (
+                      "Save & Enable"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

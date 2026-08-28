@@ -110,7 +110,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 className="flex items-center gap-2 px-2.5 py-2 text-xs rounded-lg cursor-pointer hover:bg-emerald-500/10 hover:text-emerald-400 font-medium"
               >
                 <Plus className="h-4 w-4 text-emerald-400" />
-                <span>Add New Organization to Hasura</span>
+                <span>Add New Organization</span>
               </Command.Item>
               <Command.Item
                 onSelect={() => runCommand(() => router.push("/campaigns?action=new"))}

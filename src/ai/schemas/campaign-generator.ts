@@ -22,7 +22,7 @@ export const GenerateCampaignStrategyOutputSchema = z.object({
     z.object({
       step_number: z.number(),
       day: z.number(),
-      type: z.enum(["Introduction", "Follow-up", "Case Study", "Final Message", "Custom"]),
+      type: z.enum(["Email", "Follow-up", "Case Study", "Final Message", "Custom"]),
       subject: z.string(),
       body: z.string(),
       behavioral_hook: z.string().describe("Psychological principle used (e.g., Warmth/Competence, Autonomy preservation)"),

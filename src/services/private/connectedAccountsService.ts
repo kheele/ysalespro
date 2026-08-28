@@ -226,9 +226,22 @@ export async function testAccountConnectionActionByToken(
             latency_ms: Date.now() - startTime,
           };
         } catch (smtpErr: any) {
+          const rawMsg = smtpErr?.message || '';
+          let userFriendlyMsg = rawMsg;
+          if (
+            rawMsg.includes('Application-specific password required') ||
+            rawMsg.includes('InvalidSecondFactor') ||
+            rawMsg.includes('534')
+          ) {
+            userFriendlyMsg =
+              'Google Workspace rejected the login because 2-Step Verification is enabled. You must use a 16-character Google App Password (not your standard account password). Generate one at https://myaccount.google.com/apppasswords and paste it into the Password field.';
+          } else if (rawMsg.includes('Username and Password not accepted') || rawMsg.includes('535')) {
+            userFriendlyMsg =
+              'Invalid Google Workspace credentials. Please verify your email and ensure you are using a 16-character Google App Password (https://myaccount.google.com/apppasswords).';
+          }
           return {
             success: false,
-            message: `Google Workspace SMTP handshake failed: ${smtpErr?.message || 'Invalid credentials or App Password'}.`,
+            message: `Google Workspace SMTP handshake failed: ${userFriendlyMsg}`,
             latency_ms: Date.now() - startTime,
           };
         }

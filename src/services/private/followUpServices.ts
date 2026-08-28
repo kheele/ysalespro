@@ -6,8 +6,8 @@ import {
   DailyAutomationRule,
   AutomationExecutionResult,
 } from '@/lib/types';
-import { DAILY_RULES } from '@/lib/constants';
 import * as leadServices from './leadServices';
+import { getCompanySettingsActionByToken } from './settingsService';
 
 export async function getFollowUpsActionByToken(
   token: string,
@@ -76,12 +76,23 @@ export async function getFollowUpsActionByToken(
   }
 }
 
-export async function getDailyRulesAction(): Promise<DailyFollowUpRule[]> {
-  return DAILY_RULES as DailyFollowUpRule[];
+export async function getDailyRulesAction(token?: string): Promise<DailyFollowUpRule[]> {
+  if (token) {
+    try {
+      const settings = await getCompanySettingsActionByToken(token);
+      if (settings?.daily_rules && settings.daily_rules.length > 0) {
+        return settings.daily_rules;
+      }
+    } catch (e) {
+      console.warn("Could not load daily rules from company settings:", e);
+    }
+  }
+  return [];
 }
 
-export async function getDailyAutomationRulesAction(): Promise<DailyAutomationRule[]> {
-  return DAILY_RULES.map((rule) => ({
+export async function getDailyAutomationRulesAction(token?: string): Promise<DailyAutomationRule[]> {
+  const rules = await getDailyRulesAction(token);
+  return rules.map((rule) => ({
     id: String(rule.id),
     name: rule.name,
     description: `Automatically trigger follow-ups based on ${rule.name.toLowerCase()}.`,

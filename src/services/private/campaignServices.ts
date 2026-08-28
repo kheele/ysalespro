@@ -6,27 +6,77 @@ import { getAccountCompanyIdFromClaims } from "@/lib/auth-utils";
 import {
   CampaignStatus,
   SequenceStep,
+  SequenceStepType,
   CampaignRules,
   CampaignSchedule,
   CampaignAudience,
   Campaign,
 } from '@/lib/types';
-import {
-  DEFAULT_SEQUENCE,
-  DEFAULT_RULES,
-  DEFAULT_SCHEDULE,
-} from '@/lib/constants';
+import { getCompanySettingsActionByToken } from './settingsService';
 
-export async function getDefaultSequenceAction(): Promise<SequenceStep[]> {
-  return JSON.parse(JSON.stringify(DEFAULT_SEQUENCE));
+export async function getDefaultSequenceAction(token?: string): Promise<SequenceStep[]> {
+  if (token) {
+    try {
+      const settings = await getCompanySettingsActionByToken(token);
+      if (settings?.default_sequence && settings.default_sequence.length > 0) {
+        return settings.default_sequence;
+      }
+    } catch (e) {
+      console.warn("Could not load sequence from company settings:", e);
+    }
+  }
+  return [];
 }
 
-export async function getDefaultRulesAction(): Promise<CampaignRules> {
-  return { ...DEFAULT_RULES };
+export async function getDefaultRulesAction(token?: string): Promise<CampaignRules> {
+  if (token) {
+    try {
+      const settings = await getCompanySettingsActionByToken(token);
+      if (settings?.default_rules) {
+        return settings.default_rules;
+      }
+    } catch (e) {
+      console.warn("Could not load rules from company settings:", e);
+    }
+  }
+  return {
+    stop_on_reply: true,
+    stop_on_meeting_booked: true,
+    update_lead_status: true,
+    create_follow_up_task: true,
+    exclude_customers: true,
+    exclude_competitors: true,
+    track_opens: true,
+  };
 }
 
-export async function getDefaultScheduleAction(): Promise<CampaignSchedule> {
-  return { ...DEFAULT_SCHEDULE };
+export async function getDefaultScheduleAction(token?: string): Promise<CampaignSchedule> {
+  if (token) {
+    try {
+      const settings = await getCompanySettingsActionByToken(token);
+      if (settings?.default_schedule) {
+        return settings.default_schedule;
+      }
+    } catch (e) {
+      console.warn("Could not load schedule from company settings:", e);
+    }
+  }
+  return {
+    send_days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    send_time_from: '09:00',
+    send_time_to: '17:00',
+    timezone: 'SAST (UTC+2 - Johannesburg / South Africa)',
+    start_date: new Date().toISOString().split('T')[0],
+  };
+}
+
+function normalizeSequenceStepType(type?: string): SequenceStepType {
+  if (!type) return 'Email';
+  if (type === 'Email' || type === 'Custom' || type.toLowerCase() === 'email') return 'Email';
+  if (type === 'Follow-up' || type.toLowerCase() === 'follow-up' || type.toLowerCase() === 'followup') return 'Follow-up';
+  if (type === 'Case Study' || type.toLowerCase() === 'case study') return 'Case Study';
+  if (type === 'Final Message' || type.toLowerCase() === 'final message') return 'Final Message';
+  return 'Email';
 }
 
 function mapDbCampaign(c: any): Campaign {
@@ -34,15 +84,15 @@ function mapDbCampaign(c: any): Campaign {
 
   const sequenceSteps: SequenceStep[] = Array.isArray(c.sequence_step_list) && c.sequence_step_list.length > 0
     ? c.sequence_step_list.map((st: any, idx: number) => ({
-        id: st.id || `step-${idx + 1}`,
-        day: st.day ?? (idx * 2),
-        step_number: st.step_number ?? (idx + 1),
-        type: st.type || 'Introduction',
-        subject: st.subject || '',
-        body: st.preview || '',
-        enabled: st.is_active ?? true,
-      }))
-    : DEFAULT_SEQUENCE;
+      id: st.id || st.step_number || (idx + 1),
+      day: st.day ?? (idx * 2 + 1),
+      step_number: st.step_number ?? (idx + 1),
+      type: normalizeSequenceStepType(st.type),
+      subject: st.subject || '',
+      body: st.preview || '',
+      enabled: st.is_active ?? true,
+    }))
+    : [];
 
   const rawIndustries: string[] = Array.isArray(c.target_industry_list) && c.target_industry_list.length > 0
     ? c.target_industry_list.map((ti: any) => ti.industry?.name || ti.industry_name || (ti.industry_id ? `Industry #${ti.industry_id}` : "All")).filter(Boolean)
@@ -352,7 +402,7 @@ export async function createCampaignActionByToken(
       }
     `;
 
-    const sched = (input.schedule as CampaignSchedule) || DEFAULT_SCHEDULE;
+    const sched = (input.schedule || {}) as Partial<CampaignSchedule>;
 
     const object: Record<string, any> = {
       account_company_id: companyId,
@@ -375,7 +425,7 @@ export async function createCampaignActionByToken(
         data: input.sequence.map((stepItem, idx) => ({
           day: stepItem.day ?? (idx * 2),
           step_number: idx + 1,
-          type: stepItem.type || 'Introduction',
+          type: normalizeSequenceStepType(stepItem.type),
           subject: stepItem.subject || '',
           preview: stepItem.body || '',
           is_active: stepItem.enabled ?? true,

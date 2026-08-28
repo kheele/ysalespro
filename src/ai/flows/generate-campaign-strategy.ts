@@ -21,10 +21,10 @@ export function getFallbackCampaignStrategy(input: GenerateCampaignStrategyInput
     sequence_steps: [
       {
         step_number: 1,
-        day: 0,
-        type: "Introduction",
-        subject: `Quick question regarding {{company_name}}'s ${ind} roadmap — {{first_name}}`,
-        body: `Hi {{first_name}},\n\nNoticed {{company_name}}'s recent expansion in ${ind}. Leaders in your space often face pipeline visibility and data sync latency challenges.\n\nWe helped similar teams reduce workflow bottlenecks by 38% without disrupting existing tech stacks.\n\nNo pressure at all, but would you be open to a 10-minute benchmarking conversation next Tuesday?`,
+        day: 1,
+        type: "Email",
+        subject: `Quick question regarding {{company_name}}'s ${ind} roadmap — {{fname}}`,
+        body: `Hi {{fname}},\n\nNoticed {{company_name}}'s recent expansion in ${ind}. Leaders in your space often face pipeline visibility and data sync latency challenges.\n\nWe helped similar teams reduce workflow bottlenecks by 38% without disrupting existing tech stacks.\n\nNo pressure at all, but would you be open to a 10-minute benchmarking conversation next Tuesday?`,
         behavioral_hook: "Warmth + Competence balance with Autonomy Preservation ('No pressure at all')",
       },
       {
@@ -32,7 +32,7 @@ export function getFallbackCampaignStrategy(input: GenerateCampaignStrategyInput
         day: 3,
         type: "Follow-up",
         subject: `Thought on {{company_name}}'s speed-to-lead`,
-        body: `Hi {{first_name}},\n\nWanted to share a quick 1-page benchmark report on how leading ${ind} companies handle lead conversion cycles.\n\nNo need to reply if this isn't a priority right now, but figured it might be useful for your quarterly planning.\n\nBest,\nSalesPro Team`,
+        body: `Hi {{fname}},\n\nWanted to share a quick 1-page benchmark report on how leading ${ind} companies handle lead conversion cycles.\n\nNo need to reply if this isn't a priority right now, but figured it might be useful for your quarterly planning.\n\nBest,\nSalesPro Team`,
         behavioral_hook: "The Giver Principle (unselfish value asset gift with zero immediate friction)",
       },
       {
@@ -40,15 +40,15 @@ export function getFallbackCampaignStrategy(input: GenerateCampaignStrategyInput
         day: 7,
         type: "Case Study",
         subject: `How similar ${ind} peers scaled throughput by 42%`,
-        body: `Hi {{first_name}},\n\nWhen we partnered with a peer organization in ${ind}, their primary concern was integration overhead. Within 30 days, their team automated 85% of manual CRM logging while cutting cycle times.\n\nWould you like me to send over the 2-minute architectural breakdown?`,
+        body: `Hi {{fname}},\n\nWhen we partnered with a peer organization in ${ind}, their primary concern was integration overhead. Within 30 days, their team automated 85% of manual CRM logging while cutting cycle times.\n\nWould you like me to send over the 2-minute architectural breakdown?`,
         behavioral_hook: "Validation-first peer proof point with Low-Friction Yes/No Micro-Commitment",
       },
       {
         step_number: 4,
         day: 14,
         type: "Final Message",
-        subject: `Closing the loop — {{first_name}}`,
-        body: `Hi {{first_name}},\n\nAssuming you have all hands on deck with higher priorities right now, so I will respectfully step back and close this thread.\n\nIf you ever want to explore benchmarking data for {{company_name}} down the road, feel free to reach out anytime.\n\nWishing you and the team continued momentum!`,
+        subject: `Closing the loop — {{fname}}`,
+        body: `Hi {{fname}},\n\nAssuming you have all hands on deck with higher priorities right now, so I will respectfully step back and close this thread.\n\nIf you ever want to explore benchmarking data for {{company_name}} down the road, feel free to reach out anytime.\n\nWishing you and the team continued momentum!`,
         behavioral_hook: "Respectful Breakup with High Warmth and Zero Passive Aggressiveness",
       },
     ],

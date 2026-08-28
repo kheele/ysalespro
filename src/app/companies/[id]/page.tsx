@@ -43,6 +43,7 @@ import {
   User,
   Target,
   ArrowLeft,
+  Loader2,
 } from "lucide-react";
 
 export default function CompanyProfilePage() {
@@ -84,7 +85,7 @@ export default function CompanyProfilePage() {
 
       setPeople(pList.filter(p => p.company_name === orgName || String(p.company_id) === String(orgId)));
       setLeads(lList.filter(l => l.company_name === orgName));
-      setTasks(tList.filter(t => t.related_company === orgName || String(t.related_lead_id) === String(orgId)));
+      setTasks(tList.filter(t => String(t.related_company_id) === String(orgId) || t.related_company?.name === orgName));
     } catch (e) {
       console.error("Failed to load organization details:", e);
     } finally {
@@ -96,12 +97,21 @@ export default function CompanyProfilePage() {
     loadOrgDetails();
   }, [loadOrgDetails]);
 
+  const [isAddingNote, setIsAddingNote] = React.useState(false);
+
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNoteContent.trim() || !org) return;
-    await organizationServices.addNote(org.id, newNoteContent);
-    setNewNoteContent("");
-    loadOrgDetails();
+    setIsAddingNote(true);
+    try {
+      await organizationServices.addNote(org.id, newNoteContent);
+      setNewNoteContent("");
+      loadOrgDetails();
+    } catch (e) {
+      console.error("Failed to add note:", e);
+    } finally {
+      setIsAddingNote(false);
+    }
   };
 
   if (loading) {
@@ -455,8 +465,8 @@ export default function CompanyProfilePage() {
                     onChange={(e) => setNewNoteContent(e.target.value)}
                     className="bg-muted/40 text-xs min-h-[80px]"
                   />
-                  <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1">
-                    <Plus className="h-3.5 w-3.5" /> Save Note
+                  <Button type="submit" size="sm" disabled={isAddingNote || !newNoteContent.trim()} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5">
+                    {isAddingNote ? <><Loader2 className="h-3 w-3 animate-spin" /> Saving Note...</> : <><Plus className="h-3.5 w-3.5" /> Save Note</>}
                   </Button>
                 </form>
 

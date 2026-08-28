@@ -13,7 +13,9 @@ export type GetTasksParams = {
   status?: string;
   search?: string;
   assigned_to?: string;
+  assigned_to_id?: number;
   lead_id?: number;
+  company_id?: number;
 };
 
 export type GetOutreachParams = {

@@ -18,7 +18,7 @@ import {
 } from '@/ai/schemas/sales-outreach';
 
 function generateFallbackOutreach(input: GenerateSalesOutreachInput): GenerateSalesOutreachOutput {
-  const personName = input.person.first_name || input.person.name || input.person.full_name || 'there';
+  const personName = input.person.fname || input.person.name || input.person.full_name || 'there';
   const personTitle = input.person.title || input.person.role || 'Executive Leader';
   const companyName = input.company.name || 'your organization';
   const industry = input.company.industry || 'Enterprise';
@@ -139,7 +139,7 @@ CRITICAL SCIENCE-BASED PEOPLE SKILLS GUIDELINES:
 6. PATTERN INTERRUPT PHONE SCRIPTS: Start cold calls with warm vocal cues and ask permission ("Did I catch you in the middle of something urgent, or can I have 30 seconds?").
 
 PROSPECT CONTEXT:
-- Full Name: ${input.person.full_name || input.person.name || ''} (First: ${input.person.first_name || ''})
+- Full Name: ${input.person.full_name || input.person.name || ''} (First: ${input.person.fname || ''})
 - Title: ${input.person.title || input.person.role || ''}
 - Department: ${input.person.department || ''}
 - Seniority: ${input.person.seniority || ''}

@@ -11,8 +11,8 @@ const USER_FIELDS = `
   account_company_id
   auth_id
   email
-  first_name
-  last_name
+  fname
+  lname
   role
   avatar_url
   is_active
@@ -28,8 +28,8 @@ const USER_FIELDS = `
 
 function mapDbUser(u: any): User | null {
   if (!u) return null;
-  const fname = u.first_name || u.fname || '';
-  const lname = u.last_name || u.lname || '';
+  const fname = u.fname || '';
+  const lname = u.lname || '';
   const fullName = `${fname} ${lname}`.trim() || u.email || 'User';
 
   return {
@@ -164,8 +164,8 @@ export async function createUserAction(input: CreateUserInput): Promise<User | n
       throw new Error("Cannot create user: account_company_id or account_company is required.");
     }
 
-    const firstName = input.fname || (input as any).first_name || '';
-    const lastName = input.lname || (input as any).last_name || '';
+    const fname = input.fname || '';
+    const lname = input.lname || '';
 
     const mutation = `
       mutation CreateUser($object: aa_s_users_insert_input!) {
@@ -179,8 +179,8 @@ export async function createUserAction(input: CreateUserInput): Promise<User | n
       account_company_id: Number(accountCompanyId),
       auth_id: input.auth_id,
       email: input.email,
-      first_name: firstName,
-      last_name: lastName,
+      fname,
+      lname,
       role: input.role || 'Admin',
       avatar_url: input.avatar_url || '',
       is_active: true,
@@ -212,11 +212,9 @@ export async function updateUserAction(id: number | string, updates: UpdateUserI
     `;
 
     const _set: Record<string, any> = {};
-    const firstName = updates.fname;
-    const lastName = updates.lname;
 
-    if (firstName) _set.first_name = firstName;
-    if (lastName) _set.last_name = lastName;
+    if (updates.fname !== undefined) _set.fname = updates.fname;
+    if (updates.lname !== undefined) _set.lname = updates.lname;
     if (updates.email) _set.email = updates.email;
     if (updates.role) _set.role = updates.role;
     if (updates.avatar_url !== undefined) _set.avatar_url = updates.avatar_url;

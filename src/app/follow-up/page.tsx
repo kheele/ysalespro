@@ -16,6 +16,7 @@ import type {
   AutomationExecutionResult,
 } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
+import { useSettings } from "@/hooks/use-settings";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -118,9 +119,9 @@ function AutomationConsoleModal({ open, onClose, result }: {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function FollowUpPage() {
   const { user } = useAuth();
+  const { dailyRules } = useSettings();
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [items, setItems] = React.useState<FollowUpItem[]>([]);
-  const [rules, setRules] = React.useState<DailyAutomationRule[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
@@ -129,10 +130,6 @@ export default function FollowUpPage() {
   const [consoleOpen, setConsoleOpen] = React.useState(false);
   const [execResult, setExecResult] = React.useState<AutomationExecutionResult | null>(null);
   const [running, setRunning] = React.useState(false);
-
-  React.useEffect(() => {
-    getDailyAutomationRulesAction().then(res => setRules(res || []));
-  }, []);
 
   const load = React.useCallback(async () => {
     if (!user) return;
@@ -264,13 +261,15 @@ export default function FollowUpPage() {
 
             {/* Rules Quick Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-border/30">
-              {rules.map(rule => (
+              {dailyRules.map((rule) => (
                 <div key={rule.id} className="p-3 bg-muted/20 border border-border/30 rounded-xl space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-xs text-indigo-300 line-clamp-1">{rule.name}</span>
-                    <Badge className="bg-emerald-500/10 text-emerald-400 text-[9px] px-1 py-0">Active</Badge>
+                    <Badge className={`text-[9px] px-1 py-0 ${rule.active ? "bg-emerald-500/10 text-emerald-400" : "bg-muted text-muted-foreground"}`}>
+                      {rule.active ? "Active" : "Inactive"}
+                    </Badge>
                   </div>
-                  <p className="text-[10px] text-muted-foreground line-clamp-2">{rule.description}</p>
+                  <p className="text-[10px] text-muted-foreground line-clamp-2">{rule.condition} → {rule.action}</p>
                 </div>
               ))}
             </div>

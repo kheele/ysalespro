@@ -339,9 +339,9 @@ function OutreachPageContent() {
           priority: item.priority as any,
           due_date: dueDate,
           due_time: "10:00 AM",
-          related_lead_name: callNotesProspect,
-          related_company: callNotesCompany,
-          notes: item.notes,
+          notes: item.notes
+            ? `${item.notes} (Prospect: ${callNotesProspect || ""}, Company: ${callNotesCompany || ""})`
+            : `Prospect: ${callNotesProspect || ""}, Company: ${callNotesCompany || ""}`,
         });
       }
       setTasksCreated(true);
@@ -349,7 +349,7 @@ function OutreachPageContent() {
       console.error("Failed to create extracted tasks:", err);
     }
   };
- 
+
   const load = React.useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -610,18 +610,16 @@ function OutreachPageContent() {
                   <button
                     type="button"
                     onClick={() => setForm(f => ({ ...f, sendReal: true }))}
-                    className={`px-2 py-1 rounded text-[10px] font-semibold transition-all ${
-                      form.sendReal ? "bg-indigo-600 text-white" : "text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={`px-2 py-1 rounded text-[10px] font-semibold transition-all ${form.sendReal ? "bg-indigo-600 text-white" : "text-muted-foreground hover:text-foreground"
+                      }`}
                   >
                     Live Send
                   </button>
                   <button
                     type="button"
                     onClick={() => setForm(f => ({ ...f, sendReal: false }))}
-                    className={`px-2 py-1 rounded text-[10px] font-semibold transition-all ${
-                      !form.sendReal ? "bg-indigo-600 text-white" : "text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={`px-2 py-1 rounded text-[10px] font-semibold transition-all ${!form.sendReal ? "bg-indigo-600 text-white" : "text-muted-foreground hover:text-foreground"
+                      }`}
                   >
                     Log Only
                   </button>
@@ -807,8 +805,8 @@ function OutreachPageContent() {
                 {sendingOutreach
                   ? "Dispatching..."
                   : form.sendReal && (form.channel === "Email" || form.channel === "LinkedIn")
-                  ? "Send & Log Outreach"
-                  : "Log & Save"}
+                    ? "Send & Log Outreach"
+                    : "Log & Save"}
               </Button>
             </DialogFooter>
           </form>
@@ -821,7 +819,7 @@ function OutreachPageContent() {
           <DialogHeader>
             <DialogTitle className="text-sm font-bold flex items-center justify-between gap-2">
               <span className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-400" /> AI Inbound Reply Triage (Vanessa Van Edwards Empathetic Response)
+                <Sparkles className="h-4 w-4 text-indigo-400" /> AI Inbound Reply Triage (Empathetic Response)
               </span>
             </DialogTitle>
           </DialogHeader>
@@ -922,7 +920,7 @@ function OutreachPageContent() {
         <DialogContent className="max-w-2xl bg-card border-border/60 max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-sm font-bold flex items-center gap-2">
-              <Mic className="h-4 w-4 text-purple-400" /> AI Call Notes & Task Extractor (Vanessa Van Edwards Active Listening)
+              <Mic className="h-4 w-4 text-purple-400" /> AI Call Notes & Task Extractor (Active Listening)
             </DialogTitle>
           </DialogHeader>
 

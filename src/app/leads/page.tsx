@@ -20,6 +20,7 @@ import type { ClassifyInboundReplyOutput } from "@/ai/schemas/inbound-reply";
 import type { ScoreAndQualifyLeadOutput } from "@/ai/schemas/lead-qualification";
 import type { Lead, LeadStage, LeadTemperature } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
+import { useSettings } from "@/hooks/use-settings";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,27 +59,6 @@ import {
   MessageSquare,
 } from "lucide-react";
 
-// ─── Visual Tokens ─────────────────────────────────────────────────────────
-const PIPELINE_STAGES: LeadStage[] = ["Cold", "Contacted", "Warm", "Hot", "Customer", "Lost"];
-
-const STAGE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  Cold: { bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-400" },
-  Contacted: { bg: "bg-purple-500/10", border: "border-purple-500/30", text: "text-purple-400" },
-  Warm: { bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-400" },
-  Hot: { bg: "bg-red-500/10", border: "border-red-500/30", text: "text-red-400" },
-  Customer: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400" },
-  Lost: { bg: "bg-zinc-500/10", border: "border-zinc-500/30", text: "text-zinc-400" },
-};
-
-const TEMP_COLORS: Record<string, { badge: string; text: string }> = {
-  HOT: { badge: "bg-red-500/15 text-red-400 border-red-500/30", text: "text-red-400" },
-  Hot: { badge: "bg-red-500/15 text-red-400 border-red-500/30", text: "text-red-400" },
-  WARM: { badge: "bg-amber-500/15 text-amber-400 border-amber-500/30", text: "text-amber-400" },
-  Warm: { badge: "bg-amber-500/15 text-amber-400 border-amber-500/30", text: "text-amber-400" },
-  COLD: { badge: "bg-blue-500/15 text-blue-400 border-blue-500/30", text: "text-blue-400" },
-  Cold: { badge: "bg-blue-500/15 text-blue-400 border-blue-500/30", text: "text-blue-400" },
-};
-
 const STAGE_ICONS: Record<string, React.ReactNode> = {
   Cold: <Snowflake className="h-3.5 w-3.5" />,
   Contacted: <Repeat className="h-3.5 w-3.5" />,
@@ -115,13 +95,14 @@ function KanbanCard({
   onOpenTriage: (lead: Lead) => void;
   onOpenQualify: (lead: Lead) => void;
 }) {
+  const { pipelineStages, stageColors, tempColors } = useSettings();
   const stage = (lead.stage || "Cold") as LeadStage;
-  const sc = STAGE_COLORS[stage] || STAGE_COLORS.Cold;
-  const idx = PIPELINE_STAGES.indexOf(stage);
-  const prevStage = idx > 0 ? PIPELINE_STAGES[idx - 1] : null;
-  const nextStage = idx < PIPELINE_STAGES.length - 1 ? PIPELINE_STAGES[idx + 1] : null;
+  const sc = stageColors[stage];
+  const idx = pipelineStages.indexOf(stage);
+  const prevStage = idx > 0 ? pipelineStages[idx - 1] : null;
+  const nextStage = idx < pipelineStages.length - 1 ? pipelineStages[idx + 1] : null;
   const tempKey = lead.lead_temperature || "COLD";
-  const tc = TEMP_COLORS[tempKey] || TEMP_COLORS.COLD;
+  const tc = tempColors[tempKey] || tempColors.Cold;
 
   const personName = lead.person_name || lead.person?.name || "Lead Contact";
   const personTitle = lead.person?.job_title;
@@ -220,6 +201,7 @@ function KanbanCard({
 
 // ─── Page ──────────────────────────────────────────────────────────────────
 export default function LeadsPage() {
+  const { pipelineStages, stageColors, tempColors } = useSettings();
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [leads, setLeads] = React.useState<Lead[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -275,10 +257,10 @@ export default function LeadsPage() {
       prev.map((l) =>
         l.id === qualifyTargetLead.id
           ? {
-              ...l,
-              lead_score: qualifyResult.lead_score,
-              lead_temperature: qualifyResult.lead_temperature,
-            }
+            ...l,
+            lead_score: qualifyResult.lead_score,
+            lead_temperature: qualifyResult.lead_temperature,
+          }
           : l
       )
     );
@@ -380,9 +362,12 @@ export default function LeadsPage() {
     }
   };
 
+  const [isAddingLead, setIsAddingLead] = React.useState(false);
+
   const handleAddLead = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    setIsAddingLead(true);
     try {
       const token = await user.getIdToken(true);
       await createLeadActionByToken(token, {
@@ -395,6 +380,8 @@ export default function LeadsPage() {
       load();
     } catch (e) {
       console.error("Failed to create lead:", e);
+    } finally {
+      setIsAddingLead(false);
     }
   };
 
@@ -468,7 +455,7 @@ export default function LeadsPage() {
               className="bg-muted/40 rounded-md px-2.5 py-1.5 text-xs outline-none text-foreground shrink-0"
             >
               <option value="all">All Stages</option>
-              {PIPELINE_STAGES.map((s) => (
+              {pipelineStages.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
@@ -499,8 +486,8 @@ export default function LeadsPage() {
           {/* =================== KANBAN VIEW =================== */}
           {view === "kanban" && !loading && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-              {PIPELINE_STAGES.map((stage) => {
-                const sc = STAGE_COLORS[stage];
+              {pipelineStages.map((stage) => {
+                const sc = stageColors[stage];
                 const stageLeads = leads.filter((l) => l.stage === stage);
                 return (
                   <div key={stage} className="flex flex-col gap-3">
@@ -569,9 +556,9 @@ export default function LeadsPage() {
                     ) : leads.length > 0 ? (
                       leads.map((lead) => {
                         const stage = (lead.stage || "Cold") as LeadStage;
-                        const sc = STAGE_COLORS[stage] || STAGE_COLORS.Cold;
+                        const sc = stageColors[stage];
                         const tempKey = lead.lead_temperature || "COLD";
-                        const tc = TEMP_COLORS[tempKey] || TEMP_COLORS.COLD;
+                        const tc = tempColors[tempKey] || tempColors.Cold;
                         const personName = lead.person_name || lead.person?.name || "Lead Contact";
                         const personTitle = lead.person?.job_title;
                         const initials = personName.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase() || "L";
@@ -673,8 +660,8 @@ export default function LeadsPage() {
                                   <MessageSquare className="h-3 w-3 text-purple-400" /> Triage
                                 </Button>
                                 {(() => {
-                                  const idx = PIPELINE_STAGES.indexOf(stage);
-                                  const next = PIPELINE_STAGES[idx + 1];
+                                  const idx = pipelineStages.indexOf(stage);
+                                  const next = pipelineStages[idx + 1];
                                   return next ? (
                                     <Button
                                       size="sm"
@@ -760,8 +747,8 @@ export default function LeadsPage() {
               <Button type="button" variant="ghost" onClick={() => setAddOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold">
-                Add Lead
+              <Button type="submit" disabled={isAddingLead} className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold gap-1.5">
+                {isAddingLead ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Adding Lead...</> : "Add Lead"}
               </Button>
             </DialogFooter>
           </form>
@@ -774,7 +761,7 @@ export default function LeadsPage() {
           <DialogHeader>
             <DialogTitle className="text-sm font-bold flex items-center justify-between gap-2">
               <span className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-400" /> AI Pre-Call Intelligence Brief (Vanessa Van Edwards People Skills)
+                <Sparkles className="h-4 w-4 text-indigo-400" /> AI Pre-Call Intelligence Brief
               </span>
               {briefTargetLead && (
                 <Badge variant="outline" className="bg-indigo-500/10 text-indigo-300 border-indigo-500/20 text-xs">
@@ -871,7 +858,7 @@ export default function LeadsPage() {
           <DialogHeader>
             <DialogTitle className="text-sm font-bold flex items-center justify-between gap-2">
               <span className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-400" /> AI Inbound Reply Triage (Vanessa Van Edwards Empathetic Response)
+                <Sparkles className="h-4 w-4 text-indigo-400" /> AI Inbound Reply Triage (Empathetic Response)
               </span>
             </DialogTitle>
           </DialogHeader>
@@ -973,7 +960,7 @@ export default function LeadsPage() {
           <DialogHeader>
             <DialogTitle className="text-sm font-bold flex items-center justify-between gap-2">
               <span className="flex items-center gap-2">
-                <Target className="h-4 w-4 text-amber-400" /> AI Lead Scoring & Buying Readiness (Vanessa Van Edwards Methodology)
+                <Target className="h-4 w-4 text-amber-400" /> AI Lead Scoring & Buying Readiness
               </span>
               {qualifyTargetLead && (
                 <Badge variant="outline" className="bg-amber-500/10 text-amber-300 border-amber-500/20 text-xs">

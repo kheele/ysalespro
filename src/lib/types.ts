@@ -90,8 +90,8 @@ export interface AaUser {
   account_company_id: number;
   auth_id: string;
   email: string;
-  first_name?: string | null;
-  last_name?: string | null;
+  fname?: string | null;
+  lname?: string | null;
   role?: string | null;
   avatar_url?: string | null;
   is_active?: boolean;
@@ -433,10 +433,10 @@ export interface CampaignSequenceStep {
 }
 
 export type CampaignStatus = 'Draft' | 'Active' | 'Paused' | 'Completed' | 'Cancelled';
-export type SequenceStepType = 'Introduction' | 'Follow-up' | 'Case Study' | 'Final Message' | 'Custom';
+export type SequenceStepType = 'Email' | 'Follow-up' | 'Case Study' | 'Final Message';
 
 export interface SequenceStep {
-  id: string;
+  id?: string | number;
   day: number;
   step_number?: number;
   type: SequenceStepType;
@@ -468,7 +468,7 @@ export interface CampaignSchedule {
   send_time_to: string;
   send_time?: string;
   timezone: string;
-  start_date: string;
+  start_date?: string;
 }
 
 export interface Campaign {
@@ -516,8 +516,8 @@ export type MessageType =
   | 'call_script';
 
 export interface PersonContext {
-  first_name: string;
-  last_name: string;
+  fname: string;
+  lname: string;
   full_name: string;
   title: string;
   department: string;
@@ -630,18 +630,45 @@ export type TaskType = 'Call' | 'Email' | 'Meeting' | 'Follow-up';
 export type TaskPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
 export type TaskStatus = 'To Do' | 'In Progress' | 'Completed' | 'Cancelled';
 
+export interface TaskAssignedUser {
+  id: number;
+  fname?: string;
+  lname?: string;
+  email?: string;
+  photo_url?: string;
+}
+
+export interface TaskRelatedLead {
+  id: number;
+  person_name?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface TaskRelatedCompany {
+  id: number;
+  name: string;
+  domain?: string;
+  logo_url?: string;
+  industry?: string;
+}
+
 export interface TaskItem {
   id: number;
+  account_company_id?: number;
   title: string;
   type: TaskType;
   priority: TaskPriority;
   status: TaskStatus;
   due_date: string;
   due_time?: string;
-  assigned_to: string;
+  assigned_to_id?: number;
+  assigned_to?: TaskAssignedUser | null;
   related_lead_id?: number | null;
-  related_lead_name?: string;
-  related_company?: string;
+  related_lead?: TaskRelatedLead | null;
+  related_company_id?: number | null;
+  related_company?: TaskRelatedCompany | null;
   notes?: string;
   created_at?: string;
   updated_at?: string;
@@ -918,4 +945,45 @@ export interface DispatchResult {
   timestamp: string;
   outreach_activity_id?: string | number;
 }
+
+export interface NotificationSettings {
+  email_new_lead: boolean;
+  email_followup: boolean;
+  email_won: boolean;
+  push_calls: boolean;
+  push_meetings: boolean;
+  push_pipeline: boolean;
+  slack_hot_leads: boolean;
+  slack_daily_digest: boolean;
+}
+
+export interface AppearanceSettings {
+  theme: 'Dark' | 'Light' | 'System';
+  sidebar_collapsed: boolean;
+  compact_rows: boolean;
+  animations: boolean;
+}
+
+export interface SecuritySettings {
+  two_factor_auth: boolean;
+  session_timeout: string;
+}
+
+export interface CompanySettings {
+  id?: number | string;
+  account_company_id?: number;
+  pipeline_stages: LeadStage[];
+  stage_colors: Record<string, { bg: string; text: string; border: string; dot: string }>;
+  temp_colors: Record<string, { badge: string }>;
+  default_sequence: SequenceStep[];
+  default_rules: CampaignRules;
+  default_schedule: CampaignSchedule;
+  daily_rules: DailyFollowUpRule[];
+  notifications: NotificationSettings;
+  appearance: AppearanceSettings;
+  security: SecuritySettings;
+  created_at?: string;
+  updated_at?: string;
+}
+
 

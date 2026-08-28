@@ -140,11 +140,10 @@ function MessageCard({
                 <Button
                   size="sm"
                   onClick={() => onSend(msg)}
-                  className={`text-[11px] h-7 gap-1 px-2.5 shadow-sm text-white ${
-                    isLinkedIn
-                      ? "bg-blue-600 hover:bg-blue-500 shadow-blue-500/20"
-                      : "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20"
-                  }`}
+                  className={`text-[11px] h-7 gap-1 px-2.5 shadow-sm text-white ${isLinkedIn
+                    ? "bg-blue-600 hover:bg-blue-500 shadow-blue-500/20"
+                    : "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20"
+                    }`}
                 >
                   <Send className="h-3 w-3" /> {isLinkedIn ? "Send LinkedIn" : "Send Email"}
                 </Button>
@@ -281,8 +280,8 @@ function AiMessagingContent() {
   const handleOpenDispatch = (msg: GeneratedMessage) => {
     setDispatchResult(null);
     const selectedP = people.find(p => String(p.id) === String(selectedPersonId));
-    const recipientEmail = selectedP?.email || (person.first_name ? `${person.first_name.toLowerCase()}@${company.name?.toLowerCase().replace(/[^a-z0-9]/g, '') || "company"}.com` : "");
-    const recipientName = person.full_name || `${person.first_name || ""} ${person.last_name || ""}`.trim() || "Decision Maker";
+    const recipientEmail = selectedP?.email || (person.fname ? `${person.fname.toLowerCase()}@${company.name?.toLowerCase().replace(/[^a-z0-9]/g, '') || "company"}.com` : "");
+    const recipientName = person.full_name || `${person.fname || ""} ${person.lname || ""}`.trim() || "Decision Maker";
     const recipientLinkedin = selectedP?.linkedin_url || `https://linkedin.com/in/${recipientName.toLowerCase().replace(/\s+/g, '-')}`;
 
     if (msg.type === "linkedin") {
@@ -363,8 +362,8 @@ function AiMessagingContent() {
   const [selectedCompanyId, setSelectedCompanyId] = React.useState<string>("");
 
   const [person, setPerson] = React.useState<Partial<PersonContext>>({
-    first_name: "",
-    last_name: "",
+    fname: "",
+    lname: "",
     full_name: "",
     title: "",
     department: "Operations",
@@ -405,8 +404,8 @@ function AiMessagingContent() {
     const firstName = names[0] || "";
     const lastName = names.slice(1).join(" ") || "";
     setPerson({
-      first_name: firstName,
-      last_name: lastName,
+      fname: firstName,
+      lname: lastName,
       full_name: p.name || "",
       title: p.job_title || p.title || "Executive",
       department: p.department || "Operations",
@@ -435,10 +434,10 @@ function AiMessagingContent() {
     const size: CompanyContext["size"] = employees >= 1000
       ? "Enterprise (1000+)"
       : employees >= 250
-      ? "Mid-Market (250-1000)"
-      : employees >= 50
-      ? "SMB (50-250)"
-      : "Startup (<50)";
+        ? "Mid-Market (250-1000)"
+        : employees >= 50
+          ? "SMB (50-250)"
+          : "Startup (<50)";
 
     const loc = [org.city, org.state, org.country].filter(Boolean).join(", ") || org.headquarters_location || org.location || "";
 
@@ -519,12 +518,12 @@ function AiMessagingContent() {
   }, [company.industry]);
 
   const handleGenerate = async () => {
-    if (!person.first_name || !company.name) return;
+    if (!person.fname || !company.name) return;
     setLoading(true);
     const fullPerson: PersonContext = {
-      first_name: person.first_name || "",
-      last_name: person.last_name || "",
-      full_name: person.full_name || `${person.first_name} ${person.last_name}`.trim(),
+      fname: person.fname || "",
+      lname: person.lname || "",
+      full_name: person.full_name || `${person.fname} ${person.lname}`.trim(),
       title: person.title || "Decision Maker",
       department: person.department || "Operations",
       seniority: person.seniority || "VP",
@@ -591,7 +590,7 @@ function AiMessagingContent() {
                   {/* Real Contact Dropdown Picker */}
                   <div className="space-y-1">
                     <Label className="text-[10px] text-muted-foreground font-semibold">
-                      Load Contact from Database
+                      Load Contact
                     </Label>
                     <select
                       value={selectedPersonId}
@@ -614,12 +613,12 @@ function AiMessagingContent() {
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
                         <Label className="text-[10px]">First Name</Label>
-                        <Input value={person.first_name || ""} onChange={e => setPerson((p: Partial<PersonContext>) => ({ ...p, first_name: e.target.value, full_name: `${e.target.value} ${p.last_name || ""}`.trim() }))}
+                        <Input value={person.fname || ""} onChange={e => setPerson((p: Partial<PersonContext>) => ({ ...p, fname: e.target.value, full_name: `${e.target.value} ${p.lname || ""}`.trim() }))}
                           className="h-8 text-xs bg-muted/40 border-border/60" />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-[10px]">Last Name</Label>
-                        <Input value={person.last_name || ""} onChange={e => setPerson((p: Partial<PersonContext>) => ({ ...p, last_name: e.target.value, full_name: `${p.first_name || ""} ${e.target.value}`.trim() }))}
+                        <Input value={person.lname || ""} onChange={e => setPerson((p: Partial<PersonContext>) => ({ ...p, lname: e.target.value, full_name: `${p.fname || ""} ${e.target.value}`.trim() }))}
                           className="h-8 text-xs bg-muted/40 border-border/60" />
                       </div>
                     </div>
@@ -665,7 +664,7 @@ function AiMessagingContent() {
                   {/* Real Company Dropdown Picker */}
                   <div className="space-y-1">
                     <Label className="text-[10px] text-muted-foreground font-semibold">
-                      Load Organization from Database
+                      Load Organization
                     </Label>
                     <select
                       value={selectedCompanyId}
@@ -746,7 +745,7 @@ function AiMessagingContent() {
                 </Card>
 
                 {/* Generate Button */}
-                <Button onClick={handleGenerate} disabled={loading || !person.first_name || !company.name}
+                <Button onClick={handleGenerate} disabled={loading || !person.fname || !company.name}
                   className="w-full h-11 gap-2 font-bold text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white disabled:opacity-50 shadow-lg shadow-indigo-500/20">
                   {loading ? (
                     <><RefreshCw className="h-4 w-4 animate-spin" /> Generating Outreach…</>
@@ -874,7 +873,7 @@ function AiMessagingContent() {
                         </div>
                       ))}
                     </div>
-                    <Button onClick={handleGenerate} disabled={loading || !person.first_name || !company.name}
+                    <Button onClick={handleGenerate} disabled={loading || !person.fname || !company.name}
                       className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold gap-2 shadow-lg shadow-indigo-500/20">
                       <Sparkles className="h-4 w-4" /> Generate Now
                     </Button>
@@ -892,7 +891,7 @@ function AiMessagingContent() {
           <DialogHeader>
             <DialogTitle className="text-sm font-bold flex items-center justify-between gap-2">
               <span className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-400" /> AI Sequence Copilot (Vanessa Van Edwards Science-Based Optimization)
+                <Sparkles className="h-4 w-4 text-indigo-400" /> AI Sequence Copilot (Science-Based Optimization)
               </span>
               {optimizeResult && (
                 <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-xs">
@@ -1063,11 +1062,10 @@ function AiMessagingContent() {
             </div>
 
             {dispatchResult && (
-              <div className={`p-3 rounded-xl text-xs border flex items-start gap-2 ${
-                dispatchResult.success
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                  : "bg-red-500/10 border-red-500/30 text-red-300"
-              }`}>
+              <div className={`p-3 rounded-xl text-xs border flex items-start gap-2 ${dispatchResult.success
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                : "bg-red-500/10 border-red-500/30 text-red-300"
+                }`}>
                 {dispatchResult.success ? (
                   <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
                 ) : (
@@ -1100,11 +1098,10 @@ function AiMessagingContent() {
               size="sm"
               disabled={dispatching || (dispatchChannel === "Email" ? !dispatchRecipientEmail : !dispatchRecipientName)}
               onClick={handleExecuteDispatch}
-              className={`text-white text-xs h-8 gap-1.5 shadow-md ${
-                dispatchChannel === "LinkedIn"
-                  ? "bg-blue-600 hover:bg-blue-500 shadow-blue-500/20"
-                  : "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20"
-              }`}
+              className={`text-white text-xs h-8 gap-1.5 shadow-md ${dispatchChannel === "LinkedIn"
+                ? "bg-blue-600 hover:bg-blue-500 shadow-blue-500/20"
+                : "bg-indigo-600 hover:bg-indigo-500 shadow-indigo-500/20"
+                }`}
             >
               {dispatching ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

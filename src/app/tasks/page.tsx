@@ -10,13 +10,15 @@ import {
   createTaskActionByToken,
   deleteTaskActionByToken,
 } from "@/services/private/taskServices";
+import { getLeadsActionByToken } from "@/services/private/leadServices";
+import { getOrganizations } from "@/services/public/organizationServices";
 import {
   generatePreCallBriefAction,
   prioritizeTasksAction,
 } from "@/services/private/aiMessageServices";
 import type { GeneratePreCallBriefOutput } from "@/ai/schemas/precall-brief";
 import type { PrioritizeTasksOutput } from "@/ai/schemas/task-prioritizer";
-import type { TaskItem, TaskType, TaskStatus, TaskPriority } from "@/lib/types";
+import type { TaskItem, TaskType, TaskStatus, TaskPriority, Lead, Organization } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,6 +32,7 @@ import {
   Building2, UserCheck, CheckCircle2, ChevronLeft, ChevronRight,
   MoreVertical, Trash2, Edit3, Filter, ShieldAlert, Check,
   Sparkles, Shield, Lightbulb, Loader2, HelpCircle, Volume2, Target,
+  User,
 } from "lucide-react";
 
 const TYPE_ICON: Record<TaskType, React.ReactNode> = {
@@ -49,7 +52,7 @@ const PRIORITY_BADGE: Record<TaskPriority, string> = {
 const KANBAN_STAGES: TaskStatus[] = ["To Do", "In Progress", "Completed", "Cancelled"];
 
 export default function TasksPage() {
-  const { user } = useAuth();
+  const { user, dbUser } = useAuth();
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<"list" | "kanban" | "calendar">("list");
   const [tasks, setTasks] = React.useState<TaskItem[]>([]);
@@ -60,6 +63,10 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [search, setSearch] = React.useState("");
 
+  // Relational options for Task linking
+  const [leadsList, setLeadsList] = React.useState<Lead[]>([]);
+  const [orgsList, setOrgsList] = React.useState<Organization[]>([]);
+
   // New Task Modal State
   const [createOpen, setCreateOpen] = React.useState(false);
   const [newTitle, setNewTitle] = React.useState("");
@@ -67,8 +74,9 @@ export default function TasksPage() {
   const [newPriority, setNewPriority] = React.useState<TaskPriority>("Medium");
   const [newDate, setNewDate] = React.useState(new Date().toISOString().split('T')[0]);
   const [newTime, setNewTime] = React.useState("10:00 AM");
-  const [newLead, setNewLead] = React.useState("");
-  const [newCompany, setNewCompany] = React.useState("");
+  const [selectedLeadId, setSelectedLeadId] = React.useState<number | null>(null);
+  const [selectedCompanyId, setSelectedCompanyId] = React.useState<number | null>(null);
+  const [selectedAssigneeId, setSelectedAssigneeId] = React.useState<number | null>(null);
   const [newNotes, setNewNotes] = React.useState("");
 
   // AI Pre-Call Brief State
@@ -81,6 +89,27 @@ export default function TasksPage() {
   const [prioritizeLoading, setPrioritizeLoading] = React.useState(false);
   const [planModalOpen, setPlanModalOpen] = React.useState(false);
   const [dailyPlan, setDailyPlan] = React.useState<PrioritizeTasksOutput | null>(null);
+
+  const loadOptions = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const token = await user.getIdToken(true);
+      const [leads, orgsRes] = await Promise.all([
+        getLeadsActionByToken(token),
+        getOrganizations({ limit: 100 }),
+      ]);
+      setLeadsList(leads || []);
+      setOrgsList(orgsRes?.organizations || []);
+    } catch (err) {
+      console.error("Failed to load leads/organizations for task modal:", err);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    if (createOpen) {
+      loadOptions();
+    }
+  }, [createOpen, loadOptions]);
 
   const handleGenerateDailyPlan = async () => {
     if (tasks.length === 0) return;
@@ -97,8 +126,8 @@ export default function TasksPage() {
           priority: t.priority,
           due_date: t.due_date,
           due_time: t.due_time,
-          related_lead_name: t.related_lead_name,
-          related_company: t.related_company,
+          related_lead_name: t.related_lead?.person_name || t.related_lead?.name || "",
+          related_company: t.related_company?.name || "",
           notes: t.notes,
           status: t.status,
         })),
@@ -118,12 +147,12 @@ export default function TasksPage() {
     try {
       const res = await generatePreCallBriefAction({
         prospect: {
-          name: task.related_lead_name || "Decision Maker",
+          name: task.related_lead?.person_name || task.related_lead?.name || "Decision Maker",
           title: "Executive Leader",
         },
         company: {
-          name: task.related_company || "Enterprise Account",
-          industry: "Enterprise Technology",
+          name: task.related_company?.name || "Enterprise Account",
+          industry: task.related_company?.industry || "Enterprise Technology",
         },
         call_goal: task.title,
       });
@@ -162,9 +191,12 @@ export default function TasksPage() {
     }
   };
 
+  const [isCreatingTask, setIsCreatingTask] = React.useState(false);
+
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle || !user) return;
+    setIsCreatingTask(true);
     try {
       const token = await user.getIdToken(true);
       await createTaskActionByToken(token, {
@@ -174,17 +206,22 @@ export default function TasksPage() {
         status: "To Do",
         due_date: newDate,
         due_time: newTime,
-        assigned_to: user.displayName || user.email?.split("@")[0] || "",
-        related_lead_name: newLead || undefined,
-        related_company: newCompany || undefined,
+        assigned_to_id: selectedAssigneeId || (dbUser?.id ? Number(dbUser.id) : undefined),
+        related_lead_id: selectedLeadId || undefined,
+        related_company_id: selectedCompanyId || undefined,
         notes: newNotes || undefined,
       });
       setCreateOpen(false);
       setNewTitle("");
       setNewNotes("");
+      setSelectedLeadId(null);
+      setSelectedCompanyId(null);
+      setSelectedAssigneeId(null);
       loadTasks();
     } catch (e) {
       console.error("Failed to create task:", e);
+    } finally {
+      setIsCreatingTask(false);
     }
   };
 
@@ -291,8 +328,9 @@ export default function TasksPage() {
                             <Badge className={`${PRIORITY_BADGE[task.priority] || PRIORITY_BADGE['Medium']} text-[10px]`}>{task.priority || 'Medium'}</Badge>
                           </div>
                           <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                            {task.related_company && <span><Building2 className="h-3 w-3 inline mr-1 text-indigo-400" />{task.related_company}</span>}
-                            {task.related_lead_name && <span><UserCheck className="h-3 w-3 inline mr-1 text-purple-400" />{task.related_lead_name}</span>}
+                            {task.related_company?.name && <span><Building2 className="h-3 w-3 inline mr-1 text-indigo-400" />{task.related_company.name}</span>}
+                            {(task.related_lead?.person_name || task.related_lead?.name) && <span><UserCheck className="h-3 w-3 inline mr-1 text-purple-400" />{task.related_lead.person_name || task.related_lead.name}</span>}
+                            {task.assigned_to && <span><User className="h-3 w-3 inline mr-1 text-muted-foreground" />{`${task.assigned_to.fname || ""} ${task.assigned_to.lname || ""}`.trim() || task.assigned_to.email}</span>}
                             <span><Clock className="h-3 w-3 inline mr-1 text-muted-foreground" />Due: {task.due_date} {task.due_time}</span>
                           </div>
                         </div>
@@ -426,15 +464,13 @@ export default function TasksPage() {
                     return (
                       <div
                         key={dayIdx}
-                        className={`min-h-[85px] p-1.5 rounded-lg border text-left flex flex-col justify-between transition-all ${
-                          isToday
-                            ? "border-indigo-500/60 bg-indigo-500/10 shadow-sm"
-                            : "border-border/30 bg-muted/10 hover:border-border/60"
-                        }`}
+                        className={`min-h-[85px] p-1.5 rounded-lg border text-left flex flex-col justify-between transition-all ${isToday
+                          ? "border-indigo-500/60 bg-indigo-500/10 shadow-sm"
+                          : "border-border/30 bg-muted/10 hover:border-border/60"
+                          }`}
                       >
-                        <span className={`text-[10px] font-mono font-bold flex items-center justify-between ${
-                          isToday ? "text-indigo-400" : "text-muted-foreground"
-                        }`}>
+                        <span className={`text-[10px] font-mono font-bold flex items-center justify-between ${isToday ? "text-indigo-400" : "text-muted-foreground"
+                          }`}>
                           <span>{dayNum}</span>
                           {isToday && <span className="text-[9px] font-sans font-semibold text-indigo-400">Today</span>}
                         </span>
@@ -510,18 +546,64 @@ export default function TasksPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[10px] font-semibold uppercase text-muted-foreground block mb-1">Related Lead</label>
-                <Input placeholder="e.g. Sarah Jenkins" value={newLead} onChange={e => setNewLead(e.target.value)} className="bg-muted/40 border-border/60 text-xs h-9" />
+                <label className="text-[10px] font-semibold uppercase text-muted-foreground block mb-1">
+                  Related Lead <span className="normal-case text-muted-foreground/60">(Optional)</span>
+                </label>
+                <select
+                  value={selectedLeadId || ""}
+                  onChange={(e) => {
+                    const leadId = e.target.value ? Number(e.target.value) : null;
+                    setSelectedLeadId(leadId);
+                    if (leadId) {
+                      const matchedLead = leadsList.find((l) => l.id === leadId);
+                      if (matchedLead?.company_name) {
+                        const matchedOrg = orgsList.find(
+                          (o) => o.name?.toLowerCase() === matchedLead.company_name?.toLowerCase()
+                        );
+                        if (matchedOrg) setSelectedCompanyId(Number(matchedOrg.id));
+                      }
+                    }
+                  }}
+                  className="w-full bg-muted/40 border border-border/60 rounded-md p-2 text-xs outline-none text-foreground h-9"
+                >
+                  <option value="">None / General Task</option>
+                  {leadsList.map((lead) => (
+                    <option key={lead.id} value={lead.id}>
+                      {lead.person_name || lead.person?.name || `Lead #${lead.id}`} {lead.company_name ? `(${lead.company_name})` : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
+
               <div>
-                <label className="text-[10px] font-semibold uppercase text-muted-foreground block mb-1">Related Company</label>
-                <Input placeholder="e.g. Acme Corp" value={newCompany} onChange={e => setNewCompany(e.target.value)} className="bg-muted/40 border-border/60 text-xs h-9" />
+                <label className="text-[10px] font-semibold uppercase text-muted-foreground block mb-1">
+                  Related Company <span className="normal-case text-muted-foreground/60">(Optional)</span>
+                </label>
+                <select
+                  value={selectedCompanyId || ""}
+                  onChange={(e) => setSelectedCompanyId(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full bg-muted/40 border border-border/60 rounded-md p-2 text-xs outline-none text-foreground h-9"
+                >
+                  <option value="">None / General Task</option>
+                  {orgsList.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
+                </select>
               </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-semibold uppercase text-muted-foreground block mb-1">Notes / Instructions</label>
+              <Input placeholder="Additional context..." value={newNotes} onChange={e => setNewNotes(e.target.value)} className="bg-muted/40 border-border/60 text-xs h-9" />
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} className="text-xs h-9">Cancel</Button>
-              <Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs h-9">Create Task</Button>
+              <Button type="submit" disabled={isCreatingTask} className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs h-9 gap-1.5">
+                {isCreatingTask ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Creating Task...</> : "Create Task"}
+              </Button>
             </div>
           </form>
         </DialogContent>
@@ -533,11 +615,11 @@ export default function TasksPage() {
           <DialogHeader>
             <DialogTitle className="text-sm font-bold flex items-center justify-between gap-2">
               <span className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-400" /> AI Pre-Call Intelligence Brief (Vanessa Van Edwards People Skills)
+                <Sparkles className="h-4 w-4 text-indigo-400" /> AI Pre-Call Intelligence Brief
               </span>
               {briefTargetTask && (
                 <Badge variant="outline" className="bg-indigo-500/10 text-indigo-300 border-indigo-500/20 text-xs">
-                  {briefTargetTask.related_company || "Target Account"}
+                  {briefTargetTask.related_company?.name || "Target Account"}
                 </Badge>
               )}
             </DialogTitle>
@@ -630,7 +712,7 @@ export default function TasksPage() {
           <DialogHeader>
             <DialogTitle className="text-sm font-bold flex items-center justify-between gap-2">
               <span className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-indigo-400" /> AI Daily Sales Action Plan (Vanessa Van Edwards Methodology)
+                <Sparkles className="h-4 w-4 text-indigo-400" /> AI Daily Sales Action Plan
               </span>
               {dailyPlan && (
                 <Badge className="bg-indigo-500/10 text-indigo-300 border-indigo-500/30 text-xs font-mono">

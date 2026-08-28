@@ -28,8 +28,8 @@ export const GeneratedMessageSchema = z.object({
 export const GenerateSalesOutreachInputSchema = z.object({
   person: z.object({
     name: z.string().optional(),
-    first_name: z.string().optional(),
-    last_name: z.string().optional(),
+    fname: z.string().optional(),
+    lname: z.string().optional(),
     full_name: z.string().optional(),
     role: z.string().optional(),
     title: z.string().optional(),
