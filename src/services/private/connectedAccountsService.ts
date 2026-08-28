@@ -12,55 +12,21 @@ import type {
 // Stores configured mailboxes and LinkedIn sender identities
 const accountsStore = new Map<number, ConnectedAccount[]>();
 
-// Initialize default mock / system accounts if empty for testing
+// Initialize tenant accounts store
 function getOrCreateCompanyAccounts(companyId: number): ConnectedAccount[] {
   if (!accountsStore.has(companyId)) {
-    const defaultAccounts: ConnectedAccount[] = [
-      {
-        id: `acc-email-${companyId}-1`,
-        account_company_id: companyId,
-        name: 'Google Workspace (Primary)',
-        channel: 'Email',
-        status: 'active',
-        is_default: true,
-        is_active: true,
-        sent_today: 14,
-        created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
-        email_config: {
-          provider: 'google_workspace',
-          host: 'smtp.gmail.com',
-          port: 465,
-          secure: true,
-          username: 'outreach@salespro.ai',
-          from_name: 'SalesPro Team',
-          from_email: 'outreach@salespro.ai',
-          reply_to: 'support@salespro.ai',
-          daily_send_limit: 250,
-        },
-      },
-      {
-        id: `acc-li-${companyId}-1`,
-        account_company_id: companyId,
-        name: 'LinkedIn Sales Account (Executive Rep)',
-        channel: 'LinkedIn',
-        status: 'active',
-        is_default: true,
-        is_active: true,
-        sent_today: 8,
-        created_at: new Date(Date.now() - 20 * 86400000).toISOString(),
-        linkedin_config: {
-          provider: 'linkedin_api',
-          account_name: 'Enterprise Outreach Profile',
-          vanity_name: 'salespro-enterprise',
-          profile_url: 'https://linkedin.com/in/salespro-exec',
-          daily_connection_limit: 30,
-          daily_message_limit: 50,
-        },
-      },
-    ];
-    accountsStore.set(companyId, defaultAccounts);
+    accountsStore.set(companyId, []);
   }
   return accountsStore.get(companyId)!;
+}
+
+function getNextAccountId(companyId: number): number {
+  const accounts = getOrCreateCompanyAccounts(companyId);
+  const maxId = accounts.reduce((max, a) => {
+    const numericId = typeof a.id === 'number' ? a.id : parseInt(String(a.id), 10);
+    return !isNaN(numericId) && numericId > max ? numericId : max;
+  }, 0);
+  return maxId + 1;
 }
 
 export async function getConnectedAccountsActionByToken(token: string): Promise<ConnectedAccount[]> {
@@ -75,11 +41,11 @@ export async function getConnectedAccountsActionByToken(token: string): Promise<
 export async function getActiveSendingAccountByChannel(
   companyId: number,
   channel: 'Email' | 'LinkedIn',
-  preferredAccountId?: string
+  preferredAccountId?: string | number
 ): Promise<ConnectedAccount | null> {
   const accounts = getOrCreateCompanyAccounts(companyId);
-  if (preferredAccountId) {
-    const found = accounts.find((a) => a.id === preferredAccountId && a.channel === channel && a.is_active);
+  if (preferredAccountId !== undefined && preferredAccountId !== null) {
+    const found = accounts.find((a) => String(a.id) === String(preferredAccountId) && a.channel === channel && a.is_active);
     if (found) return found;
   }
   // Default active account for channel
@@ -104,8 +70,8 @@ export async function saveConnectedAccountActionByToken(
 
   let target: ConnectedAccount;
 
-  if (accountData.id) {
-    const idx = list.findIndex((a) => a.id === accountData.id);
+  if (accountData.id !== undefined && accountData.id !== null && String(accountData.id).trim() !== '') {
+    const idx = list.findIndex((a) => String(a.id) === String(accountData.id));
     if (idx >= 0) {
       // If setting as default, unset other defaults in the same channel
       if (accountData.is_default) {
@@ -116,13 +82,16 @@ export async function saveConnectedAccountActionByToken(
       target = {
         ...list[idx],
         ...accountData,
+        id: list[idx].id,
         account_company_id: companyId,
         updated_at: now,
       };
       list[idx] = target;
     } else {
+      const parsedId = typeof accountData.id === 'number' ? accountData.id : parseInt(String(accountData.id), 10);
+      const newNumericId = !isNaN(parsedId) && parsedId > 0 ? parsedId : getNextAccountId(companyId);
       target = {
-        id: accountData.id,
+        id: newNumericId,
         account_company_id: companyId,
         name: accountData.name || 'New Channel',
         channel: accountData.channel || 'Email',
@@ -138,14 +107,14 @@ export async function saveConnectedAccountActionByToken(
       list.push(target);
     }
   } else {
-    const newId = `acc-${(accountData.channel || 'channel').toLowerCase()}-${Date.now()}`;
+    const newNumericId = getNextAccountId(companyId);
     if (accountData.is_default) {
       list.forEach((a) => {
         if (a.channel === accountData.channel) a.is_default = false;
       });
     }
     target = {
-      id: newId,
+      id: newNumericId,
       account_company_id: companyId,
       name: accountData.name || 'New Channel',
       channel: accountData.channel || 'Email',
@@ -167,21 +136,21 @@ export async function saveConnectedAccountActionByToken(
 
 export async function deleteConnectedAccountActionByToken(
   token: string,
-  accountId: string
+  accountId: string | number
 ): Promise<{ success: boolean }> {
   const companyId = await getAccountCompanyIdFromClaims(token);
   if (!companyId) {
     throw new Error('Unauthorized: Account company ID missing from token claims');
   }
   const list = getOrCreateCompanyAccounts(companyId);
-  const filtered = list.filter((a) => a.id !== accountId);
+  const filtered = list.filter((a) => String(a.id) !== String(accountId));
   accountsStore.set(companyId, filtered);
   return { success: true };
 }
 
 export async function toggleAccountActiveActionByToken(
   token: string,
-  accountId: string,
+  accountId: string | number,
   isActive: boolean
 ): Promise<ConnectedAccount | null> {
   const companyId = await getAccountCompanyIdFromClaims(token);
@@ -189,18 +158,17 @@ export async function toggleAccountActiveActionByToken(
     throw new Error('Unauthorized: Account company ID missing from token claims');
   }
   const list = getOrCreateCompanyAccounts(companyId);
-  const acc = list.find((a) => a.id === accountId);
+  const acc = list.find((a) => String(a.id) === String(accountId));
   if (!acc) return null;
-
   acc.is_active = isActive;
   acc.updated_at = new Date().toISOString();
   accountsStore.set(companyId, list);
   return JSON.parse(JSON.stringify(acc));
 }
 
-export async function incrementAccountSentCount(companyId: number, accountId: string): Promise<void> {
+export async function incrementAccountSentCount(companyId: number, accountId: string | number): Promise<void> {
   const list = getOrCreateCompanyAccounts(companyId);
-  const acc = list.find((a) => a.id === accountId);
+  const acc = list.find((a) => String(a.id) === String(accountId));
   if (acc) {
     acc.sent_today = (acc.sent_today || 0) + 1;
     acc.last_used_at = new Date().toISOString();
@@ -258,11 +226,10 @@ export async function testAccountConnectionActionByToken(
             latency_ms: Date.now() - startTime,
           };
         } catch (smtpErr: any) {
-          // If in development/mock sandbox environment or credentials are test dummy
           return {
-            success: true,
-            message: `Verified Google Workspace SMTP handshake profile for ${emailConfig.from_email}. (${smtpErr?.message || 'Ready'})`,
-            latency_ms: Date.now() - startTime + 35,
+            success: false,
+            message: `Google Workspace SMTP handshake failed: ${smtpErr?.message || 'Invalid credentials or App Password'}.`,
+            latency_ms: Date.now() - startTime,
           };
         }
       }
@@ -294,9 +261,9 @@ export async function testAccountConnectionActionByToken(
           };
         } catch (smtpErr: any) {
           return {
-            success: true,
-            message: `Configured SMTP transport for ${emailConfig.host}:${emailConfig.port || 587} with sender ${emailConfig.from_email}.`,
-            latency_ms: Date.now() - startTime + 50,
+            success: false,
+            message: `SMTP transport verification failed: ${smtpErr?.message || 'Connection refused or credentials rejected'}.`,
+            latency_ms: Date.now() - startTime,
           };
         }
       }

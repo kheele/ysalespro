@@ -54,6 +54,7 @@ export default function TasksPage() {
   const [viewMode, setViewMode] = React.useState<"list" | "kanban" | "calendar">("list");
   const [tasks, setTasks] = React.useState<TaskItem[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [calendarDate, setCalendarDate] = React.useState(new Date());
 
   const [typeFilter, setTypeFilter] = React.useState<string>("all");
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
@@ -360,55 +361,108 @@ export default function TasksPage() {
           )}
 
           {/* VIEW 3: CALENDAR VIEW */}
-          {viewMode === "calendar" && (
-            <Card className="bg-card p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-bold text-sm text-foreground flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4 text-indigo-400" /> July 2026 Task Schedule
-                </h2>
-                <div className="flex items-center gap-1">
-                  <Button size="icon" variant="outline" className="h-7 w-7"><ChevronLeft className="h-3.5 w-3.5" /></Button>
-                  <Button size="icon" variant="outline" className="h-7 w-7"><ChevronRight className="h-3.5 w-3.5" /></Button>
-                </div>
-              </div>
+          {viewMode === "calendar" && (() => {
+            const year = calendarDate.getFullYear();
+            const month = calendarDate.getMonth();
+            const monthTitle = calendarDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const firstDayOfWeek = (new Date(year, month, 1).getDay() + 6) % 7; // Mon = 0
+            const todayIso = new Date().toISOString().split("T")[0];
 
-              {/* 7-Column Calendar Grid Mock */}
-              <div className="grid grid-cols-7 gap-2 text-center text-xs">
-                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => (
-                  <div key={d} className="font-semibold text-muted-foreground py-1 bg-muted/20 rounded">{d}</div>
-                ))}
-
-                {Array.from({ length: 31 }).map((_, dayIdx) => {
-                  const dayNum = dayIdx + 1;
-                  const dateStr = `2026-07-${dayNum < 10 ? '0' + dayNum : dayNum}`;
-                  const dayTasks = tasks.filter(t => t.due_date === dateStr);
-
-                  return (
-                    <div key={dayIdx} className={`min-h-[80px] p-1.5 rounded-lg border text-left flex flex-col justify-between ${dateStr === "2026-07-23" ? "border-indigo-500/50 bg-indigo-500/5" : "border-border/30 bg-muted/10"
-                      }`}>
-                      <span className={`text-[10px] font-mono font-bold ${dateStr === "2026-07-23" ? "text-indigo-400" : "text-muted-foreground"}`}>
-                        {dayNum} {dateStr === "2026-07-23" && "(Today)"}
-                      </span>
-                      <div className="space-y-1">
-                        {dayTasks.map(t => (
-                          <div key={t.id} className="p-1 rounded bg-indigo-600/20 border border-indigo-500/30 text-[9px] text-indigo-300 truncate">
-                            {t.due_time || ""} {t.title}
-                          </div>
-                        ))}
-                      </div>
+            return (
+              <Card className="bg-card p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-bold text-sm text-foreground flex items-center gap-2">
+                    <CalendarIcon className="h-4 w-4 text-indigo-400" /> {monthTitle} Task Schedule
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setCalendarDate(new Date())}
+                      className="text-xs h-7 px-2 text-muted-foreground hover:text-foreground"
+                    >
+                      Today
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => setCalendarDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+                        className="h-7 w-7"
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => setCalendarDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+                        className="h-7 w-7"
+                      >
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
-                  );
-                })}
-              </div>
-            </Card>
-          )}
+                  </div>
+                </div>
+
+                {/* 7-Column Calendar Grid */}
+                <div className="grid grid-cols-7 gap-2 text-center text-xs">
+                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => (
+                    <div key={d} className="font-semibold text-muted-foreground py-1 bg-muted/20 rounded">{d}</div>
+                  ))}
+
+                  {/* Empty leading cells */}
+                  {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+                    <div key={`empty-${i}`} className="min-h-[85px] p-1.5 rounded-lg border border-border/10 bg-muted/5 opacity-30" />
+                  ))}
+
+                  {/* Days of Month */}
+                  {Array.from({ length: daysInMonth }).map((_, dayIdx) => {
+                    const dayNum = dayIdx + 1;
+                    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                    const isToday = dateStr === todayIso;
+                    const dayTasks = tasks.filter(t => t.due_date === dateStr);
+
+                    return (
+                      <div
+                        key={dayIdx}
+                        className={`min-h-[85px] p-1.5 rounded-lg border text-left flex flex-col justify-between transition-all ${
+                          isToday
+                            ? "border-indigo-500/60 bg-indigo-500/10 shadow-sm"
+                            : "border-border/30 bg-muted/10 hover:border-border/60"
+                        }`}
+                      >
+                        <span className={`text-[10px] font-mono font-bold flex items-center justify-between ${
+                          isToday ? "text-indigo-400" : "text-muted-foreground"
+                        }`}>
+                          <span>{dayNum}</span>
+                          {isToday && <span className="text-[9px] font-sans font-semibold text-indigo-400">Today</span>}
+                        </span>
+                        <div className="space-y-1 my-1 overflow-y-auto max-h-16 pr-0.5">
+                          {dayTasks.map(t => (
+                            <div
+                              key={t.id}
+                              title={`${t.due_time || ''} ${t.title}`}
+                              className="p-1 rounded bg-indigo-600/20 border border-indigo-500/30 text-[9px] text-indigo-300 truncate"
+                            >
+                              {t.due_time ? `${t.due_time} ` : ""}{t.title}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            );
+          })()}
 
         </main>
       </div>
 
       {/* New Task Dialog Modal */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-md bg-card/98 border-border/60">
+        <DialogContent className="sm:max-w-md bg-card text-card-foreground border border-border shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-sm font-bold flex items-center gap-2">
               <Plus className="h-4 w-4 text-indigo-400" /> Create Sales Task

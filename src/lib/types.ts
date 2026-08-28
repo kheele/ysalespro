@@ -868,7 +868,7 @@ export interface LinkedInAccountConfig {
 }
 
 export interface ConnectedAccount {
-  id: string;
+  id: number | string;
   account_company_id?: number;
   name: string;
   channel: ChannelType;

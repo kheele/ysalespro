@@ -585,7 +585,7 @@ function OutreachPageContent() {
 
       {/* ─── Compose / Log Activity Modal ──────────────────────────────────── */}
       <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
-        <DialogContent className="sm:max-w-lg bg-card/95 border-border/60 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg bg-card text-card-foreground border border-border shadow-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-sm font-bold flex items-center gap-2">
               <Send className="h-4 w-4 text-indigo-400" /> Log Outreach Activity

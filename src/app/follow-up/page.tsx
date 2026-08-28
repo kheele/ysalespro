@@ -59,7 +59,7 @@ function AutomationConsoleModal({ open, onClose, result }: {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-xl bg-card/98 border-border/60 p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-xl bg-card text-card-foreground border border-border shadow-2xl p-0 overflow-hidden">
         <DialogHeader className="p-5 pb-3 border-b border-border/40 bg-muted/20">
           <DialogTitle className="text-sm font-bold flex items-center gap-2">
             <Terminal className="h-4 w-4 text-emerald-400" /> Automated Daily Follow-Up Execution

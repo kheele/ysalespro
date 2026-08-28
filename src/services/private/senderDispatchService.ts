@@ -73,7 +73,7 @@ export async function sendEmailOutreachActionByToken(
         connectionTimeout: 8000,
       });
 
-      const info = await transporter.sendMail({
+      const info: any = await transporter.sendMail({
         from: `"${config.from_name || 'SalesPro'}" <${config.from_email}>`,
         to: payload.to_name ? `"${payload.to_name}" <${payload.to}>` : payload.to,
         subject: payload.subject,
@@ -82,7 +82,7 @@ export async function sendEmailOutreachActionByToken(
         replyTo: payload.reply_to || config.reply_to || config.from_email,
         headers: {
           'X-SalesPro-Outreach': 'true',
-          'X-SalesPro-Account-Id': account.id,
+          'X-SalesPro-Account-Id': String(account.id),
           'X-SalesPro-Lead-Id': String(payload.lead_id || ''),
           'X-SalesPro-Campaign-Id': String(payload.campaign_id || ''),
         },

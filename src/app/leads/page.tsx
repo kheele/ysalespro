@@ -725,7 +725,7 @@ export default function LeadsPage() {
 
       {/* Add Lead Modal */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-sm bg-card/95 border-border/60">
+        <DialogContent className="sm:max-w-sm bg-card text-card-foreground border border-border shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-sm font-bold">Add New Lead</DialogTitle>
           </DialogHeader>

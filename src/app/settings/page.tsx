@@ -80,7 +80,7 @@ export default function SettingsPage() {
   // Connected accounts state
   const [accounts, setAccounts] = React.useState<ConnectedAccount[]>([]);
   const [loadingAccounts, setLoadingAccounts] = React.useState(true);
-  const [testingAccountId, setTestingAccountId] = React.useState<string | null>(null);
+  const [testingAccountId, setTestingAccountId] = React.useState<string | number | null>(null);
 
   // Email account modal state
   const [emailModalOpen, setEmailModalOpen] = React.useState(false);
@@ -357,7 +357,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleToggleAccount = async (id: string, active: boolean) => {
+  const handleToggleAccount = async (id: string | number, active: boolean) => {
     if (!user) return;
     try {
       const token = await user.getIdToken(true);
@@ -368,7 +368,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleDeleteAccount = async (id: string) => {
+  const handleDeleteAccount = async (id: string | number) => {
     if (!user) return;
     if (!confirm("Are you sure you want to disconnect this sending account?")) return;
     try {
@@ -437,9 +437,26 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 2500);
   };
 
+  const emailConnected = accounts.some(a => a.channel === "Email" && a.is_active);
+  const emailCount = accounts.filter(a => a.channel === "Email" && a.is_active).length;
+  const liConnected = accounts.some(a => a.channel === "LinkedIn" && a.is_active);
+  const liCount = accounts.filter(a => a.channel === "LinkedIn" && a.is_active).length;
+
   const INTEGRATIONS = [
-    { name: "Gmail / Google Workspace", desc: "Email sync for outreach tracking and thread history", color: "text-red-400", status: "Connected", statusColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
-    { name: "LinkedIn Sales Navigator", desc: "Contact enrichment and LinkedIn outreach sequences", color: "text-blue-400", status: "Connected", statusColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
+    {
+      name: "Google Workspace / Custom SMTP",
+      desc: "Email mailboxes for automated sequences, cold outreach, and thread tracking",
+      color: "text-red-400",
+      status: emailConnected ? `Connected (${emailCount} active)` : "Not Connected",
+      statusColor: emailConnected ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-muted/40 text-muted-foreground border-border/40",
+    },
+    {
+      name: "LinkedIn Outbound Engine",
+      desc: "LinkedIn API & webhook dispatch for connection requests and InMails",
+      color: "text-blue-400",
+      status: liConnected ? `Connected (${liCount} active)` : "Not Connected",
+      statusColor: liConnected ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-muted/40 text-muted-foreground border-border/40",
+    },
     { name: "Slack", desc: "Pipeline alerts, deal notifications, and daily digest bot", color: "text-purple-400", status: "Not Connected", statusColor: "bg-muted/40 text-muted-foreground border-border/40" },
     { name: "Microsoft Teams", desc: "Real-time deal alerts, scheduled call sync, and channel notifications", color: "text-indigo-400", status: "Not Connected", statusColor: "bg-muted/40 text-muted-foreground border-border/40" },
     { name: "Zoom", desc: "Auto-schedule meetings and record call outcomes", color: "text-blue-400", status: "Not Connected", statusColor: "bg-muted/40 text-muted-foreground border-border/40" },

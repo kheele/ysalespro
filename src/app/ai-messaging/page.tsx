@@ -294,7 +294,7 @@ function AiMessagingContent() {
       setDispatchSubject("LinkedIn Message");
       setDispatchBody(msg.content);
       const defLi = connectedAccounts.find(a => a.channel === "LinkedIn" && a.is_default && a.is_active) || connectedAccounts.find(a => a.channel === "LinkedIn" && a.is_active);
-      setDispatchAccountId(defLi?.id || "");
+      setDispatchAccountId(defLi ? String(defLi.id) : "");
     } else {
       setDispatchChannel("Email");
       setDispatchRecipientEmail(recipientEmail);
@@ -305,7 +305,7 @@ function AiMessagingContent() {
       setDispatchSubject(msg.subject || subjectMsg?.content || `Quick question — ${company.name || "partnership"}`);
       setDispatchBody(msg.content);
       const defEmail = connectedAccounts.find(a => a.channel === "Email" && a.is_default && a.is_active) || connectedAccounts.find(a => a.channel === "Email" && a.is_active);
-      setDispatchAccountId(defEmail?.id || "");
+      setDispatchAccountId(defEmail ? String(defEmail.id) : "");
     }
     setDispatchModalOpen(true);
   };

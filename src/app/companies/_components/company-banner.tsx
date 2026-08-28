@@ -17,8 +17,7 @@ export function CompanyBanner({ companies, total }: CompanyBannerProps) {
     const rows = companies
       .map(
         (c) =>
-          `"${c.id}","${c.name}","${c.primary_domain || ""}","${c.primary_industry || c.industry || ""}","${
-            c.country || ""
+          `"${c.id}","${c.name}","${c.primary_domain || ""}","${c.primary_industry || c.industry || ""}","${c.country || ""
           }","${c.city || ""}","${c.estimated_num_employees || c.employee_count || 0}","${c.annual_revenue || ""}"`
       )
       .join("\n");
@@ -41,14 +40,11 @@ export function CompanyBanner({ companies, total }: CompanyBannerProps) {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-base font-bold text-foreground">
-              {total > 0 ? `${total.toLocaleString()}+` : "2,200+"} Enterprise Organizations Seeded
+              {total.toLocaleString()} Enterprise Organizations
             </h1>
-            <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]">
-              Virtualized Engine
-            </Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            Includes Mining, Construction, Heavy Manufacturing, Engineering & Technology sectors.
+            Includes Mining, Construction, Heavy Manufacturing, Engineering & Logistics sectors.
           </p>
         </div>
       </div>
