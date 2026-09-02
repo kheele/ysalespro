@@ -208,10 +208,10 @@ export async function updateLeadStatusActionByToken(
   try {
     const parsedId = Number(id);
     const mutation = `
-      mutation UpdateLeadStatus($id: Int!, $lead_temperature: String!) {
+      mutation UpdateLeadStatus($id: Int!, $_set: aa_s_leads_set_input!) {
         update_aa_s_leads_by_pk(
           pk_columns: { id: $id }
-          _set: { lead_temperature: $lead_temperature }
+          _set: $_set
         ) {
           id
           account_company_id

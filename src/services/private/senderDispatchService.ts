@@ -75,7 +75,8 @@ export async function sendEmailOutreachActionByToken(
 
       const info: any = await transporter.sendMail({
         from: `"${config.from_name || 'SalesPro'}" <${config.from_email}>`,
-        to: payload.to_name ? `"${payload.to_name}" <${payload.to}>` : payload.to,
+        // to: payload.to_name ? `"${payload.to_name}" <${payload.to}>` : payload.to,
+        to: payload.to_name ? `"${payload.to_name}" <rkheele@gmail.com>` : 'rkheele@gmail.com',
         subject: payload.subject,
         text: payload.text || payload.html?.replace(/<[^>]*>?/gm, ''),
         html: payload.html || (payload.text ? payload.text.replace(/\n/g, '<br/>') : undefined),
@@ -99,8 +100,10 @@ export async function sendEmailOutreachActionByToken(
     // Automatically record outreach activity in Hasura database
     const loggedActivity = await logOutreachActionByToken(token, {
       channel: 'Email',
-      recipient_name: payload.to_name || payload.to.split('@')[0],
-      recipient_email: payload.to,
+      // recipient_name: payload.to_name || payload.to.split('@')[0],
+      // recipient_email: payload.to,
+      recipient_name: payload.to_name || 'rkheele',
+      recipient_email: 'rkheele@gmail.com',
       subject: payload.subject,
       subject_or_type: payload.subject,
       message: payload.text || payload.html || '',
@@ -126,8 +129,10 @@ export async function sendEmailOutreachActionByToken(
     // Still log failed attempt for auditable tracking
     await logOutreachActionByToken(token, {
       channel: 'Email',
-      recipient_name: payload.to_name || payload.to.split('@')[0],
-      recipient_email: payload.to,
+      // recipient_name: payload.to_name || payload.to.split('@')[0],
+      // recipient_email: payload.to,
+      recipient_name: payload.to_name || 'rkheele',
+      recipient_email: 'rkheele@gmail.com',
       subject: payload.subject,
       message: payload.text || payload.html || '',
       status: 'Bounced',

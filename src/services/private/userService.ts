@@ -137,8 +137,27 @@ export async function getUserByAuthIdAction(authId: string): Promise<User | null
     console.error("getUserByAuthIdAction error:", err);
     return null;
   }
+}export async function getUserByEmailAction(email: string): Promise<User | null> {
+  try {
+    const query = `
+      query GetUserByEmail($email: String!) {
+        aa_s_users(where: {email: {_eq: $email}}, limit: 1) {
+          ${USER_FIELDS}
+        }
+      }
+    `;
+    const list = await listGraphQL({
+      query,
+      operationName: 'GetUserByEmail',
+      variables: { email }
+    });
+    if (!Array.isArray(list) || list.length === 0) return null;
+    return mapDbUser(list[0]);
+  } catch (err) {
+    console.error("getUserByEmailAction error:", err);
+    return null;
+  }
 }
-
 
 
 export async function createUserAction(input: CreateUserInput): Promise<User | null> {
@@ -213,6 +232,7 @@ export async function updateUserAction(id: number | string, updates: UpdateUserI
 
     const _set: Record<string, any> = {};
 
+    if (updates.auth_id !== undefined) _set.auth_id = updates.auth_id;
     if (updates.fname !== undefined) _set.fname = updates.fname;
     if (updates.lname !== undefined) _set.lname = updates.lname;
     if (updates.email) _set.email = updates.email;

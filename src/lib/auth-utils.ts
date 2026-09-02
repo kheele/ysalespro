@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { adminAuth } from '@/lib/firebase-admin';
-import { getUserByAuthIdAction } from '@/services/private/userService';
+import { getUserByAuthIdAction, getUserByEmailAction, updateUserAction } from '@/services/private/userService';
 import type { User } from '@/lib/types';
 
 export type Role = 'SuperAdmin' | 'Admin' | 'Manager' | 'SalesRep' | 'Member' | 'User' | 'any';
@@ -30,7 +30,15 @@ export async function getCustomClaimsByAuth(
       : null;
 
     // Fetch full user profile from DB for other details
-    const user = await getUserByAuthIdAction(decodedClaims.uid);
+    let user = await getUserByAuthIdAction(decodedClaims.uid);
+    if (!user && decodedClaims.email) {
+      user = await getUserByEmailAction(decodedClaims.email);
+      if (user) {
+        await updateUserAction(user.id, { auth_id: decodedClaims.uid, is_active: true });
+        user = { ...user, auth_id: decodedClaims.uid, is_active: true };
+      }
+    }
+
     if (!user) {
       return {
         user: null,

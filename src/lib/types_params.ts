@@ -64,6 +64,7 @@ export interface CreateUserInput {
 }
 
 export interface UpdateUserInput {
+  auth_id?: string;
   fname?: string;
   lname?: string;
   email?: string;

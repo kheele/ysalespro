@@ -483,8 +483,8 @@ export async function updateCampaignStatusActionByToken(
 
   try {
     const mutation = `
-      mutation UpdateCampaignStatus($id: Int!, $status: String!) {
-        update_aa_s_campaigns_by_pk(pk_columns: { id: $id }, _set: { status: $status }) {
+      mutation UpdateCampaignStatus($id: Int!, $_set: aa_s_campaigns_set_input!) {
+        update_aa_s_campaigns_by_pk(pk_columns: { id: $id }, _set: $_set) {
           id
           account_company_id
           name

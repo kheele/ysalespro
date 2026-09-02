@@ -9,25 +9,29 @@ import {
   createCampaignActionByToken,
   updateCampaignStatusActionByToken,
 } from "@/services/private/campaignServices";
+import { processAllActiveCampaignsAction } from "@/services/private/campaignCronService";
 import type {
   Campaign,
   CampaignStatus,
 } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, Rocket } from "lucide-react";
+import { Search, Plus, Rocket, Play, Loader2 } from "lucide-react";
 import { CampaignCard, CampaignBuilderModal } from "./_components";
 
 export default function CampaignsPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [campaigns, setCampaigns] = React.useState<Campaign[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<CampaignStatus | "all">("all");
   const [builderOpen, setBuilderOpen] = React.useState(false);
+  const [runningScheduler, setRunningScheduler] = React.useState(false);
 
   const load = React.useCallback(async () => {
     if (!user) return;
@@ -66,6 +70,35 @@ export default function CampaignsPage() {
       load();
     } catch (e) {
       console.error("Failed to update campaign status:", e);
+    }
+  };
+
+  const handleRunScheduler = async () => {
+    setRunningScheduler(true);
+    try {
+      const result = await processAllActiveCampaignsAction({ forceWindow: true });
+      if (result.success) {
+        toast({
+          title: "Scheduler Processed",
+          description: `Evaluated ${result.campaigns_evaluated} active campaigns. Dispatched ${result.emails_sent} sequence email(s).`,
+        });
+        load();
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Scheduler Failed",
+          description: "An error occurred while evaluating campaign schedules.",
+        });
+      }
+    } catch (err: any) {
+      console.error("Scheduler run error:", err);
+      toast({
+        variant: "destructive",
+        title: "Dispatch Error",
+        description: err?.message || "Failed to trigger scheduled campaigns.",
+      });
+    } finally {
+      setRunningScheduler(false);
     }
   };
 
@@ -129,6 +162,20 @@ export default function CampaignsPage() {
                 </button>
               ))}
             </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleRunScheduler}
+              disabled={runningScheduler}
+              className="text-xs gap-1.5 font-semibold h-9 shrink-0 border-indigo-500/40 hover:bg-indigo-500/10 text-indigo-300"
+              title="Processes active campaigns and dispatches due sequence emails immediately"
+            >
+              {runningScheduler ? (
+                <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Running...</>
+              ) : (
+                <><Play className="h-3.5 w-3.5 text-emerald-400" /> Run Active Campaigns</>
+              )}
+            </Button>
             <Button
               size="sm"
               onClick={() => setBuilderOpen(true)}

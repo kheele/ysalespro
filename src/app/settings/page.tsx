@@ -18,6 +18,7 @@ import {
   Globe, Mail, Plug, ChevronRight, Save, CheckCircle2, Zap,
   ToggleLeft, ToggleRight, Plus, Trash2, Edit3, Loader2, Sparkles,
   Linkedin, Check, AlertCircle, RefreshCw, Key, Server, Lock, ExternalLink,
+  UserPlus, UserX, UserCog, Copy, Crown,
 } from "lucide-react";
 import {
   getConnectedAccountsActionByToken,
@@ -35,7 +36,16 @@ import type {
   NotificationSettings,
   AppearanceSettings,
   SecuritySettings,
+  User as UserType,
+  UserRole,
 } from "@/lib/types";
+import {
+  getTeamMembersActionByToken,
+  inviteTeamMemberActionByToken,
+  updateTeamMemberRoleActionByToken,
+  removeTeamMemberActionByToken,
+  updateUserProfileActionByToken,
+} from "@/services/private/settingsService";
 import {
   Dialog,
   DialogContent,
@@ -76,11 +86,463 @@ function SettingRow({ label, description, children }: { label: string; descripti
   );
 }
 
+// ─── Role configuration ───────────────────────────────────────────────────────
+const ROLE_CONFIG: Record<UserRole, { label: string; color: string; badgeCls: string; desc: string }> = {
+  SuperAdmin: {
+    label: "Super Admin",
+    color: "text-red-400",
+    badgeCls: "bg-red-500/10 text-red-400 border-red-500/20",
+    desc: "Full platform access including billing and user management",
+  },
+  Admin: {
+    label: "Admin",
+    color: "text-amber-400",
+    badgeCls: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    desc: "Manage leads, campaigns, companies, and settings",
+  },
+  Editor: {
+    label: "Editor",
+    color: "text-indigo-400",
+    badgeCls: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+    desc: "Create and edit records, run outreach campaigns",
+  },
+  Viewer: {
+    label: "Viewer",
+    color: "text-muted-foreground",
+    badgeCls: "bg-muted/40 text-muted-foreground border-border/40",
+    desc: "Read-only access to all records and reports",
+  },
+};
+
+const ROLES: UserRole[] = ["SuperAdmin", "Admin", "Editor", "Viewer"];
+
+// ─── TeamSection component ─────────────────────────────────────────────────────
+function TeamSection({
+  user,
+  dbUser,
+  initials,
+  profile,
+}: {
+  user: any;
+  dbUser: any;
+  initials: string;
+  profile: { name: string; email: string; title: string; company: string };
+}) {
+  const [members, setMembers] = React.useState<UserType[]>([]);
+  const [loadingMembers, setLoadingMembers] = React.useState(true);
+  const [inviteOpen, setInviteOpen] = React.useState(false);
+
+  // Invite form state
+  const [inviteEmail, setInviteEmail] = React.useState("");
+  const [inviteFname, setInviteFname] = React.useState("");
+  const [inviteLname, setInviteLname] = React.useState("");
+  const [inviteRole, setInviteRole] = React.useState<UserRole>("Editor");
+  const [inviting, setInviting] = React.useState(false);
+  const [inviteResult, setInviteResult] = React.useState<{ success: boolean; message: string; inviteLink?: string } | null>(null);
+  const [copied, setCopied] = React.useState(false);
+
+  // Role editing state
+  const [editingRoleId, setEditingRoleId] = React.useState<string | null>(null);
+  const [updatingRoleId, setUpdatingRoleId] = React.useState<string | null>(null);
+
+  // Remove state
+  const [removingId, setRemovingId] = React.useState<string | null>(null);
+
+  const loadMembers = React.useCallback(async () => {
+    if (!user) return;
+    setLoadingMembers(true);
+    try {
+      const token = await user.getIdToken(true);
+      const data = await getTeamMembersActionByToken(token);
+      setMembers(data);
+    } catch (err) {
+      console.error("Failed to load team members:", err);
+    } finally {
+      setLoadingMembers(false);
+    }
+  }, [user]);
+
+  React.useEffect(() => { loadMembers(); }, [loadMembers]);
+
+  const handleInvite = async () => {
+    if (!user || !inviteEmail.trim()) return;
+    setInviting(true);
+    setInviteResult(null);
+    try {
+      const token = await user.getIdToken(true);
+      const result = await inviteTeamMemberActionByToken(token, {
+        email: inviteEmail.trim(),
+        role: inviteRole,
+        fname: inviteFname.trim(),
+        lname: inviteLname.trim(),
+      });
+      setInviteResult(result);
+      if (result.success) {
+        loadMembers();
+      }
+    } catch (err: any) {
+      setInviteResult({ success: false, message: err?.message || "Failed to send invite" });
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (!inviteResult?.inviteLink) return;
+    await navigator.clipboard.writeText(inviteResult.inviteLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRoleChange = async (memberId: string, newRole: UserRole) => {
+    if (!user) return;
+    setUpdatingRoleId(memberId);
+    try {
+      const token = await user.getIdToken(true);
+      await updateTeamMemberRoleActionByToken(token, memberId, newRole);
+      setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m));
+    } catch (err) {
+      console.error("Failed to update role:", err);
+    } finally {
+      setUpdatingRoleId(null);
+      setEditingRoleId(null);
+    }
+  };
+
+  const handleRemove = async (memberId: string) => {
+    if (!user || !confirm("Are you sure you want to remove this team member? They will lose access immediately.")) return;
+    setRemovingId(memberId);
+    try {
+      const token = await user.getIdToken(true);
+      await removeTeamMemberActionByToken(token, memberId);
+      setMembers(prev => prev.filter(m => m.id !== memberId));
+    } catch (err) {
+      console.error("Failed to remove member:", err);
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  const isCurrentUser = (m: UserType) =>
+    m.email === (dbUser?.email || user?.email) || m.auth_id === user?.uid;
+
+  const resetInviteForm = () => {
+    setInviteEmail(""); setInviteFname(""); setInviteLname("");
+    setInviteRole("Editor"); setInviteResult(null); setCopied(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-base font-bold flex items-center gap-2">
+            <Users className="h-4 w-4 text-indigo-400" /> Team &amp; Permissions
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Manage team members, assign roles, and control access levels.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          onClick={() => { resetInviteForm(); setInviteOpen(true); }}
+          className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 h-9 shadow-lg shadow-indigo-500/20"
+        >
+          <UserPlus className="h-3.5 w-3.5" /> Invite Member
+        </Button>
+      </div>
+
+      {/* Role Legend */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {ROLES.map(role => (
+          <div key={role} className={`px-3 py-2.5 rounded-xl border ${ROLE_CONFIG[role].badgeCls.replace("text-", "border-").replace("/20", "/30")} bg-transparent`}>
+            <p className={`text-[11px] font-bold ${ROLE_CONFIG[role].color}`}>{ROLE_CONFIG[role].label}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{ROLE_CONFIG[role].desc}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Members Table */}
+      <div className="bg-card border border-border/50 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-border/40 flex items-center justify-between">
+          <p className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">
+            Team Members
+          </p>
+          <Badge variant="outline" className="text-[10px] font-mono bg-muted/40">
+            {loadingMembers ? "..." : members.length} member{members.length !== 1 ? "s" : ""}
+          </Badge>
+        </div>
+
+        {loadingMembers ? (
+          <div className="p-10 flex flex-col items-center justify-center gap-2 text-muted-foreground text-xs">
+            <Loader2 className="h-5 w-5 animate-spin text-indigo-400" />
+            Loading team members...
+          </div>
+        ) : members.length === 0 ? (
+          <div className="p-10 text-center space-y-2">
+            <Users className="h-8 w-8 text-muted-foreground/40 mx-auto" />
+            <p className="text-sm font-semibold text-foreground">No team members yet</p>
+            <p className="text-xs text-muted-foreground">Invite colleagues to collaborate on your sales pipeline.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border/30">
+            {members.map(member => {
+              const cfg = ROLE_CONFIG[member.role] || ROLE_CONFIG.Viewer;
+              const memberInitials = member.fname && member.lname
+                ? `${member.fname[0]}${member.lname[0]}`.toUpperCase()
+                : (member.email?.[0] || "?").toUpperCase();
+              const isSelf = isCurrentUser(member);
+              const isPending = member.auth_id?.startsWith("pending_");
+              const isEditing = editingRoleId === member.id;
+              const isUpdating = updatingRoleId === member.id;
+              const isRemoving = removingId === member.id;
+
+              return (
+                <div key={member.id} className="flex items-center gap-3 px-4 py-3.5 hover:bg-muted/20 transition-colors flex-wrap">
+                  {/* Avatar */}
+                  <div className={`h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                    isSelf
+                      ? "bg-indigo-500/20 border border-indigo-500/30 text-indigo-300"
+                      : "bg-muted/40 border border-border/40 text-muted-foreground"
+                  }`}>
+                    {memberInitials}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-semibold text-foreground truncate">
+                        {member.name && member.name !== member.email
+                          ? member.name
+                          : member.fname || member.email}
+                      </p>
+                      {isSelf && (
+                        <Badge className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 text-[9px] px-1.5 py-0">
+                          You
+                        </Badge>
+                      )}
+                      {isPending && (
+                        <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[9px] px-1.5 py-0">
+                          Invite Pending
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground truncate">{member.email}</p>
+                  </div>
+
+                  {/* Role (editable inline for non-self members) */}
+                  <div className="shrink-0">
+                    {isEditing && !isSelf ? (
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={member.role}
+                          onChange={(e) => handleRoleChange(member.id, e.target.value as UserRole)}
+                          disabled={isUpdating}
+                          className="bg-muted/40 border border-border/60 rounded-md px-2 py-1 text-xs outline-none text-foreground"
+                          autoFocus
+                          onBlur={() => setEditingRoleId(null)}
+                        >
+                          {ROLES.map(r => (
+                            <option key={r} value={r} className="bg-card">{ROLE_CONFIG[r].label}</option>
+                          ))}
+                        </select>
+                        {isUpdating && <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-400" />}
+                      </div>
+                    ) : (
+                      <Badge className={`${cfg.badgeCls} text-[11px] cursor-default`}>
+                        {cfg.label}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  {!isSelf && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-indigo-400 hover:bg-indigo-500/10"
+                        title="Change role"
+                        onClick={() => setEditingRoleId(isEditing ? null : member.id)}
+                      >
+                        <UserCog className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
+                        title="Remove member"
+                        disabled={isRemoving}
+                        onClick={() => handleRemove(member.id)}
+                      >
+                        {isRemoving
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <UserX className="h-3.5 w-3.5" />
+                        }
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ─── Invite Member Dialog ─────────────────────────────────────────── */}
+      <Dialog open={inviteOpen} onOpenChange={(open) => { setInviteOpen(open); if (!open) resetInviteForm(); }}>
+        <DialogContent className="sm:max-w-md bg-card border-border/60">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <div className="h-8 w-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                <UserPlus className="h-4 w-4" />
+              </div>
+              Invite Team Member
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Send a sign-in link to a colleague. They'll be able to join your workspace immediately.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-1">
+            {/* Name row */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">First Name</Label>
+                <Input
+                  placeholder="Jane"
+                  value={inviteFname}
+                  onChange={e => setInviteFname(e.target.value)}
+                  className="bg-muted/40 border-border/60 h-9 text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Last Name</Label>
+                <Input
+                  placeholder="Smith"
+                  value={inviteLname}
+                  onChange={e => setInviteLname(e.target.value)}
+                  className="bg-muted/40 border-border/60 h-9 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Email */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Email Address <span className="text-red-400">*</span></Label>
+              <Input
+                type="email"
+                placeholder="jane@company.com"
+                value={inviteEmail}
+                onChange={e => { setInviteEmail(e.target.value); setInviteResult(null); }}
+                className="bg-muted/40 border-border/60 h-9 text-xs"
+              />
+            </div>
+
+            {/* Role */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Access Role</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {ROLES.map(role => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => setInviteRole(role)}
+                    className={`flex items-start gap-2 p-3 rounded-xl border text-left transition-all ${
+                      inviteRole === role
+                        ? `${ROLE_CONFIG[role].badgeCls} border-current/40`
+                        : "bg-muted/20 border-border/40 hover:border-border/70 text-muted-foreground"
+                    }`}
+                  >
+                    <div className="mt-0.5 shrink-0">
+                      {inviteRole === role
+                        ? <Check className="h-3.5 w-3.5" />
+                        : <div className="h-3.5 w-3.5 rounded-full border border-current/40" />
+                      }
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold">{ROLE_CONFIG[role].label}</p>
+                      <p className="text-[10px] leading-tight opacity-70">{ROLE_CONFIG[role].desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Result feedback */}
+            {inviteResult && (
+              <div className={`p-3 rounded-xl border text-xs ${
+                inviteResult.success
+                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                  : "bg-red-500/10 border-red-500/20 text-red-400"
+              }`}>
+                <div className="flex items-center gap-2 font-semibold">
+                  {inviteResult.success
+                    ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                    : <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  }
+                  {inviteResult.message}
+                </div>
+                {inviteResult.success && inviteResult.inviteLink && (
+                  <div className="mt-2.5 space-y-1.5">
+                    <p className="text-[11px] text-muted-foreground">Share this link if the email doesn't arrive:</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 bg-black/20 px-2 py-1 rounded text-[10px] font-mono truncate text-foreground/70">
+                        {inviteResult.inviteLink}
+                      </code>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[10px] gap-1 shrink-0 border-border/60"
+                        onClick={handleCopyLink}
+                      >
+                        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                        {copied ? "Copied!" : "Copy"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Footer actions */}
+            <div className="flex items-center justify-between pt-2 border-t border-border/30">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-9"
+                onClick={() => { setInviteOpen(false); resetInviteForm(); }}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                disabled={!inviteEmail.trim() || inviting || (inviteResult?.success === true)}
+                onClick={handleInvite}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-9 gap-1.5 font-semibold shadow-lg shadow-indigo-500/20"
+              >
+                {inviting
+                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Sending Invite...</>
+                  : inviteResult?.success
+                    ? <><CheckCircle2 className="h-3.5 w-3.5" /> Invite Sent</>
+                    : <><UserPlus className="h-3.5 w-3.5" /> Send Invite</>
+                }
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+
 export default function SettingsPage() {
-  const { user, dbUser } = useAuth();
+  const { user, dbUser, fetchDbUser } = useAuth();
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [activeSection, setActiveSection] = React.useState("profile");
   const [saved, setSaved] = React.useState(false);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
 
   // Connected accounts state
   const [accounts, setAccounts] = React.useState<ConnectedAccount[]>([]);
@@ -472,16 +934,37 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveError(null);
     try {
+      if (user) {
+        const token = await user.getIdToken(true);
+        // 1. Update Profile (name, email, company, title, etc.)
+        await updateUserProfileActionByToken(token, {
+          name: profile.name,
+          email: profile.email,
+          title: profile.title,
+          company: profile.company,
+          timezone: profile.timezone,
+          language: profile.language,
+        });
+
+        if (fetchDbUser) {
+          await fetchDbUser(user, true);
+        }
+      }
+
+      // 2. Update company settings (notifications, appearance, security)
       await updateSettings({
         notifications: notifs as NotificationSettings,
         appearance: appearance as AppearanceSettings,
         security: security as SecuritySettings,
       });
+
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to save settings:", err);
+      setSaveError(err?.message || "Failed to save settings. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -615,31 +1098,7 @@ export default function SettingsPage() {
         );
 
       case "team":
-        return (
-          <div className="space-y-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold">Team & Permissions</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Manage team members and their access levels.</p>
-              </div>
-              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5">
-                <User className="h-3.5 w-3.5" /> Invite Member
-              </Button>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-3 p-4 bg-card/40 border border-border/40 rounded-xl">
-                <div className="h-9 w-9 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xs font-bold shrink-0">{initials}</div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm">{profile.name || user?.displayName || "Account Member"}</p>
-                  <p className="text-[11px] text-muted-foreground">{profile.email || user?.email || ""}</p>
-                </div>
-                <Badge className="bg-red-500/10 text-red-400 border-red-500/20">
-                  {profile.title || "Admin"}
-                </Badge>
-              </div>
-            </div>
-          </div>
-        );
+        return <TeamSection user={user} dbUser={dbUser} initials={initials} profile={profile} />;
 
       case "notifications":
         return (
@@ -1042,7 +1501,13 @@ export default function SettingsPage() {
             {/* Settings Content Card */}
             <Card className="border-border/50 bg-card p-6">
               {renderSection()}
-              <div className="mt-6 pt-4 border-t border-border/30 flex items-center justify-between">
+              {saveError && (
+                <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2 font-medium">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+                  <span>{saveError}</span>
+                </div>
+              )}
+              <div className="mt-6 pt-4 border-t border-border/30 flex items-center justify-between flex-wrap gap-3">
                 <p className="text-[11px] text-muted-foreground">Changes are saved immediately after clicking Save.</p>
                 <Button size="sm" onClick={handleSave}
                   disabled={saving}

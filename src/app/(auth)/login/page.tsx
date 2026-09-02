@@ -4,7 +4,7 @@ import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -38,6 +38,8 @@ const formSchema = z.object({
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTarget = searchParams?.get("redirect") || "/dashboard";
   const { toast } = useToast();
   const { signInWithEmail, signInWithGoogle } = useAuth();
   const [isLoading, setIsLoading] = React.useState(false);
@@ -55,7 +57,7 @@ export default function LoginPage() {
     try {
       await signInWithEmail(values.email, values.password);
       toast({ title: "Success", description: "Logged in successfully." });
-      router.push("/");
+      router.push(redirectTarget);
     } catch (error: any) {
       console.error(error);
       toast({
@@ -73,7 +75,7 @@ export default function LoginPage() {
     try {
       await signInWithGoogle();
       toast({ title: "Success", description: "Logged in successfully." });
-      router.push("/");
+      router.push(redirectTarget);
     } catch (error: any) {
       console.error(error);
       toast({

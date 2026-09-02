@@ -120,10 +120,12 @@ export interface User {
   avatar_url?: string;
   phone?: string | null;
   auth_id?: string;
+  is_active?: boolean;
   subscription?: Subscription | null;
   permissions?: Record<string, boolean>;
   unreadNotificationCount?: number;
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface UserDevice {
@@ -967,6 +969,7 @@ export interface AppearanceSettings {
 export interface SecuritySettings {
   two_factor_auth: boolean;
   session_timeout: string;
+  ip_whitelist?: string;
 }
 
 export interface CompanySettings {

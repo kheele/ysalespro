@@ -1,7 +1,7 @@
 'use server';
 
 import { adminAuth } from '@/lib/firebase-admin';
-import { getUserByAuthIdAction } from './userService';
+import { getUserByAuthIdAction, getUserByEmailAction, updateUserAction } from './userService';
 
 /**
  * Bootstraps and synchronizes custom claims when a user authenticates.
@@ -11,12 +11,19 @@ import { getUserByAuthIdAction } from './userService';
 export async function initializeUserClaimsAction(token: string): Promise<void> {
   const auth = adminAuth();
   const decodedToken = await auth.verifyIdToken(token);
-  const { uid } = decodedToken;
+  const { uid, email } = decodedToken;
 
   const userRecord = await auth.getUser(uid);
   const currentClaims = userRecord.customClaims || {};
 
-  const dbUser = await getUserByAuthIdAction(uid);
+  let dbUser = await getUserByAuthIdAction(uid);
+  if (!dbUser && email) {
+    dbUser = await getUserByEmailAction(email);
+    if (dbUser) {
+      await updateUserAction(dbUser.id, { auth_id: uid, is_active: true });
+    }
+  }
+
   if (!dbUser) {
     throw new Error('User not found in database');
   }

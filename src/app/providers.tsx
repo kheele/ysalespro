@@ -4,6 +4,7 @@
 import { AuthContextProvider } from "@/hooks/use-auth";
 import { SettingsProvider } from "@/hooks/use-settings";
 import { ThemeProvider } from "@/components/layout/theme-provider";
+import { AuthGuard } from "@/components/layout/auth-guard";
 
 export function Providers({ children }: { children: React.ReactNode }) {
     return (
@@ -15,7 +16,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
                     enableSystem
                     disableTransitionOnChange
                 >
-                    {children}
+                    <AuthGuard>
+                        {children}
+                    </AuthGuard>
                 </ThemeProvider>
             </SettingsProvider>
         </AuthContextProvider>
