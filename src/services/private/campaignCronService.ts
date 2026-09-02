@@ -29,7 +29,7 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 /**
  * Checks if the current moment falls within the campaign's allowed send_days and time window.
  */
-export function isCampaignInSendingWindow(campaign: any, now: Date = new Date()): { inWindow: boolean; reason?: string } {
+export async function isCampaignInSendingWindow(campaign: any, now: Date = new Date()): Promise<{ inWindow: boolean; reason?: string }> {
   const timezone = campaign.timezone || 'Africa/Johannesburg';
   
   // Normalize timezone identifier
@@ -184,7 +184,7 @@ export async function processSingleCampaign(
 
     // 2. Check Schedule Window
     if (!options.forceWindow) {
-      const windowCheck = isCampaignInSendingWindow(campaign);
+      const windowCheck = await isCampaignInSendingWindow(campaign);
       if (!windowCheck.inWindow) {
         return { emailsSent: 0, logs: [{ campaign_id: campaign.id, campaign_name: campaign.name, status: 'window_closed', reason: windowCheck.reason }] };
       }
@@ -501,7 +501,7 @@ export async function processAllActiveCampaignsAction(
     const activeCampaigns: any[] = Array.isArray(res) ? res : [];
 
     for (const c of activeCampaigns) {
-      const windowCheck = isCampaignInSendingWindow(c);
+      const windowCheck = await isCampaignInSendingWindow(c);
       if (windowCheck.inWindow || options.forceWindow) {
         campaignsInWindow++;
         const { emailsSent, logs } = await processSingleCampaign(c.id, {
