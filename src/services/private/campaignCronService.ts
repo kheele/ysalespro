@@ -31,7 +31,7 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
  */
 export async function isCampaignInSendingWindow(campaign: any, now: Date = new Date()): Promise<{ inWindow: boolean; reason?: string }> {
   const timezone = campaign.timezone || 'Africa/Johannesburg';
-  
+
   // Normalize timezone identifier
   let resolvedTz = 'Africa/Johannesburg';
   if (timezone.includes('UTC+2') || timezone.includes('Johannesburg') || timezone.includes('SAST')) {
@@ -178,6 +178,8 @@ export async function processSingleCampaign(
       return { emailsSent: 0, logs: [{ campaign_id: campaignId, campaign_name: 'Unknown', status: 'skipped', reason: 'Campaign not found' }] };
     }
 
+    console.log('processSingleCampaign campaign', campaign)
+
     if (campaign.status !== 'Active' && !options.forceWindow) {
       return { emailsSent: 0, logs: [{ campaign_id: campaign.id, campaign_name: campaign.name, status: 'skipped', reason: `Campaign status is ${campaign.status}` }] };
     }
@@ -185,21 +187,27 @@ export async function processSingleCampaign(
     // 2. Check Schedule Window
     if (!options.forceWindow) {
       const windowCheck = await isCampaignInSendingWindow(campaign);
+
+      console.log('processSingleCampaign campaign windowCheck', windowCheck)
       if (!windowCheck.inWindow) {
         return { emailsSent: 0, logs: [{ campaign_id: campaign.id, campaign_name: campaign.name, status: 'window_closed', reason: windowCheck.reason }] };
       }
     }
 
     const steps: any[] = campaign.sequence_step_list || [];
+    console.log('processSingleCampaign campaign sequence_step_list', steps)
     if (steps.length === 0) {
       return { emailsSent: 0, logs: [{ campaign_id: campaign.id, campaign_name: campaign.name, status: 'skipped', reason: 'No active sequence steps defined' }] };
     }
 
     // 3. Resolve Connected Sending Mailbox
     const account = await getActiveSendingAccountByChannel(campaign.account_company_id, 'Email');
+    console.log('processSingleCampaign campaign account', account)
     if (!account || !account.email_config) {
       return { emailsSent: 0, logs: [{ campaign_id: campaign.id, campaign_name: campaign.name, status: 'failed', reason: 'No active email sending mailbox connected in Settings > Integrations' }] };
     }
+
+    console.log('processSingleCampaign account', account)
 
     const config = account.email_config;
     const dailyLimit = account.email_config?.daily_send_limit || 200;
@@ -260,21 +268,23 @@ export async function processSingleCampaign(
       operationName: 'GetLeadsForCampaign',
     });
 
+    console.log('processSingleCampaign leadsRes', leadsRes)
+
     const leads: any[] = Array.isArray(leadsRes) ? leadsRes : [];
     const maxBatch = Math.min(options.maxBatch || 25, remainingQuota);
 
     // Setup SMTP Transporter once per campaign batch
     const transporter = config.password && (config.provider === 'google_workspace' || config.provider === 'smtp')
       ? nodemailer.createTransport({
-          host: config.host || (config.provider === 'google_workspace' ? 'smtp.gmail.com' : 'localhost'),
-          port: config.port || (config.provider === 'google_workspace' ? 465 : 587),
-          secure: config.secure ?? (config.port === 465),
-          auth: {
-            user: config.username || config.from_email,
-            pass: config.password,
-          },
-          connectionTimeout: 8000,
-        })
+        host: config.host || (config.provider === 'google_workspace' ? 'smtp.gmail.com' : 'localhost'),
+        port: config.port || (config.provider === 'google_workspace' ? 465 : 587),
+        secure: config.secure ?? (config.port === 465),
+        auth: {
+          user: config.username || config.from_email,
+          pass: config.password,
+        },
+        connectionTimeout: 8000,
+      })
       : null;
 
     const todayStr = new Date().toISOString().split('T')[0];
@@ -500,8 +510,11 @@ export async function processAllActiveCampaignsAction(
 
     const activeCampaigns: any[] = Array.isArray(res) ? res : [];
 
+    console.log('activeCampaigns', activeCampaigns)
+
     for (const c of activeCampaigns) {
       const windowCheck = await isCampaignInSendingWindow(c);
+      console.log('activeCampaigns windowCheck', windowCheck)
       if (windowCheck.inWindow || options.forceWindow) {
         campaignsInWindow++;
         const { emailsSent, logs } = await processSingleCampaign(c.id, {
