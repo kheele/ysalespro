@@ -36,7 +36,7 @@ const formSchema = z.object({
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
 });
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTarget = searchParams?.get("redirect") || "/dashboard";
@@ -158,3 +158,12 @@ export default function LoginPage() {
     </Card>
   );
 }
+
+export default function LoginPage() {
+  return (
+    <React.Suspense fallback={<div className="flex items-center justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
+      <LoginForm />
+    </React.Suspense>
+  );
+}
+
