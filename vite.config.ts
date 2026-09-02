@@ -3,6 +3,9 @@ import vinext from 'vinext';
 
 export default defineConfig({
   plugins: [vinext()],
+  server: {
+    allowedHosts: true,
+  },
   resolve: {
     alias: {
       '@genkit-ai/ai/chat': '@genkit-ai/ai/session',

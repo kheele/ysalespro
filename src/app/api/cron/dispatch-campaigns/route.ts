@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processAllActiveCampaignsAction, processSingleCampaign } from '@/services/private/campaignCronService';
 
-export const dynamic = 'force-dynamic';
+// export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Allow up to 60s for batch sending
 
 /**
