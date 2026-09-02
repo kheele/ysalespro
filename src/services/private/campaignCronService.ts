@@ -255,7 +255,7 @@ export async function processSingleCampaign(
             id
             channel
             status
-            subject
+            subject_or_type
             created_at
           }
         }
