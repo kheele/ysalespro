@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processAllActiveCampaignsAction, processSingleCampaign } from '@/services/private/campaignCronService';
 
-// export const dynamic = 'force-dynamic';
-export const maxDuration = 60; // Allow up to 60s for batch sending
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300; // Allow up to 300s for batch sending with jitter
 
 /**
  * Endpoint for automated cron triggers (e.g., n8n, Vercel Cron, Google Cloud Scheduler).
@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
 
     let forceWindow = false;
     let specificCampaignId: number | undefined;
+    let maxBatch: number | undefined;
 
     // Parse parameters from JSON body
     if (req.headers.get('content-type')?.includes('application/json')) {
@@ -43,13 +44,19 @@ export async function POST(req: NextRequest) {
             specificCampaignId = parsedId;
           }
         }
+        if (body?.max_batch !== undefined && body?.max_batch !== null) {
+          const parsedBatch = parseInt(String(body.max_batch), 10);
+          if (!isNaN(parsedBatch) && parsedBatch > 0) {
+            maxBatch = parsedBatch;
+          }
+        }
       } catch {
         // Empty body or non-JSON body is acceptable for default cron runs
       }
     }
 
     if (specificCampaignId !== undefined) {
-      const result = await processSingleCampaign(specificCampaignId, { forceWindow });
+      const result = await processSingleCampaign(specificCampaignId, { forceWindow, maxBatch });
       return NextResponse.json({
         success: true,
         campaign_id: specificCampaignId,
@@ -58,7 +65,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const result = await processAllActiveCampaignsAction({ forceWindow });
+    const result = await processAllActiveCampaignsAction({ forceWindow, maxBatchPerCampaign: maxBatch });
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('API Cron dispatch error:', error);

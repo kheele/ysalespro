@@ -32,8 +32,36 @@ export const sendGraphQL = async (args: Record<string, any>) => {
 
     // console.log('hasura headers:', headers);
 
+    // Helper for resilient fetch with automatic retry on connect timeouts
+    const fetchWithRetry = async (url: string, init: RequestInit, retries = 5, delayMs = 2000): Promise<Response> => {
+        let lastError: any;
+        for (let attempt = 0; attempt <= retries; attempt++) {
+            try {
+                return await fetch(url, init);
+            } catch (err: any) {
+                lastError = err;
+                const isNetworkError =
+                    err?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+                    err?.name === 'ConnectTimeoutError' ||
+                    err?.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+                    err?.message?.includes('fetch failed') ||
+                    err?.code === 'ECONNRESET' ||
+                    err?.code === 'ETIMEDOUT';
+
+                if (attempt < retries && isNetworkError) {
+                    const wait = delayMs * Math.pow(2, attempt);
+                    console.warn(`[sendGraphQL] Connection timeout/error (${err?.cause?.code || err?.code || err?.message}), retrying in ${wait}ms (attempt ${attempt + 1}/${retries})...`);
+                    await new Promise((r) => setTimeout(r, wait));
+                    continue;
+                }
+                throw err;
+            }
+        }
+        throw lastError;
+    };
+
     if (mutation) {
-        return fetch(process.env.ENDPOINT_HASURA_GRAPHQL!, {
+        return fetchWithRetry(process.env.ENDPOINT_HASURA_GRAPHQL!, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -65,7 +93,7 @@ export const sendGraphQL = async (args: Record<string, any>) => {
         });
     }
 
-    return fetch(process.env.ENDPOINT_HASURA_GRAPHQL!, {
+    return fetchWithRetry(process.env.ENDPOINT_HASURA_GRAPHQL!, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

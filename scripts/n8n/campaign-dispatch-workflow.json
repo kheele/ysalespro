@@ -1,0 +1,98 @@
+{
+  "name": "SalesPro - Campaign Email Dispatcher",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "2b1c3d4e-0001-4000-8000-000000000001",
+      "name": "Every 15 Minutes Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SALESPRO_APP_URL || 'http://localhost:3000' }}/api/cron/dispatch-campaigns",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.CRON_SECRET || 'dev_cron_secret' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"max_batch\": 15,\n  \"force\": false\n}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "2b1c3d4e-0002-4000-8000-000000000002",
+      "name": "Dispatch Campaign Batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n\nreturn [{\n  json: {\n    timestamp: new Date().toISOString(),\n    status: response.success ? 'SUCCESS' : 'FAILED',\n    emails_sent: response.emails_sent || 0,\n    campaigns_in_window: response.campaigns_in_window || 0,\n    campaigns_evaluated: response.campaigns_evaluated || 0,\n    logs: response.logs || []\n  }\n}];"
+      },
+      "id": "2b1c3d4e-0003-4000-8000-000000000003",
+      "name": "Format Dispatch Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes Schedule": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Campaign Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Campaign Batch": {
+      "main": [
+        [
+          {
+            "node": "Format Dispatch Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

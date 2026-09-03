@@ -99,6 +99,18 @@ CREATE TABLE IF NOT EXISTS public.aa_s_organization_sic_codes (
   sic_code TEXT
 );
 
+CREATE TABLE IF NOT EXISTS public.aa_s_organization_emails (
+  id SERIAL PRIMARY KEY,
+  organization_id INT REFERENCES public.aa_s_organizations(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  source TEXT DEFAULT 'website_scrape',
+  email_type TEXT DEFAULT 'internal', -- 'internal' | 'external'
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(organization_id, email)
+);
+
+ALTER TABLE public.aa_s_organization_emails ADD COLUMN IF NOT EXISTS email_type TEXT DEFAULT 'internal';
+
 -- ==============================================================================
 -- 4. People (Contacts / Decision Makers) — matches Person interface
 -- ==============================================================================

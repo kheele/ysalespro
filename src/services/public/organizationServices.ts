@@ -58,6 +58,7 @@ function mapDbOrganization(o: any): Organization {
       code: s.sic_code || s.code || "",
       title: s.title || s.sic_code || "",
     })) || [],
+    email_list: o.email_list || [],
     people_list: o.people_list || [],
   };
 }
@@ -287,6 +288,16 @@ export async function getOrganizations(params?: GetOrganizationsParams): Promise
             id
             sic_code
           }
+          email_list(
+            where: {email_type: {_eq: "internal"}, source: {_neq: "mx_fallback"}},
+            order_by: [{ email: asc }]
+          ) {
+            id
+            email
+            email_type
+            source
+            created_at
+          }
         }
         aa_s_organizations_aggregate(distinct_on: [id], where: $where) {
           aggregate {
@@ -431,6 +442,16 @@ export async function getOrganizationById(id: string | number): Promise<Organiza
             city
             state
             country
+          }
+          email_list(
+            where: {email_type: {_eq: "internal"}, source: {_neq: "mx_fallback"}},
+            order_by: [{ email: asc }]
+          ) {
+            id
+            email
+            email_type
+            source
+            created_at
           }
         }
       }

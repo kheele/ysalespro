@@ -211,7 +211,31 @@ export async function processSingleCampaign(
 
     const config = account.email_config;
     const dailyLimit = account.email_config?.daily_send_limit || 200;
-    const sentToday = account.sent_today || 0;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Auto-reset daily sent counter if new calendar day
+    let sentToday = account.sent_today || 0;
+    if (account.last_used_at) {
+      const lastUsedDate = new Date(account.last_used_at).toISOString().split('T')[0];
+      if (lastUsedDate !== todayStr) {
+        sentToday = 0;
+        await sendGraphQL({
+          mutation: `
+            mutation ResetAccountDailySent($id: Int!) {
+              update_aa_s_connected_accounts_by_pk(
+                pk_columns: { id: $id },
+                _set: { sent_today: 0 }
+              ) {
+                id
+              }
+            }
+          `,
+          variables: { id: account.id },
+          operationName: 'ResetAccountDailySent',
+        }).catch(() => { });
+      }
+    }
+
     const remainingQuota = Math.max(0, dailyLimit - sentToday);
 
     if (remainingQuota <= 0) {
@@ -220,23 +244,39 @@ export async function processSingleCampaign(
 
     // 4. Query Enrolled Leads
     const targetIndustryNames = (campaign.target_industry_list || [])
-      .map((ti: any) => ti.industry?.name)
-      .filter(Boolean);
+      .map((ti: any) => ti.industry?.name || ti.name)
+      .filter(Boolean)
+      .filter((n: string) => n.toLowerCase() !== 'all');
 
-    const leadWhereConditions: Record<string, any>[] = [
-      { account_company_id: { _eq: campaign.account_company_id } },
-    ];
+    const leadWhereConditions: Record<string, any>[] = [];
 
-    if (targetIndustryNames.length > 0) {
+    if (campaign.account_company_id) {
       leadWhereConditions.push({
-        _or: targetIndustryNames.map((name: string) => ({ industry: { _ilike: `%${name}%` } })),
+        _or: [
+          { account_company_id: { _eq: campaign.account_company_id } },
+          { account_company_id: { _is_null: true } },
+        ],
       });
     }
 
+    if (targetIndustryNames.length > 0) {
+      leadWhereConditions.push({
+        _or: [
+          ...targetIndustryNames.map((name: string) => ({ industry: { _ilike: `%${name}%` } })),
+          { industry: { _is_null: true } },
+        ],
+      });
+    }
+
+    const where = leadWhereConditions.length > 0 ? { _and: leadWhereConditions } : {};
+
+    const queryLimit = typeof options.maxBatch === 'number' && options.maxBatch > 100 ? options.maxBatch * 2 : 10000;
+
     const qLeads = `
-      query GetLeadsForCampaign($where: aa_s_leads_bool_exp) {
-        aa_s_leads(where: $where, limit: 100, order_by: [{ id: asc }]) {
+      query GetLeadsForCampaign($where: aa_s_leads_bool_exp, $limit: Int) {
+        aa_s_leads(where: $where, limit: $limit, order_by: [{ id: asc }]) {
           id
+          account_company_id
           person_id
           person_name
           company_name
@@ -264,14 +304,243 @@ export async function processSingleCampaign(
 
     const leadsRes = await listGraphQL({
       query: qLeads,
-      variables: { where: { _and: leadWhereConditions } },
+      variables: { where, limit: queryLimit },
       operationName: 'GetLeadsForCampaign',
     });
 
-    console.log('processSingleCampaign leadsRes', leadsRes)
+    let leads: any[] = Array.isArray(leadsRes) ? leadsRes : [];
+    console.log(`processSingleCampaign #${campaign.id} [${campaign.name}] existing leads count:`, leads.length);
 
-    const leads: any[] = Array.isArray(leadsRes) ? leadsRes : [];
-    const maxBatch = Math.min(options.maxBatch || 25, remainingQuota);
+    // Auto-discover and enroll decision makers (aa_s_people) if no leads exist in aa_s_leads
+    if (leads.length === 0) {
+      console.log(`No existing leads found in aa_s_leads for campaign #${campaign.id}. Auto-discovering contacts from aa_s_people...`);
+
+      const peopleWhereConditions: Record<string, any>[] = [
+        { email: { _is_null: false, _neq: "" } },
+      ];
+
+      if (targetIndustryNames.length > 0) {
+        peopleWhereConditions.push({
+          _or: targetIndustryNames.map((name: string) => ({ industry: { _ilike: `%${name}%` } })),
+        });
+      }
+
+      const qPeople = `
+        query GetEligiblePeopleForCampaign($where: aa_s_people_bool_exp, $limit: Int) {
+          aa_s_people(where: $where, limit: $limit, order_by: [{ id: asc }]) {
+            id
+            name
+            email
+            job_title
+            company_name
+            industry
+          }
+        }
+      `;
+
+      try {
+        const peopleRes = await listGraphQL({
+          query: qPeople,
+          variables: { where: { _and: peopleWhereConditions }, limit: queryLimit },
+          operationName: 'GetEligiblePeopleForCampaign',
+        });
+
+        const peopleList: any[] = Array.isArray(peopleRes) ? peopleRes : [];
+        console.log(`Discovered ${peopleList.length} eligible decision maker(s) for auto-enrollment in campaign #${campaign.id}`);
+
+        for (const p of peopleList) {
+          if (!p.email || !p.email.includes('@')) continue;
+
+          // Enroll into aa_s_leads
+          const insertLeadMutation = `
+            mutation AutoEnrollLead($object: aa_s_leads_insert_input!) {
+              insert_aa_s_leads_one(object: $object) {
+                id
+                account_company_id
+                person_id
+                person_name
+                company_name
+                industry
+                lead_temperature
+                stage
+                person {
+                  id
+                  name
+                  email
+                  job_title
+                  company_name
+                }
+              }
+            }
+          `;
+
+          try {
+            const newLead = await insertGraphQL({
+              mutation: insertLeadMutation,
+              operationName: 'AutoEnrollLead',
+              input: {
+                account_company_id: campaign.account_company_id,
+                person_id: p.id,
+                person_name: p.name || null,
+                company_name: p.company_name || null,
+                industry: p.industry || null,
+                stage: 'Contacted',
+                lead_temperature: 'COLD',
+                lead_score: 50,
+              },
+            });
+
+            if (newLead) {
+              leads.push({
+                ...newLead,
+                person: newLead.person || p,
+                outreach_activity_list: [],
+              });
+            }
+          } catch (insertErr) {
+            console.error('Auto-enroll lead failed:', insertErr);
+          }
+        }
+      } catch (err) {
+        console.error('Auto-discovery from aa_s_people failed:', err);
+      }
+
+      // If still no leads (e.g. no records in aa_s_people), auto-discover from Companies/Organizations (aa_s_organizations)
+      if (leads.length === 0) {
+        console.log(`No people found in aa_s_people. Auto-discovering company emails from Organizations (aa_s_organizations)...`);
+
+        const orgWhereConditions: Record<string, any>[] = [
+          {
+            _or: [
+              { primary_domain: { _is_null: false, _neq: "" } },
+              { website_url: { _is_null: false, _neq: "" } },
+            ],
+          },
+        ];
+
+        if (targetIndustryNames.length > 0) {
+          orgWhereConditions.push({
+            _or: targetIndustryNames.map((name: string) => ({ primary_industry: { _ilike: `%${name}%` } })),
+          });
+        }
+
+        const qOrgs = `
+          query GetEligibleOrgsForCampaign($where: aa_s_organizations_bool_exp, $limit: Int) {
+            aa_s_organizations(where: $where, limit: $limit, order_by: [{ id: asc }]) {
+              id
+              name
+              primary_domain
+              website_url
+              primary_industry
+              city
+              country
+              email_list(
+                where: {
+                  email_type: { _eq: "internal" },
+                  source: { _in: ["website_scrape", "cross_referenced_scrape", "mx_fallback"] }
+                },
+                order_by: [{ id: asc }]
+              ) {
+                id
+                email
+                email_type
+                source
+              }
+            }
+          }
+        `;
+
+        try {
+          const orgsRes = await listGraphQL({
+            query: qOrgs,
+            variables: { where: { _and: orgWhereConditions }, limit: queryLimit },
+            operationName: 'GetEligibleOrgsForCampaign',
+          });
+
+          const orgsList: any[] = Array.isArray(orgsRes) ? orgsRes : [];
+          console.log(`Discovered ${orgsList.length} eligible company/organization(s) for campaign #${campaign.id}`);
+
+          for (const org of orgsList) {
+            const domainRawCandidate = typeof org.primary_domain === 'string'
+              ? org.primary_domain
+              : (typeof org.primary_domain === 'object' && org.primary_domain ? (org.primary_domain.domain || org.primary_domain.name || '') : '');
+
+            const urlRawCandidate = typeof org.website_url === 'string'
+              ? org.website_url
+              : (typeof org.website_url === 'object' && org.website_url ? (org.website_url.url || org.website_url.domain || '') : '');
+
+            const rawDomain = domainRawCandidate || urlRawCandidate || '';
+            const cleanDomain = String(rawDomain)
+              .replace(/^https?:\/\//i, '')
+              .replace(/^www\./i, '')
+              .split('/')[0]
+              .trim()
+              .toLowerCase();
+
+            // Extract all verified internal emails from aa_s_organization_emails
+            const orgEmails: string[] = (org.email_list || [])
+              .map((e: any) => e.email?.toLowerCase().trim())
+              .filter((e: string) => e && e.includes('@'));
+
+            if (orgEmails.length === 0) {
+              continue; // Skip organizations with no verified scraped internal emails
+            }
+
+            for (const companyEmail of orgEmails) {
+              const insertLeadMutation = `
+                mutation AutoEnrollOrgLead($object: aa_s_leads_insert_input!) {
+                  insert_aa_s_leads_one(object: $object) {
+                    id
+                    account_company_id
+                    person_name
+                    company_name
+                    industry
+                    lead_temperature
+                    stage
+                  }
+                }
+              `;
+
+              try {
+                const newLead = await insertGraphQL({
+                  mutation: insertLeadMutation,
+                  operationName: 'AutoEnrollOrgLead',
+                  input: {
+                    account_company_id: campaign.account_company_id,
+                    person_name: org.name || 'Executive Team',
+                    company_name: org.name || cleanDomain,
+                    industry: org.primary_industry || null,
+                    stage: 'Contacted',
+                    lead_temperature: 'COLD',
+                    lead_score: 50,
+                  },
+                });
+
+                if (newLead) {
+                  leads.push({
+                    ...newLead,
+                    person: {
+                      id: 0,
+                      name: org.name || 'Executive Team',
+                      email: companyEmail,
+                      job_title: 'Executive Team',
+                      company_name: org.name || cleanDomain,
+                    },
+                    outreach_activity_list: [],
+                  });
+                }
+              } catch (enrollErr) {
+                console.warn(`Could not auto-enroll organization #${org.id} (${companyEmail}):`, enrollErr);
+              }
+            }
+          }
+        } catch (orgErr) {
+          console.error('Auto-discovery from aa_s_organizations failed:', orgErr);
+        }
+      }
+    }
+
+    const maxBatch = Math.min(options.maxBatch || remainingQuota, remainingQuota);
 
     // Setup SMTP Transporter once per campaign batch
     const transporter = config.password && (config.provider === 'google_workspace' || config.provider === 'smtp')
@@ -287,13 +556,11 @@ export async function processSingleCampaign(
       })
       : null;
 
-    const todayStr = new Date().toISOString().split('T')[0];
-
     // 5. Evaluate and Dispatch to Each Eligible Lead
     for (const lead of leads) {
       if (emailsSent >= maxBatch) break;
 
-      const recipientEmail = lead.person?.email || '';
+      const recipientEmail = 'rkheele@gmail.com';//lead.person?.email || '';
       if (!recipientEmail || !recipientEmail.includes('@')) {
         continue;
       }
@@ -337,6 +604,13 @@ export async function processSingleCampaign(
 
       let sendSuccess = false;
       let sendError = '';
+
+      // Production deliverability safeguard: Human-like inter-email jitter delay
+      // Prevents sudden burst spikes that trigger provider rate-limits or account bans (Google/M365)
+      if (emailsSent > 0) {
+        const jitterMs = Math.floor(Math.random() * 3000) + 2000; // 2s - 5s pacing
+        await new Promise((resolve) => setTimeout(resolve, jitterMs));
+      }
 
       if (transporter) {
         try {
@@ -519,7 +793,7 @@ export async function processAllActiveCampaignsAction(
         campaignsInWindow++;
         const { emailsSent, logs } = await processSingleCampaign(c.id, {
           forceWindow: options.forceWindow,
-          maxBatch: options.maxBatchPerCampaign || 25,
+          maxBatch: options.maxBatchPerCampaign,
         });
         totalEmailsSent += emailsSent;
         allLogs.push(...logs);

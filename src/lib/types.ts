@@ -210,8 +210,18 @@ export interface Organization {
   language_list?: Array<{ id: string | number; language?: { name: string } }>;
   naics_code_list?: Array<{ id: string | number; organization_id?: number | null; naics_code?: string | null; code?: string; title?: string }>;
   sic_code_list?: Array<{ id: string | number; organization_id?: number | null; sic_code?: string | null; code?: string; title?: string }>;
+  email_list?: OrganizationEmail[];
   notes?: OrganizationNote[];
   activities?: OrganizationActivity[];
+}
+
+export interface OrganizationEmail {
+  id?: number | string;
+  organization_id?: number | string;
+  email: string;
+  source?: 'website_scrape' | 'mx_fallback' | 'manual' | string;
+  email_type?: 'internal' | 'external' | string;
+  created_at?: string;
 }
 
 export interface IndustrySignal {

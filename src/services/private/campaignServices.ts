@@ -464,6 +464,60 @@ export async function createCampaignActionByToken(
     });
 
     if (!res) return null;
+
+    // Auto-enroll specifically selected audience people into aa_s_leads
+    if (Array.isArray(input.audience?.people) && input.audience.people.length > 0) {
+      try {
+        for (const personStr of input.audience.people) {
+          const personName = personStr.split(" (")[0]?.trim();
+          if (!personName) continue;
+
+          const findQ = `
+            query FindPersonByName($name: String!) {
+              aa_s_people(where: { name: { _ilike: $name } }, limit: 1) {
+                id
+                name
+                company_name
+                industry
+              }
+            }
+          `;
+          const found = await listGraphQL({
+            query: findQ,
+            variables: { name: personName },
+            operationName: "FindPersonByName",
+          });
+          const personObj = Array.isArray(found) && found.length > 0 ? found[0] : null;
+
+          if (personObj) {
+            const insertLeadQ = `
+              mutation EnrollCampaignLead($object: aa_s_leads_insert_input!) {
+                insert_aa_s_leads_one(object: $object) {
+                  id
+                }
+              }
+            `;
+            await insertGraphQL({
+              mutation: insertLeadQ,
+              operationName: "EnrollCampaignLead",
+              input: {
+                account_company_id: companyId,
+                person_id: personObj.id,
+                person_name: personObj.name,
+                company_name: personObj.company_name,
+                industry: personObj.industry,
+                stage: "Cold",
+                lead_temperature: "COLD",
+                lead_score: 50,
+              },
+            });
+          }
+        }
+      } catch (enrollErr) {
+        console.warn("Could not auto-enroll selected audience people into leads:", enrollErr);
+      }
+    }
+
     return mapDbCampaign(res);
   } catch (err) {
     console.error("Hasura createCampaignActionByToken error:", err);
