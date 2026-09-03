@@ -9,6 +9,7 @@ import {
   getOutreachActivitiesActionByToken,
   logOutreachActionByToken,
 } from "@/services/private/outreachServices";
+import * as organizationServices from "@/services/public/organizationServices";
 import {
   sendEmailOutreachActionByToken,
   sendLinkedInOutreachActionByToken,
@@ -214,8 +215,8 @@ function ActivityCard({ activity }: { activity: OutreachActivity }) {
 function OutreachPageContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
+  const prefilledId = searchParams?.get("id") || searchParams?.get("company_id") || "";
   const prefilledEmail = searchParams?.get("email") || "";
-  const prefilledOrg = searchParams?.get("organization") || "";
 
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [activities, setActivities] = React.useState<OutreachActivity[]>([]);
@@ -258,7 +259,7 @@ function OutreachPageContent() {
     sendReal: true,
     sender_account_id: "",
     recipient_name: "",
-    recipient_org: prefilledOrg,
+    recipient_org: "",
     recipient_email: prefilledEmail,
     recipient_title: "",
     recipient_linkedin: "",
@@ -268,6 +269,32 @@ function OutreachPageContent() {
     followup_days: "3",
     assigned_to: "",
   });
+
+  // Automatically open compose dialog and resolve organization name strictly from company id
+  React.useEffect(() => {
+    const orgId = searchParams?.get("id") || searchParams?.get("company_id");
+    const emailParam = searchParams?.get("email") || "";
+
+    if (orgId || emailParam) {
+      setComposeOpen(true);
+    }
+
+    if (emailParam) {
+      setForm(f => ({ ...f, recipient_email: emailParam }));
+    }
+
+    if (orgId) {
+      organizationServices.getOrganizationById(orgId).then(orgData => {
+        if (orgData) {
+          setForm(f => ({
+            ...f,
+            recipient_org: orgData.name || "",
+            recipient_email: emailParam || f.recipient_email || orgData.email_list?.[0]?.email || "",
+          }));
+        }
+      }).catch(err => console.error("Error resolving organization for outreach by id:", err));
+    }
+  }, [searchParams]);
 
   // AI Inbound Reply Triage State
   const [triageOpen, setTriageOpen] = React.useState(false);

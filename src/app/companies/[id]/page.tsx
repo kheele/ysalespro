@@ -330,13 +330,13 @@ export default function CompanyProfilePage() {
                       <Badge
                         className={
                           org.status === "Customer" || org.lead_status === "Hot"
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                            : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                            ? "bg-emerald-500/10 text-emerald-400"
+                            : "bg-amber-500/10 text-amber-400"
                         }
                       >
                         {org.status || org.lead_status || "Prospect"}
                       </Badge>
-                      <Badge variant="outline" className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 text-xs">
+                      <Badge className="bg-indigo-500/10 text-indigo-400 text-xs">
                         Score {org.score || "-"}/100
                       </Badge>
                     </div>
@@ -359,7 +359,7 @@ export default function CompanyProfilePage() {
                           href={websiteUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 transition-colors shadow-sm"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 transition-colors shadow-sm"
                         >
                           <Globe className="h-3.5 w-3.5 text-indigo-400" />
                           <span>{org.primary_domain || org.website_url?.replace(/^https?:\/\//, "")}</span>
@@ -373,7 +373,7 @@ export default function CompanyProfilePage() {
                           target="_blank"
                           rel="noreferrer"
                           title="LinkedIn Profile"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 transition-colors"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-colors"
                         >
                           <LinkedInIcon className="h-3.5 w-3.5" />
                           <span>LinkedIn</span>
@@ -387,7 +387,7 @@ export default function CompanyProfilePage() {
                           target="_blank"
                           rel="noreferrer"
                           title="Twitter / X Profile"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 transition-colors"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition-colors"
                         >
                           <TwitterIcon className="h-3 w-3" />
                           <span>X (Twitter)</span>
@@ -401,7 +401,7 @@ export default function CompanyProfilePage() {
                           target="_blank"
                           rel="noreferrer"
                           title="Facebook Page"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-600/10 hover:bg-blue-600/20 text-blue-300 border border-blue-600/20 transition-colors"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-600/10 hover:bg-blue-600/20 text-blue-300 transition-colors"
                         >
                           <FacebookIcon className="h-3.5 w-3.5" />
                           <span>Facebook</span>
@@ -443,7 +443,7 @@ export default function CompanyProfilePage() {
                 <div className="flex items-center gap-2 shrink-0">
                   <Button
                     size="sm"
-                    onClick={() => router.push(`/outreach?organization=${encodeURIComponent(org.name)}`)}
+                    onClick={() => router.push(`/outreach?id=${org.id}`)}
                     className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 font-semibold"
                   >
                     <Send className="h-3.5 w-3.5" /> Log Outreach
@@ -455,29 +455,29 @@ export default function CompanyProfilePage() {
 
           {/* Profile Tabs Container */}
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="bg-muted/40 border border-border/40 p-1 overflow-x-auto flex w-full justify-start text-xs font-semibold gap-1">
-              <TabsTrigger value="overview" className="gap-1.5 text-xs">
+            <TabsList className="bg-card border border-border/40 p-1 overflow-x-auto flex w-full justify-start text-xs font-semibold gap-1">
+              <TabsTrigger value="overview" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white gap-1.5 text-xs">
                 <Building2 className="h-3.5 w-3.5" /> Overview
               </TabsTrigger>
-              <TabsTrigger value="contacts" className="gap-1.5 text-xs text-emerald-400">
+              <TabsTrigger value="contacts" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white gap-1.5 text-xs text-emerald-400">
                 <Mail className="h-3.5 w-3.5" /> Contacts ({totalContactsCount})
               </TabsTrigger>
-              <TabsTrigger value="news" className="gap-1.5 text-xs text-sky-400">
+              {/* <TabsTrigger value="news" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white gap-1.5 text-xs text-sky-400">
                 <Newspaper className="h-3.5 w-3.5" /> Company News ({news.length})
-              </TabsTrigger>
-              <TabsTrigger value="people" className="gap-1.5 text-xs">
+              </TabsTrigger> */}
+              <TabsTrigger value="people" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white gap-1.5 text-xs">
                 <Users className="h-3.5 w-3.5" /> People ({people.length})
               </TabsTrigger>
-              <TabsTrigger value="leads" className="gap-1.5 text-xs">
+              <TabsTrigger value="leads" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white gap-1.5 text-xs">
                 <Target className="h-3.5 w-3.5" /> Leads ({leads.length})
               </TabsTrigger>
-              <TabsTrigger value="notes" className="gap-1.5 text-xs">
+              <TabsTrigger value="notes" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white gap-1.5 text-xs">
                 <MessageSquare className="h-3.5 w-3.5" /> Notes ({org.notes?.length || 0})
               </TabsTrigger>
-              <TabsTrigger value="tasks" className="gap-1.5 text-xs">
+              <TabsTrigger value="tasks" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white gap-1.5 text-xs">
                 <CheckSquare className="h-3.5 w-3.5" /> Tasks ({tasks.length})
               </TabsTrigger>
-              <TabsTrigger value="activities" className="gap-1.5 text-xs">
+              <TabsTrigger value="activities" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white gap-1.5 text-xs">
                 <Activity className="h-3.5 w-3.5" /> Activities ({org.activities?.length || 0})
               </TabsTrigger>
             </TabsList>
@@ -592,7 +592,7 @@ export default function CompanyProfilePage() {
                         <div className="text-[11px] font-semibold text-muted-foreground">Twitter / X</div>
                         <div className="text-xs font-bold truncate">
                           {twitterUrl ? (
-                            <a href={twitterUrl} target="_blank" rel="noreferrer" className="text-neutral-200 hover:underline">
+                            <a href={twitterUrl} target="_blank" rel="noreferrer" className="text-muted-foreground/60 hover:underline">
                               Follow @{org.twitter_url?.replace(/^@/, "").replace(/^https?:\/\/(x|twitter)\.com\//, "")}
                             </a>
                           ) : (
@@ -839,7 +839,7 @@ export default function CompanyProfilePage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => router.push(`/outreach?organization=${encodeURIComponent(org.name)}`)}
+                    onClick={() => router.push(`/outreach?id=${org.id}`)}
                     className="text-xs gap-1.5 h-8 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 self-start sm:self-auto"
                   >
                     <Send className="h-3 w-3" /> Bulk Outreach
@@ -882,7 +882,7 @@ export default function CompanyProfilePage() {
                             <Button
                               size="sm"
                               onClick={() =>
-                                router.push(`/outreach?email=${encodeURIComponent(em.email)}&organization=${encodeURIComponent(org.name)}`)
+                                router.push(`/outreach?id=${org.id}&email=${encodeURIComponent(em.email)}`)
                               }
                               className="h-7 text-[11px] gap-1 px-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium ml-auto"
                             >
@@ -1018,7 +1018,7 @@ export default function CompanyProfilePage() {
                             <Button
                               size="sm"
                               onClick={() =>
-                                router.push(`/outreach?email=${encodeURIComponent(p.email!)}&organization=${encodeURIComponent(org.name)}`)
+                                router.push(`/outreach?id=${org.id}&email=${encodeURIComponent(p.email!)}`)
                               }
                               className="h-7 text-[11px] gap-1 px-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium ml-auto"
                             >
@@ -1036,9 +1036,9 @@ export default function CompanyProfilePage() {
             </TabsContent>
 
             {/* TAB 3: COMPANY NEWS (NEW DEDICATED TAB) */}
-            <TabsContent value="news" className="mt-4 space-y-6">
-              {/* Buying Intent & News Header */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* <TabsContent value="news" className="mt-4 space-y-6"> */}
+            {/* Buying Intent & News Header */}
+            {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="border-border/50 bg-card p-4">
                   <div className="flex items-center gap-2 text-indigo-400 text-xs font-semibold uppercase">
                     <Radio className="h-3.5 w-3.5" /> Intent Strength
@@ -1070,10 +1070,10 @@ export default function CompanyProfilePage() {
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-0.5">Telemetry timestamp</p>
                 </Card>
-              </div>
+              </div> */}
 
-              {/* Live News Feed */}
-              <Card className="border-border/50 bg-card p-5 space-y-4">
+            {/* Live News Feed */}
+            {/* <Card className="border-border/50 bg-card p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-bold flex items-center gap-2">
@@ -1175,8 +1175,8 @@ export default function CompanyProfilePage() {
                     </div>
                   </div>
                 )}
-              </Card>
-            </TabsContent>
+              </Card> */}
+            {/* </TabsContent> */}
 
             {/* TAB 4: PEOPLE */}
             <TabsContent value="people" className="mt-4 space-y-4">
@@ -1202,7 +1202,7 @@ export default function CompanyProfilePage() {
                       </div>
                       <Button
                         size="sm"
-                        onClick={() => router.push(`/outreach?email=${person.email}&organization=${encodeURIComponent(org.name)}`)}
+                        onClick={() => router.push(`/outreach?id=${org.id}&email=${encodeURIComponent(person.email || "")}`)}
                         className="text-[10px] h-7 bg-indigo-600 hover:bg-indigo-500 text-white"
                       >
                         Contact

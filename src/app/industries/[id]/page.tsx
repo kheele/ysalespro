@@ -201,8 +201,8 @@ export default function IndustryDetailPage() {
                     {industry.active !== undefined && (
                       <Badge
                         className={`text-xs font-mono ${industry.active
-                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                          : "bg-muted/40 text-muted-foreground border-border/40"
+                          ? "bg-emerald-500/10 text-emerald-400"
+                          : "bg-muted/40 text-muted-foreground"
                           }`}
                       >
                         {industry.active ? "Active" : "Inactive"}
@@ -238,23 +238,23 @@ export default function IndustryDetailPage() {
           </Card>
 
           {/* Tabbed Detail Views */}
-          <Tabs defaultValue="intelligence" className="w-full space-y-5">
-            <TabsList className="bg-card p-1 rounded-xl h-auto flex flex-wrap justify-start items-center gap-1 border border-border/40">
+          <Tabs defaultValue="intelligence" className="w-full">
+            <TabsList className="bg-card border border-border/40 p-1 overflow-x-auto flex w-full justify-start text-xs font-semibold gap-1">
               <TabsTrigger
                 value="intelligence"
-                className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-xs py-2 px-3.5 gap-2"
+                className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white gap-1.5 text-xs"
               >
                 <Activity className="h-3.5 w-3.5" /> Market Intelligence ({signals.length})
               </TabsTrigger>
               <TabsTrigger
                 value="organizations"
-                className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-xs py-2 px-3.5 gap-2"
+                className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white gap-1.5 text-xs"
               >
                 <Building2 className="h-3.5 w-3.5" /> Related Organizations ({orgTotal})
               </TabsTrigger>
               <TabsTrigger
                 value="leads"
-                className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white text-xs py-2 px-3.5 gap-2"
+                className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white gap-1.5 text-xs"
               >
                 <Target className="h-3.5 w-3.5" /> Lead Performance ({leads.length})
               </TabsTrigger>
