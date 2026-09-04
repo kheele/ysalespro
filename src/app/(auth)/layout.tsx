@@ -118,8 +118,8 @@ export default function AuthLayout({
 
         {/* Footer */}
         <div className="relative z-10 flex items-center justify-between text-xs text-zinc-500 pt-4 border-t border-white/[0.08]">
-          <span>© {new Date().getFullYear()} YSalesPro Technologies.</span>
-          <span className="font-mono text-[11px] text-zinc-400">v2.4 Enterprise Intelligence</span>
+          <span>© {new Date().getFullYear()} YSalesPro. All Rights Reserved.</span>
+          <span className="font-mono text-[11px] text-zinc-400">v1.0 Enterprise Intelligence</span>
         </div>
       </div>
 
