@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useSettings } from "@/hooks/use-settings";
+import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -88,6 +89,7 @@ export function CampaignBuilderModal({
   initialCampaign,
 }: CampaignBuilderModalProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const isEditing = Boolean(initialCampaign?.id);
   const isDuplicating = Boolean(initialCampaign && !initialCampaign.id);
   const [step, setStep] = React.useState(1);
@@ -367,8 +369,13 @@ export function CampaignBuilderModal({
           }));
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to generate campaign strategy:", err);
+      toast({
+        variant: "destructive",
+        title: "Service Currently Unavailable",
+        description: err?.message || "The AI campaign strategy service is currently not available. Please try again later.",
+      });
     } finally {
       setGeneratingStrategy(false);
     }
@@ -391,8 +398,13 @@ export function CampaignBuilderModal({
       });
       setOptimizeResult(res);
       setOptimizeModalOpen(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error("AI Sequence Optimize failed:", err);
+      toast({
+        variant: "destructive",
+        title: "Service Currently Unavailable",
+        description: err?.message || "The AI sequence optimization service is currently not available. Please try again later.",
+      });
     } finally {
       setOptimizing(false);
     }
@@ -424,8 +436,13 @@ export function CampaignBuilderModal({
       });
       setTimingResult(res);
       setTimingModalOpen(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Predict timing failed:", err);
+      toast({
+        variant: "destructive",
+        title: "Service Currently Unavailable",
+        description: err?.message || "The AI smart timing service is currently not available. Please try again later.",
+      });
     } finally {
       setTimingLoading(false);
     }

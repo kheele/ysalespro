@@ -102,10 +102,12 @@ Output the top primary and secondary channels, top 3 email delivery windows (wit
       if (response.output) {
         return response.output;
       }
-    } catch (err) {
-      console.warn('[Genkit] predictOptimalTimingFlow fallback:', err);
+      throw new Error("AI Timing Prediction service returned empty output. Please try again later.");
+    } catch (err: any) {
+      console.error('[Genkit] predictOptimalTimingFlow error:', err);
+      throw new Error(
+        "The AI smart timing service is currently not available. Please check your connection or try again later."
+      );
     }
-
-    return fallbackPredictTiming(input);
   }
 );

@@ -187,10 +187,12 @@ Generate exactly 7 messages (email_subject, initial_email, followup_1, followup_
         };
       }
 
-      return generateFallbackOutreach(input);
-    } catch (err) {
-      console.warn('[Genkit] generateSalesOutreachFlow fallback:', err);
-      return generateFallbackOutreach(input);
+      throw new Error("AI Outreach generation service returned empty output. Please try again later.");
+    } catch (err: any) {
+      console.error('[Genkit] generateSalesOutreachFlow error:', err);
+      throw new Error(
+        "The AI generation service is currently not available. Please check your connection or try again later."
+      );
     }
   }
 );
@@ -254,32 +256,9 @@ Ensure high warmth + high competence, avoid robotic corporate jargon, use low-pr
       key_hooks_used: [company.name, industry, role, 'Warmth & Competence'],
     };
   } catch (err) {
-    console.warn('[Genkit] generateSingleMessageFlow fallback:', err);
-    const hooks = [
-      `${industry} workflow velocity`,
-      `initiatives at ${company.name}`,
-      `${role} leadership in ${location}`,
-    ];
-
-    let subject = `Quick question regarding ${company.name}'s ${industry.toLowerCase()} growth, ${name}?`;
-    let content = `Hi ${name},\n\nReally admire your leadership driving ${person.department || 'operations'} as ${role} at ${company.name}.\n\nWe recently partnered with peer ${industry} teams in ${location} to eliminate manual qualification friction, helping them accelerate qualified pipeline by 35%.\n\nCurious how your team is navigating this this quarter? Would you be open to a brief 10-minute exploratory conversation next week? (No pressure at all if timing is tight).\n\nWarmly,\nYSalesPro Intelligence`;
-
-    if (message_type === 'LinkedIn Message') {
-      subject = '';
-      content = `Hi ${name}, really impressed by your leadership as ${role} at ${company.name}. We work closely with ${industry} leaders on ${hooks[0]} and would love to connect and share insights!`;
-    } else if (message_type === 'Follow-up') {
-      subject = `Re: ${company.name}'s ${industry.toLowerCase()} growth`;
-      content = `Hi ${name},\n\nFollowing up with a quick insight—fellow ${industry} organizations implementing automated verification saw a 2.4x lift in executive engagement.\n\nHappy to gift you the 1-page benchmark brief if helpful for ${company.name}. Just let me know!\n\nBest,\nYSalesPro Intelligence`;
-    } else if (message_type === 'Call Script') {
-      subject = '';
-      content = `[SCIENCE OF PEOPLE COLD CALL SCRIPT FOR ${name.toUpperCase()} (${role.toUpperCase()} @ ${company.name.toUpperCase()})]\nWarm Opening: "Hi ${name}, this is Sales Intelligence with YSalesPro. I know you weren't expecting my call—do you have 30 seconds for me to share why I reached out to you specifically?"\nDiscovery Sparker: "How is your team currently tackling data qualification and pipeline velocity across ${location}?"\nValue & Autonomy: "We help ${industry} teams cut qualification time by 35%. Would you be open to a 10-minute look next week?"`;
-    }
-
-    return {
-      message_type,
-      subject: subject || undefined,
-      content,
-      key_hooks_used: hooks,
-    };
+    console.error('[Genkit] generateSingleMessageFlow error:', err);
+    throw new Error(
+      "The AI message generation service is currently not available. Please check your connection or try again later."
+    );
   }
 }

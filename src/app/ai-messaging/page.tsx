@@ -404,16 +404,26 @@ function AiMessagingContent() {
       recent_news: company.recent_news,
       challenges: company.challenges,
     };
-    const res = await aiMessageServices.generateMessages(
-      fullPerson,
-      fullCompany,
-      senderName || "Sales Executive",
-      senderTitle || "Enterprise Account Executive",
-      offer
-    );
-    setResult(res);
-    setEditableMessages(res.messages);
-    setLoading(false);
+    try {
+      const res = await aiMessageServices.generateMessages(
+        fullPerson,
+        fullCompany,
+        senderName || "Sales Executive",
+        senderTitle || "Enterprise Account Executive",
+        offer
+      );
+      setResult(res);
+      setEditableMessages(res.messages);
+    } catch (err: any) {
+      console.error("AI Outreach generation failed:", err);
+      toast({
+        variant: "destructive",
+        title: "Service Currently Unavailable",
+        description: err?.message || "The AI generation service is currently not available. Please try again later.",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getSequenceStepsFromMessages = React.useCallback((): SequenceStep[] => {

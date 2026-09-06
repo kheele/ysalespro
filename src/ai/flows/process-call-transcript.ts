@@ -92,10 +92,12 @@ SCIENCE-OF-PEOPLE ANALYSIS MANDATES:
       if (response.output) {
         return response.output;
       }
-    } catch (err) {
-      console.warn('[Genkit] processCallTranscriptFlow fallback:', err);
+      throw new Error("AI Call Transcript processing service returned empty output. Please try again later.");
+    } catch (err: any) {
+      console.error('[Genkit] processCallTranscriptFlow error:', err);
+      throw new Error(
+        "The AI transcript processing service is currently not available. Please check your connection or try again later."
+      );
     }
-
-    return fallbackProcessCall(input);
   }
 );

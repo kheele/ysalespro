@@ -127,10 +127,12 @@ Classify intent, sentiment, confidence, summary, parse return date if OOO, parse
       if (response.output) {
         return response.output;
       }
-    } catch (err) {
-      console.warn('[Genkit] classifyInboundReplyFlow fallback:', err);
+      throw new Error("AI Reply Classification service returned empty output. Please try again later.");
+    } catch (err: any) {
+      console.error('[Genkit] classifyInboundReplyFlow error:', err);
+      throw new Error(
+        "The AI reply classification service is currently not available. Please check your connection or try again later."
+      );
     }
-
-    return fallbackClassification(input);
   }
 );

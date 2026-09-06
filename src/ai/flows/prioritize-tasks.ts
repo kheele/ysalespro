@@ -76,10 +76,12 @@ Return strictly valid JSON conforming to the output schema.`;
       if (response.output) {
         return response.output;
       }
-      return getFallbackPrioritizeTasks(input);
-    } catch (err) {
-      console.warn("prioritizeTasksFlow falling back to deterministic plan:", err);
-      return getFallbackPrioritizeTasks(input);
+      throw new Error("AI Task Prioritization service returned empty output. Please try again later.");
+    } catch (err: any) {
+      console.error("prioritizeTasksFlow error:", err);
+      throw new Error(
+        "The AI task prioritization service is currently not available. Please check your connection or try again later."
+      );
     }
   }
 );

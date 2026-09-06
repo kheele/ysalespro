@@ -114,10 +114,12 @@ CRITICAL SCIENCE-OF-PEOPLE GUIDELINES:
       if (response.output) {
         return response.output;
       }
-    } catch (err) {
-      console.warn('[Genkit] generatePreCallBriefFlow fallback:', err);
+      throw new Error("AI Pre-Call Brief generation service returned empty output. Please try again later.");
+    } catch (err: any) {
+      console.error('[Genkit] generatePreCallBriefFlow error:', err);
+      throw new Error(
+        "The AI pre-call intelligence service is currently not available. Please check your connection or try again later."
+      );
     }
-
-    return fallbackPreCallBrief(input);
   }
 );

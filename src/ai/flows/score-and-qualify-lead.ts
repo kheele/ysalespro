@@ -84,10 +84,12 @@ Return strictly valid JSON matching the schema.`;
       if (response.output) {
         return response.output;
       }
-      return getFallbackLeadQualification(input);
-    } catch (err) {
-      console.warn("scoreAndQualifyLeadFlow falling back to deterministic heuristic:", err);
-      return getFallbackLeadQualification(input);
+      throw new Error("AI Lead Qualification service returned empty output. Please try again later.");
+    } catch (err: any) {
+      console.error("scoreAndQualifyLeadFlow error:", err);
+      throw new Error(
+        "The AI lead qualification service is currently not available. Please check your connection or try again later."
+      );
     }
   }
 );

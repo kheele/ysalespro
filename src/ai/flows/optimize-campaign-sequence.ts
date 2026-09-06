@@ -106,10 +106,12 @@ Return an overall letter grade, quality score, 4 strategic science-backed recomm
       if (response.output) {
         return response.output;
       }
-    } catch (err) {
-      console.warn('[Genkit] optimizeCampaignSequenceFlow fallback:', err);
+      throw new Error("AI Sequence Optimization service returned empty output. Please try again later.");
+    } catch (err: any) {
+      console.error('[Genkit] optimizeCampaignSequenceFlow error:', err);
+      throw new Error(
+        "The AI sequence optimization service is currently not available. Please check your connection or try again later."
+      );
     }
-
-    return fallbackOptimizeSequence(input);
   }
 );
