@@ -10,8 +10,8 @@ import {
   updateCampaignActionByToken,
   updateCampaignStatusActionByToken,
   deleteCampaignActionByToken,
-  prepareCampaignForDuplication,
 } from "@/services/private/campaignServices";
+import { prepareCampaignForDuplication } from "@/lib/campaign-utils";
 import { processAllActiveCampaignsAction } from "@/services/private/campaignCronService";
 import type {
   Campaign,

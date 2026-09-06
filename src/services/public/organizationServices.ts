@@ -66,6 +66,7 @@ function mapDbOrganization(o: any): Organization {
 export interface GetOrganizationsParams {
   search?: string;
   industry?: string;
+  industries?: string[];
   industry_id?: number | string;
   country?: string;
   status?: string;
@@ -118,17 +119,58 @@ export async function getOrganizations(params?: GetOrganizationsParams): Promise
       });
     }
 
-    if (params?.industry && params.industry !== "all") {
+    if (params?.industries && params.industries.length > 0) {
+      whereConditions.push({
+        _or: params.industries.map((ind) => {
+          const numInd = Number(ind);
+          if (!isNaN(numInd) && numInd > 0) {
+            return {
+              industry_list: {
+                industry: {
+                  id: { _eq: numInd },
+                  status: { _eq: "Active" }
+                }
+              }
+            };
+          }
+          return {
+            _or: [
+              { primary_industry: { _eq: ind } },
+              {
+                industry_list: {
+                  industry: {
+                    name: { _ilike: `%${ind}%` },
+                    status: { _eq: "Active" }
+                  }
+                }
+              },
+            ],
+          };
+        }),
+      });
+    } else if (params?.industry && params.industry !== "all") {
       const numInd = Number(params.industry);
       if (!isNaN(numInd) && numInd > 0) {
         whereConditions.push({
-          industry_list: { industry_id: { _eq: numInd } }
+          industry_list: {
+            industry: {
+              id: { _eq: numInd },
+              status: { _eq: "Active" }
+            }
+          }
         });
       } else {
         whereConditions.push({
           _or: [
             { primary_industry: { _eq: params.industry } },
-            { industry_list: { industry: { name: { _ilike: `%${params.industry}%` } } } },
+            {
+              industry_list: {
+                industry: {
+                  name: { _ilike: `%${params.industry}%` },
+                  status: { _eq: "Active" }
+                }
+              }
+            },
           ],
         });
       }
@@ -137,7 +179,12 @@ export async function getOrganizations(params?: GetOrganizationsParams): Promise
     if (params?.industry_id) {
       const numIndId = Number(params.industry_id);
       whereConditions.push({
-        industry_list: { industry_id: { _eq: isNaN(numIndId) ? params.industry_id : numIndId } }
+        industry_list: {
+          industry: {
+            id: { _eq: isNaN(numIndId) ? params.industry_id : numIndId },
+            status: { _eq: "Active" }
+          }
+        }
       });
     }
 

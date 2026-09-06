@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Search, CheckCircle2, ChevronRight, Loader2, X } from "lucide-react";
 
 export interface SearchableMultiSelectProps {
@@ -17,6 +18,13 @@ export interface SearchableMultiSelectProps {
   loading?: boolean;
   icon?: React.ReactNode;
   hint?: string;
+  // Pagination & Server Search
+  page?: number;
+  totalPages?: number;
+  totalCount?: number;
+  onPageChange?: (newPage: number) => void;
+  searchValue?: string;
+  onSearchChange?: (val: string) => void;
 }
 
 export function SearchableMultiSelect({
@@ -31,9 +39,16 @@ export function SearchableMultiSelect({
   loading = false,
   icon,
   hint,
+  page,
+  totalPages,
+  totalCount,
+  onPageChange,
+  searchValue,
+  onSearchChange,
 }: SearchableMultiSelectProps) {
   const [open, setOpen] = React.useState(false);
-  const [search, setSearch] = React.useState("");
+  const [internalSearch, setInternalSearch] = React.useState("");
+  const search = searchValue !== undefined ? searchValue : internalSearch;
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -54,10 +69,11 @@ export function SearchableMultiSelect({
   }, [options, allowAll]);
 
   const filteredOptions = React.useMemo(() => {
+    if (onSearchChange) return displayOptions;
     if (!search.trim()) return displayOptions;
     const query = search.toLowerCase();
     return displayOptions.filter(o => o.toLowerCase().includes(query));
-  }, [displayOptions, search]);
+  }, [displayOptions, search, onSearchChange]);
 
   const isAllSelected = allowAll && (selected.length === 0 || selected.includes("All"));
 
@@ -142,21 +158,28 @@ export function SearchableMultiSelect({
             </button>
           )}
           <span className="text-[10px] font-mono">
-            {isAllSelected ? "All" : `${selected.length} / ${options.length}`}
+            {isAllSelected
+              ? "All"
+              : totalCount !== undefined
+              ? `${selected.length} selected (${totalCount} total)`
+              : `${selected.length} / ${options.length}`}
           </span>
           <ChevronRight className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-90" : ""}`} />
         </div>
       </div>
 
       {open && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border/60 rounded-xl shadow-2xl p-2 space-y-2 max-h-64 overflow-hidden flex flex-col backdrop-blur-xl animate-in fade-in-50 zoom-in-95">
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-card border border-border/60 rounded-xl shadow-2xl p-2 space-y-2 max-h-72 overflow-hidden flex flex-col backdrop-blur-xl animate-in fade-in-50 zoom-in-95">
           {searchable && (
             <div className="relative shrink-0">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <input
                 type="text"
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={e => {
+                  setInternalSearch(e.target.value);
+                  if (onSearchChange) onSearchChange(e.target.value);
+                }}
                 placeholder={placeholder}
                 className="w-full pl-8 pr-3 py-1.5 bg-muted/40 border border-border/40 rounded-lg text-xs outline-none text-foreground placeholder:text-muted-foreground/60"
                 autoFocus
@@ -173,12 +196,12 @@ export function SearchableMultiSelect({
             ) : filteredOptions.length === 0 ? (
               <div className="text-center p-3">
                 <p className="text-[11px] text-muted-foreground">{emptyText}</p>
-                {search.trim() && (
+                {search.trim() && !onSearchChange && (
                   <button
                     type="button"
                     onClick={() => {
                       toggleOption(search.trim());
-                      setSearch("");
+                      setInternalSearch("");
                     }}
                     className="mt-2 text-xs text-indigo-400 hover:underline inline-flex items-center gap-1"
                   >
@@ -207,6 +230,44 @@ export function SearchableMultiSelect({
               })
             )}
           </div>
+
+          {totalPages !== undefined && totalPages > 1 && onPageChange && (
+            <div className="sticky bottom-0 flex items-center justify-between px-3 py-1.5 border-t border-border/50 bg-card/95 backdrop-blur text-[10px] mt-1 shrink-0">
+              <span className="text-muted-foreground font-mono">
+                Page {page || 1} / {totalPages} {totalCount !== undefined ? `(${totalCount.toLocaleString()} total)` : ""}
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={(page || 1) <= 1 || loading}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onPageChange(Math.max(1, (page || 1) - 1));
+                  }}
+                  className="h-5 px-2 text-[10px] hover:bg-muted"
+                >
+                  Prev
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={(page || 1) >= totalPages || loading}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onPageChange(Math.min(totalPages, (page || 1) + 1));
+                  }}
+                  className="h-5 px-2 text-[10px] hover:bg-muted"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

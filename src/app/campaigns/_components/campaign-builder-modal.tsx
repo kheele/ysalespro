@@ -105,11 +105,32 @@ export function CampaignBuilderModal({
   const [availableIndustries, setAvailableIndustries] = React.useState<string[]>([]);
   const [loadingIndustries, setLoadingIndustries] = React.useState(false);
 
+  // Companies pagination & search state
   const [availableCompanies, setAvailableCompanies] = React.useState<string[]>([]);
   const [loadingCompanies, setLoadingCompanies] = React.useState(false);
+  const [companyPage, setCompanyPage] = React.useState(1);
+  const [companyTotalPages, setCompanyTotalPages] = React.useState(1);
+  const [companyTotal, setCompanyTotal] = React.useState(0);
+  const [companySearch, setCompanySearch] = React.useState("");
 
+  // People pagination & search state
   const [availablePeople, setAvailablePeople] = React.useState<string[]>([]);
   const [loadingPeople, setLoadingPeople] = React.useState(false);
+  const [peoplePage, setPeoplePage] = React.useState(1);
+  const [peopleTotalPages, setPeopleTotalPages] = React.useState(1);
+  const [peopleTotal, setPeopleTotal] = React.useState(0);
+  const [peopleSearch, setPeopleSearch] = React.useState("");
+
+  // Reset pagination when industry or company selection changes
+  React.useEffect(() => {
+    setCompanyPage(1);
+    setCompanySearch("");
+  }, [audience.industries]);
+
+  React.useEffect(() => {
+    setPeoplePage(1);
+    setPeopleSearch("");
+  }, [audience.industries, audience.companies]);
 
   // 1. Fetch available industries on modal open
   React.useEffect(() => {
@@ -129,99 +150,77 @@ export function CampaignBuilderModal({
     })();
   }, [open]);
 
-  // 2. Fetch companies cascading from selected industries
+  // 2. Fetch companies cascading from selected industries with pagination
   React.useEffect(() => {
     if (!open) return;
     let isMounted = true;
-    (async () => {
+    const timer = setTimeout(async () => {
       setLoadingCompanies(true);
       try {
-        let companiesList: string[] = [];
-        if (audience.industries.length === 0) {
-          const res = await organizationServices.getOrganizations({ pageSize: 60 });
-          companiesList = (res?.organizations || []).map((o) => o.name).filter(Boolean);
-        } else {
-          const results = await Promise.all(
-            audience.industries.map((ind) =>
-              organizationServices.getOrganizations({ industry: ind, pageSize: 50 })
-            )
-          );
-          const allOrgs = results.flatMap((r) => r?.organizations || []);
-          companiesList = Array.from(new Set(allOrgs.map((o) => o.name).filter(Boolean)));
-        }
-        if (isMounted) {
-          setAvailableCompanies(companiesList);
+        const res = await organizationServices.getOrganizations({
+          search: companySearch.trim() || undefined,
+          industries: audience.industries.length > 0 ? audience.industries : undefined,
+          page: companyPage,
+          pageSize: 20,
+        });
+
+        if (isMounted && res) {
+          const names = (res.organizations || []).map((o) => o.name).filter(Boolean);
+          const combined = Array.from(new Set([...names, ...audience.companies]));
+          setAvailableCompanies(combined);
+          setCompanyTotal(res.total || 0);
+          setCompanyTotalPages(res.totalPages || 1);
         }
       } catch (err) {
         console.error("Failed to load companies for selected industries:", err);
       } finally {
         if (isMounted) setLoadingCompanies(false);
       }
-    })();
+    }, 200);
+
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
-  }, [open, audience.industries]);
+  }, [open, audience.industries, companyPage, companySearch]);
 
-  // 3. Fetch people cascading from selected companies and industries
+  // 3. Fetch people cascading from selected companies and industries with pagination
   React.useEffect(() => {
     if (!open) return;
     let isMounted = true;
-    (async () => {
+    const timer = setTimeout(async () => {
       setLoadingPeople(true);
       try {
-        let peopleList: string[] = [];
-        if (audience.companies.length > 0) {
-          const results = await Promise.all(
-            audience.companies.map((comp) =>
-              peopleServices.getDecisionMakers({ company_name: comp, limit: 50 })
-            )
-          );
-          const allPpl = results.flatMap((r) => r?.people || []);
-          peopleList = Array.from(
-            new Set(
-              allPpl.map(
-                (p) =>
-                  `${p.name} (${p.title || p.job_title || "Executive"}, ${p.company_name || ""})`
-              )
-            )
-          ).filter(Boolean);
-        } else if (audience.industries.length > 0) {
-          const results = await Promise.all(
-            audience.industries.map((ind) =>
-              peopleServices.getDecisionMakers({ industry: ind, limit: 50 })
-            )
-          );
-          const allPpl = results.flatMap((r) => r?.people || []);
-          peopleList = Array.from(
-            new Set(
-              allPpl.map(
-                (p) =>
-                  `${p.name} (${p.title || p.job_title || "Executive"}, ${p.company_name || ""})`
-              )
-            )
-          ).filter(Boolean);
-        } else {
-          const res = await peopleServices.getDecisionMakers({ limit: 60 });
-          peopleList = (res?.people || []).map(
-            (p) =>
-              `${p.name} (${p.title || p.job_title || "Executive"}, ${p.company_name || ""})`
-          ).filter(Boolean);
-        }
+        const res = await peopleServices.getDecisionMakers({
+          search: peopleSearch.trim() || undefined,
+          company_names: audience.companies.length > 0 ? audience.companies : undefined,
+          industries: audience.companies.length === 0 && audience.industries.length > 0 ? audience.industries : undefined,
+          page: peoplePage,
+          pageSize: 20,
+        });
 
-        if (isMounted) {
-          setAvailablePeople(peopleList);
+        if (isMounted && res) {
+          const list = (res.people || []).map(
+            (p) => `${p.name} (${p.title || p.job_title || "Executive"}, ${p.company_name || ""})`
+          ).filter(Boolean);
+
+          const combined = Array.from(new Set([...list, ...audience.people]));
+          setAvailablePeople(combined);
+          setPeopleTotal(res.total || 0);
+          setPeopleTotalPages((res as any).totalPages || Math.ceil((res.total || 0) / 20) || 1);
         }
       } catch (err) {
         console.error("Failed to load decision makers:", err);
       } finally {
         if (isMounted) setLoadingPeople(false);
       }
-    })();
+    }, 200);
+
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
-  }, [open, audience.industries, audience.companies]);
+  }, [open, audience.industries, audience.companies, peoplePage, peopleSearch]);
 
   // Estimated reach calculation
   React.useEffect(() => {
@@ -288,7 +287,7 @@ export function CampaignBuilderModal({
             try {
               const parsed = JSON.parse(initialCampaign.schedule);
               if (parsed && typeof parsed === "object") setSchedule(parsed);
-            } catch {}
+            } catch { }
           }
         } else if (defaultSchedule) {
           setSchedule(defaultSchedule);
@@ -512,14 +511,14 @@ export function CampaignBuilderModal({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-2xl bg-card max-h-[92vh] flex flex-col overflow-hidden p-0">
-        <DialogHeader className="p-6 pb-0">
+        <DialogHeader className="px-6 py-3 border-b border-border/30">
           <DialogTitle className="text-base font-bold flex items-center gap-2">
             <Rocket className="h-5 w-5 text-indigo-400" />{" "}
             {isEditing
               ? `Edit Campaign: ${initialCampaign?.name}`
               : isDuplicating
-              ? `Duplicate & Customize: ${initialCampaign?.name}`
-              : "Email Campaign Builder"}
+                ? `Duplicate & Customize: ${initialCampaign?.name}`
+                : "Email Campaign Builder"}
           </DialogTitle>
           {isDuplicating && (
             <p className="text-xs text-indigo-300/90 pt-1">
@@ -534,17 +533,15 @@ export function CampaignBuilderModal({
               return (
                 <React.Fragment key={ws.id}>
                   <div
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
-                      isClickable ? "cursor-pointer" : "cursor-not-allowed opacity-60"
-                    } ${
-                      step === ws.id
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${isClickable ? "cursor-pointer" : "cursor-not-allowed opacity-60"
+                      } ${step === ws.id
                         ? "bg-indigo-600 text-white shadow-sm"
                         : step > ws.id
-                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20"
-                        : isClickable
-                        ? "bg-muted/40 text-foreground border border-border/60 hover:bg-muted/70"
-                        : "bg-muted/20 text-muted-foreground border border-border/30"
-                    }`}
+                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20"
+                          : isClickable
+                            ? "bg-muted/40 text-foreground border border-border/60 hover:bg-muted/70"
+                            : "bg-muted/20 text-muted-foreground border border-border/30"
+                      }`}
                     onClick={() => isClickable && setStep(ws.id)}
                   >
                     {step > ws.id ? <CheckCircle2 className="h-3 w-3" /> : ws.icon}
@@ -631,7 +628,7 @@ export function CampaignBuilderModal({
                 hint="Filters company & decision maker suggestions"
               />
 
-              {/* 2. Select Companies (loaded from Selected Industries) */}
+              {/* 2. Select Companies (loaded from Selected Industries with Pagination) */}
               <SearchableMultiSelect
                 label="Select Companies"
                 icon={<Target className="h-3.5 w-3.5 text-purple-400" />}
@@ -644,14 +641,23 @@ export function CampaignBuilderModal({
                 selected={audience.companies}
                 onChange={(v) => setAudience((a) => ({ ...a, companies: v }))}
                 loading={loadingCompanies}
+                page={companyPage}
+                totalPages={companyTotalPages}
+                totalCount={companyTotal}
+                onPageChange={setCompanyPage}
+                searchValue={companySearch}
+                onSearchChange={(val) => {
+                  setCompanySearch(val);
+                  setCompanyPage(1);
+                }}
                 hint={
                   audience.industries.length > 0
-                    ? `Loaded from ${audience.industries.length} selected industry(ies)`
-                    : "All industries"
+                    ? `${companyTotal.toLocaleString()} found in ${audience.industries.length} industry(ies)`
+                    : `${companyTotal.toLocaleString()} verified organizations`
                 }
               />
 
-              {/* 3. Select People (loaded from Selected Companies & Selected Industries) */}
+              {/* 3. Select People (loaded from Selected Companies & Selected Industries with Pagination) */}
               <SearchableMultiSelect
                 label="Select People (Decision Makers)"
                 icon={<Users className="h-3.5 w-3.5 text-emerald-400" />}
@@ -666,12 +672,21 @@ export function CampaignBuilderModal({
                 selected={audience.people}
                 onChange={(v) => setAudience((a) => ({ ...a, people: v }))}
                 loading={loadingPeople}
+                page={peoplePage}
+                totalPages={peopleTotalPages}
+                totalCount={peopleTotal}
+                onPageChange={setPeoplePage}
+                searchValue={peopleSearch}
+                onSearchChange={(val) => {
+                  setPeopleSearch(val);
+                  setPeoplePage(1);
+                }}
                 hint={
                   audience.companies.length > 0
-                    ? `Filtered by ${audience.companies.length} company(ies)`
+                    ? `${peopleTotal.toLocaleString()} in ${audience.companies.length} company(ies)`
                     : audience.industries.length > 0
-                      ? `Filtered by ${audience.industries.length} industry(ies)`
-                      : "All contacts"
+                      ? `${peopleTotal.toLocaleString()} in ${audience.industries.length} industry(ies)`
+                      : `${peopleTotal.toLocaleString()} verified contacts`
                 }
               />
 
@@ -1088,7 +1103,7 @@ export function CampaignBuilderModal({
         </div>
 
         {/* Footer Nav */}
-        <div className="p-6 pt-0 border-t border-border/30 flex items-center justify-between gap-3">
+        <div className="p-3 border-t border-border/30 flex items-center justify-between gap-3">
           <Button
             type="button"
             variant="ghost"

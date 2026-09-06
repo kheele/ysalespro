@@ -12,6 +12,7 @@ import { CampaignCard } from "@/app/campaigns/_components/campaign-card";
 import { CampaignBuilderModal } from "@/app/campaigns/_components/campaign-builder-modal";
 import { CampaignDetailsModal } from "@/components/campaigns/campaign-details-modal";
 import * as campaignServices from "@/services/private/campaignServices";
+import { prepareCampaignForDuplication } from "@/lib/campaign-utils";
 import type { Campaign, CampaignStatus } from "@/lib/types";
 
 export interface CompanyCampaignsTabProps {
@@ -71,7 +72,7 @@ export function CompanyCampaignsTab({
   };
 
   const handleDuplicate = (c: Campaign) => {
-    const duplicated = campaignServices.prepareCampaignForDuplication(c);
+    const duplicated = prepareCampaignForDuplication(c);
     setEditingCampaign(duplicated);
     setViewModalOpen(false);
     setSelectedCampaign(null);

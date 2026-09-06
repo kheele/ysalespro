@@ -99,22 +99,47 @@ function mapDbDecisionMaker(p: any): DecisionMaker {
   };
 }
 
-export async function getDecisionMakers(params?: {
+export interface GetDecisionMakersParams {
   search?: string;
   industry?: string;
+  industries?: string[];
   department?: string;
   seniority?: string;
   country?: string;
   location?: string;
   company_id?: number | string;
   company_name?: string;
+  company_names?: string[];
   has_email?: boolean;
   has_phone?: boolean;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   limit?: number;
   offset?: number;
-}): Promise<{ people: DecisionMaker[]; total: number }> {
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedDecisionMakersResponse {
+  people: DecisionMaker[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasMore: boolean;
+}
+
+export async function getDecisionMakers(
+  params?: GetDecisionMakersParams
+): Promise<PaginatedDecisionMakersResponse> {
+  const limit = params?.pageSize ?? params?.limit ?? 30;
+  const offset = params?.offset !== undefined
+    ? params.offset
+    : params?.page
+      ? (params.page - 1) * limit
+      : 0;
+  const page = params?.page ?? (limit > 0 ? Math.floor(offset / limit) + 1 : 1);
+
   try {
     const whereConditions: Record<string, any>[] = [];
 
@@ -132,7 +157,11 @@ export async function getDecisionMakers(params?: {
       });
     }
 
-    if (params?.industry && params.industry !== "all") {
+    if (params?.industries && params.industries.length > 0) {
+      whereConditions.push({
+        _or: params.industries.map((ind) => ({ industry: { _eq: ind } }))
+      });
+    } else if (params?.industry && params.industry !== "all") {
       whereConditions.push({ industry: { _eq: params.industry } });
     }
 
@@ -148,7 +177,11 @@ export async function getDecisionMakers(params?: {
       whereConditions.push({ country: { _eq: params.country } });
     }
 
-    if (params?.company_name && params.company_name !== "all") {
+    if (params?.company_names && params.company_names.length > 0) {
+      whereConditions.push({
+        _or: params.company_names.map((cn) => ({ company_name: { _ilike: `%${cn}%` } }))
+      });
+    } else if (params?.company_name && params.company_name !== "all") {
       whereConditions.push({ company_name: { _ilike: `%${params.company_name}%` } });
     }
 
@@ -201,8 +234,8 @@ export async function getDecisionMakers(params?: {
       variables: {
         where,
         order_by,
-        limit: params?.limit || 30,
-        offset: params?.offset || 0,
+        limit,
+        offset,
       },
       operationName: "GetDecisionMakers",
       multi_queries: true,
@@ -217,14 +250,27 @@ export async function getDecisionMakers(params?: {
     };
 
     const people = rawList.map(mapDbDecisionMaker).filter(Boolean);
+    const totalPages = Math.ceil(total / limit) || 1;
+    const hasMore = offset + limit < total;
 
     return {
       people,
       total,
+      page,
+      pageSize: limit,
+      totalPages,
+      hasMore,
     };
   } catch (err) {
     console.error("Hasura peopleServices getDecisionMakers error:", err);
-    return { people: [], total: 0 };
+    return {
+      people: [],
+      total: 0,
+      page,
+      pageSize: limit,
+      totalPages: 1,
+      hasMore: false,
+    };
   }
 }
 
