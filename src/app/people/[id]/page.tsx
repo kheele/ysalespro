@@ -27,6 +27,7 @@ import {
   MessageSquare,
   Target,
   User,
+  Sparkles,
 } from "lucide-react";
 
 const TIMELINE_ICONS: Record<string, React.ReactNode> = {
@@ -212,7 +213,15 @@ export default function PersonProfilePage() {
               </div>
 
               {/* Quick Actions */}
-              <div className="flex flex-col gap-2 shrink-0">
+              <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => router.push(`/ai-messaging?person_id=${person.id}`)}
+                  className="text-xs gap-1.5 font-semibold border-purple-500/30 text-purple-300 hover:bg-purple-500/10 h-8"
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-purple-400" /> AI Messaging
+                </Button>
                 <Button size="sm" asChild className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 font-semibold h-8">
                   <a href={`mailto:${person.email}`}>
                     <Mail className="h-3.5 w-3.5" /> Send Email

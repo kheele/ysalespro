@@ -21,6 +21,7 @@ import type {
   CompanyContext,
   GeneratedMessage,
   MessageGenerationResult,
+  OutreachOfferContext,
 } from '@/lib/types';
 import type { ClassifyInboundReplyInput, ClassifyInboundReplyOutput } from '@/ai/schemas/inbound-reply';
 import type { GeneratePreCallBriefInput, GeneratePreCallBriefOutput } from '@/ai/schemas/precall-brief';
@@ -40,13 +41,15 @@ export async function generateMessages(
   person: PersonContext,
   company: CompanyContext,
   senderName: string = "Sales Executive",
-  senderTitle: string = "Sales Representative"
+  senderTitle: string = "Sales Representative",
+  offer?: OutreachOfferContext
 ): Promise<MessageGenerationResult> {
   const result = await generateSalesOutreachFlow({
     person,
     company,
     senderName,
     senderTitle,
+    offer,
   });
 
   const messages: GeneratedMessage[] = (result.messages || []).map((m: any) => ({
@@ -65,6 +68,7 @@ export async function generateMessages(
   return {
     person,
     company,
+    offer,
     messages,
     avg_score,
   };

@@ -85,7 +85,7 @@ Generate a comprehensive, high-converting outbound campaign strategy for:
 Create:
 1. Campaign Name & Description
 2. Target Persona Mindset Summary
-3. 4-step sequence (Day 0 Intro, Day 3 Giver Asset Follow-up, Day 7 Peer Case Study, Day 14 Respectful Breakup)
+3. 4-step sequence (Day 1 Intro, Day 3 Giver Asset Follow-up, Day 7 Peer Case Study, Day 14 Respectful Breakup)
    - Every email MUST use Vanessa Van Edwards' human behavior principles (Warmth + Competence, Autonomy preservation 'Feel free to say no', anti-boring openers).
 4. Recommended automation rules and schedule.
 

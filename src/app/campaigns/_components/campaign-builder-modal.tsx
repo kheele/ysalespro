@@ -77,11 +77,19 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 export interface CampaignBuilderModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (c: Partial<Campaign>) => void;
+  onSave: (c: Partial<Campaign>, existingId?: string | number) => Promise<void> | void;
+  initialCampaign?: Campaign | null;
 }
 
-export function CampaignBuilderModal({ open, onClose, onSave }: CampaignBuilderModalProps) {
+export function CampaignBuilderModal({
+  open,
+  onClose,
+  onSave,
+  initialCampaign,
+}: CampaignBuilderModalProps) {
   const { user } = useAuth();
+  const isEditing = Boolean(initialCampaign?.id);
+  const isDuplicating = Boolean(initialCampaign && !initialCampaign.id);
   const [step, setStep] = React.useState(1);
   const [name, setName] = React.useState("");
   const [description, setDescription] = React.useState("");
@@ -252,11 +260,55 @@ export function CampaignBuilderModal({ open, onClose, onSave }: CampaignBuilderM
 
   React.useEffect(() => {
     if (open) {
-      if (defaultSequence && defaultSequence.length > 0) setSequence(defaultSequence);
-      if (defaultRules) setRules(defaultRules);
-      if (defaultSchedule) setSchedule(defaultSchedule);
+      if (initialCampaign) {
+        setName(initialCampaign.name || "");
+        setDescription(initialCampaign.description || "");
+        setAudience(
+          initialCampaign.audience || {
+            industries: [],
+            companies: [],
+            people: [],
+            estimated_contacts: initialCampaign.total_contacts || 0,
+          }
+        );
+        if (initialCampaign.sequence && initialCampaign.sequence.length > 0) {
+          setSequence(initialCampaign.sequence);
+        } else if (defaultSequence && defaultSequence.length > 0) {
+          setSequence(defaultSequence);
+        }
+        if (initialCampaign.rules) {
+          setRules(initialCampaign.rules);
+        } else if (defaultRules) {
+          setRules(defaultRules);
+        }
+        if (initialCampaign.schedule) {
+          if (typeof initialCampaign.schedule === "object") {
+            setSchedule(initialCampaign.schedule);
+          } else {
+            try {
+              const parsed = JSON.parse(initialCampaign.schedule);
+              if (parsed && typeof parsed === "object") setSchedule(parsed);
+            } catch {}
+          }
+        } else if (defaultSchedule) {
+          setSchedule(defaultSchedule);
+        }
+      } else {
+        setName("");
+        setDescription("");
+        setAudience({
+          industries: [],
+          companies: [],
+          people: [],
+          estimated_contacts: 0,
+        });
+        if (defaultSequence && defaultSequence.length > 0) setSequence(defaultSequence);
+        if (defaultRules) setRules(defaultRules);
+        if (defaultSchedule) setSchedule(defaultSchedule);
+      }
+      setStep(1);
     }
-  }, [open, defaultSequence, defaultRules, defaultSchedule]);
+  }, [open, initialCampaign, defaultSequence, defaultRules, defaultSchedule]);
 
   // AI Campaign Strategy Generator State
   const [generatingStrategy, setGeneratingStrategy] = React.useState(false);
@@ -426,16 +478,20 @@ export function CampaignBuilderModal({ open, onClose, onSave }: CampaignBuilderM
   const handleLaunch = async (asDraft = false) => {
     setIsSavingCampaign(true);
     try {
-      await onSave({
-        name,
-        description,
-        audience,
-        sequence,
-        rules,
-        schedule,
-        status: asDraft ? "Draft" : "Active",
-        created_by: user?.displayName || user?.email?.split("@")[0] || "User",
-      });
+      await onSave(
+        {
+          name,
+          description,
+          audience,
+          sequence,
+          rules,
+          schedule,
+          status: asDraft ? "Draft" : isEditing ? initialCampaign?.status || "Active" : "Active",
+          created_by: user?.displayName || user?.email?.split("@")[0] || "User",
+          target_organization_id: initialCampaign?.target_organization_id,
+        },
+        initialCampaign?.id
+      );
       onClose();
       setStep(1);
     } catch (e) {
@@ -458,30 +514,48 @@ export function CampaignBuilderModal({ open, onClose, onSave }: CampaignBuilderM
       <DialogContent className="sm:max-w-2xl bg-card max-h-[92vh] flex flex-col overflow-hidden p-0">
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="text-base font-bold flex items-center gap-2">
-            <Rocket className="h-5 w-5 text-indigo-400" /> Email Campaign Builder
+            <Rocket className="h-5 w-5 text-indigo-400" />{" "}
+            {isEditing
+              ? `Edit Campaign: ${initialCampaign?.name}`
+              : isDuplicating
+              ? `Duplicate & Customize: ${initialCampaign?.name}`
+              : "Email Campaign Builder"}
           </DialogTitle>
+          {isDuplicating && (
+            <p className="text-xs text-indigo-300/90 pt-1">
+              Modifying duplicated copy. You can update messaging, target audience, schedule, or rules before saving.
+            </p>
+          )}
 
           {/* Wizard Step Indicator */}
           <div className="flex items-center gap-1 mt-4">
-            {WIZARD_STEPS.map((ws, i) => (
-              <React.Fragment key={ws.id}>
-                <div
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${step === ws.id
-                    ? "bg-indigo-600 text-white"
-                    : step > ws.id
-                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                      : "bg-muted/30 text-muted-foreground border border-border/40"
+            {WIZARD_STEPS.map((ws, i) => {
+              const isClickable = isEditing || isDuplicating || step > ws.id || canNext;
+              return (
+                <React.Fragment key={ws.id}>
+                  <div
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+                      isClickable ? "cursor-pointer" : "cursor-not-allowed opacity-60"
+                    } ${
+                      step === ws.id
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : step > ws.id
+                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20"
+                        : isClickable
+                        ? "bg-muted/40 text-foreground border border-border/60 hover:bg-muted/70"
+                        : "bg-muted/20 text-muted-foreground border border-border/30"
                     }`}
-                  onClick={() => step > ws.id && setStep(ws.id)}
-                >
-                  {step > ws.id ? <CheckCircle2 className="h-3 w-3" /> : ws.icon}
-                  {ws.label}
-                </div>
-                {i < WIZARD_STEPS.length - 1 && (
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-                )}
-              </React.Fragment>
-            ))}
+                    onClick={() => isClickable && setStep(ws.id)}
+                  >
+                    {step > ws.id ? <CheckCircle2 className="h-3 w-3" /> : ws.icon}
+                    {ws.label}
+                  </div>
+                  {i < WIZARD_STEPS.length - 1 && (
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
         </DialogHeader>
 
@@ -1026,7 +1100,7 @@ export function CampaignBuilderModal({ open, onClose, onSave }: CampaignBuilderM
             {step === 1 ? "Cancel" : "Back"}
           </Button>
           <div className="flex items-center gap-2">
-            {step === 4 && (
+            {canNext && (step > 1 || isEditing || isDuplicating) && (
               <Button
                 type="button"
                 variant="outline"
@@ -1035,7 +1109,11 @@ export function CampaignBuilderModal({ open, onClose, onSave }: CampaignBuilderM
                 onClick={() => handleLaunch(true)}
                 className="text-xs gap-1.5 border-border/60 h-9"
               >
-                {isSavingCampaign ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving...</> : "Save as Draft"}
+                {isSavingCampaign ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving...</>
+                ) : (
+                  "Save as Draft"
+                )}
               </Button>
             )}
             <Button
@@ -1050,10 +1128,10 @@ export function CampaignBuilderModal({ open, onClose, onSave }: CampaignBuilderM
             >
               {step === 4 ? (
                 isSavingCampaign ? (
-                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Launching...</>
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> {isEditing ? "Saving Changes..." : isDuplicating ? "Saving Copy..." : "Launching..."}</>
                 ) : (
                   <>
-                    <Rocket className="h-3.5 w-3.5" /> Launch Campaign
+                    <Rocket className="h-3.5 w-3.5" /> {isEditing ? "Save Changes" : isDuplicating ? "Save & Launch Copy" : "Launch Campaign"}
                   </>
                 )
               ) : (

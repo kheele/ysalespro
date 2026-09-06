@@ -302,3 +302,145 @@ export async function getDecisionMakersCount(): Promise<number> {
     return 0;
   }
 }
+
+export interface PaginatedDecisionMakersResponse {
+  people: DecisionMaker[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasMore: boolean;
+}
+
+export interface SearchDecisionMakersByNamePrefixParams {
+  search: string;
+  page?: number;
+  pageSize?: number;
+  limit?: number;
+  offset?: number;
+}
+
+export async function searchDecisionMakersByNamePrefixAction(
+  searchOrParams: string | SearchDecisionMakersByNamePrefixParams,
+  limitOrOptions?: number | { page?: number; pageSize?: number; limit?: number; offset?: number },
+  pageParam?: number
+): Promise<PaginatedDecisionMakersResponse> {
+  try {
+    let q = "";
+    let limit: number | undefined = 20;
+    let page = 1;
+    let offset = 0;
+
+    if (typeof searchOrParams === "object" && searchOrParams !== null) {
+      q = (searchOrParams.search || "").trim();
+      limit = searchOrParams.pageSize ?? searchOrParams.limit ?? 20;
+      page = searchOrParams.page ?? 1;
+      offset = searchOrParams.offset !== undefined ? searchOrParams.offset : (page - 1) * limit;
+    } else {
+      q = (searchOrParams || "").trim();
+      if (typeof limitOrOptions === "object" && limitOrOptions !== null) {
+        limit = limitOrOptions.pageSize ?? limitOrOptions.limit ?? 20;
+        page = limitOrOptions.page ?? 1;
+        offset = limitOrOptions.offset !== undefined ? limitOrOptions.offset : (page - 1) * limit;
+      } else {
+        if (typeof limitOrOptions === "number") {
+          limit = limitOrOptions > 0 ? limitOrOptions : 20;
+        } else {
+          limit = 20;
+        }
+        page = typeof pageParam === "number" && pageParam > 0 ? pageParam : 1;
+        offset = limit ? (page - 1) * limit : 0;
+      }
+    }
+
+    const effectivePageSize = limit ?? 20;
+
+    if (!q || q.length < 2) {
+      return {
+        people: [],
+        total: 0,
+        page: 1,
+        pageSize: effectivePageSize,
+        totalPages: 0,
+        hasMore: false,
+      };
+    }
+
+    const query = `
+      query SearchDecisionMakersByNamePrefix(
+        $prefixStart: String!
+        $prefixWord: String!
+        $prefixHyphen: String!
+        $limit: Int
+        $offset: Int
+      ) {
+        aa_s_people(
+          where: {
+            _or: [
+              { name: { _ilike: $prefixStart } },
+              { name: { _ilike: $prefixWord } },
+              { name: { _ilike: $prefixHyphen } }
+            ]
+          }
+          limit: $limit
+          offset: $offset
+          order_by: [{ score: desc_nulls_last }, { name: asc }]
+        ) {
+          ${DECISION_MAKER_FIELDS}
+        }
+        aa_s_people_aggregate(
+          where: {
+            _or: [
+              { name: { _ilike: $prefixStart } },
+              { name: { _ilike: $prefixWord } },
+              { name: { _ilike: $prefixHyphen } }
+            ]
+          }
+        ) {
+          aggregate {
+            count
+          }
+        }
+      }
+    `;
+
+    const res = await sendGraphQL({
+      query,
+      variables: {
+        prefixStart: `${q}%`,
+        prefixWord: `% ${q}%`,
+        prefixHyphen: `%-${q}%`,
+        limit,
+        offset,
+      },
+      operationName: "SearchDecisionMakersByNamePrefix",
+      multi_queries: true,
+    });
+
+    const rawList = res?.aa_s_people || [];
+    const total = res?.aa_s_people_aggregate?.aggregate?.count ?? rawList.length;
+    const people = rawList.map(mapDbDecisionMaker).filter(Boolean);
+    const totalPages = effectivePageSize > 0 ? Math.ceil(total / effectivePageSize) : 0;
+    const hasMore = offset + people.length < total;
+
+    return {
+      people,
+      total,
+      page,
+      pageSize: effectivePageSize,
+      totalPages,
+      hasMore,
+    };
+  } catch (err) {
+    console.error("searchDecisionMakersByNamePrefixAction error:", err);
+    return {
+      people: [],
+      total: 0,
+      page: 1,
+      pageSize: 20,
+      totalPages: 0,
+      hasMore: false,
+    };
+  }
+}
+

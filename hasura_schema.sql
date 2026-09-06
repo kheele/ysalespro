@@ -185,6 +185,7 @@ CREATE TABLE IF NOT EXISTS public.aa_s_outreach_activities (
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.aa_s_campaigns (
   id                      SERIAL PRIMARY KEY,
+  target_organization_id  INT REFERENCES public.aa_s_organizations(id) ON DELETE SET NULL,
   name                    TEXT NOT NULL,
   status                  TEXT CHECK (status IN ('Active','Draft','Completed','Paused')) DEFAULT 'Draft',
   target_companies_count  INT DEFAULT 0,
@@ -197,6 +198,8 @@ CREATE TABLE IF NOT EXISTS public.aa_s_campaigns (
   created_at              TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at              TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE public.aa_s_campaigns ADD COLUMN IF NOT EXISTS target_organization_id INT REFERENCES public.aa_s_organizations(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS public.aa_s_campaign_target_industries (
   id          SERIAL PRIMARY KEY,

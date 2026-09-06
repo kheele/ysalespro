@@ -5,6 +5,23 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Play,
   Pause,
   Rocket,
@@ -12,6 +29,12 @@ import {
   CheckCircle2,
   FileEdit,
   XCircle,
+  MoreVertical,
+  Eye,
+  Edit,
+  Copy,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import type {
   Campaign,
@@ -38,124 +61,336 @@ export const STATUS_META: Record<CampaignStatus, { color: string; bg: string; bo
 
 export interface CampaignCardProps {
   campaign: Campaign;
-  onStatusChange: (id: string | number, status: CampaignStatus) => Promise<void>;
+  onStatusChange?: (id: string | number, status: CampaignStatus) => Promise<void> | void;
+  onView?: (campaign: Campaign) => void;
+  onEdit?: (campaign: Campaign) => void;
+  onCopy?: (campaign: Campaign) => Promise<void> | void;
+  onDelete?: (campaign: Campaign) => Promise<void> | void;
 }
 
-export function CampaignCard({ campaign, onStatusChange }: CampaignCardProps) {
+export function CampaignCard({
+  campaign,
+  onStatusChange,
+  onView,
+  onEdit,
+  onCopy,
+  onDelete,
+}: CampaignCardProps) {
   const sm = STATUS_META[campaign.status] || STATUS_META.Draft;
   const totalSteps = campaign.sequence?.length || 0;
-  const enabledSteps = campaign.sequence?.filter(s => s?.enabled).length || 0;
-  const duration = (campaign.sequence && campaign.sequence.length > 0) ? Math.max(...campaign.sequence.map(s => s?.day || 0)) : 0;
+  const enabledSteps = campaign.sequence?.filter((s) => s?.enabled !== false).length || 0;
+  const duration =
+    campaign.sequence && campaign.sequence.length > 0
+      ? Math.max(...campaign.sequence.map((s) => s?.day || 0))
+      : 0;
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [isCopying, setIsCopying] = React.useState(false);
+
+  const handleDeleteConfirm = async () => {
+    if (!onDelete) return;
+    setIsDeleting(true);
+    try {
+      await onDelete(campaign);
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
+  const handleCopyClick = async () => {
+    if (!onCopy) return;
+    setIsCopying(true);
+    try {
+      await onCopy(campaign);
+    } finally {
+      setIsCopying(false);
+    }
+  };
 
   return (
-    <Card className="bg-card backdrop-blur-md p-5 space-y-4 hover:border-indigo-500/30 transition-all">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="space-y-1 flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-bold text-sm">{campaign.name}</h3>
-            <Badge className={`${sm.bg} ${sm.color} ${sm.border} text-[10px] gap-1`}>{sm.icon} {campaign.status}</Badge>
+    <>
+      <Card className="bg-card backdrop-blur-md p-5 space-y-4 hover:border-indigo-500/30 transition-all group">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="space-y-1 flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3
+                onClick={() => onView && onView(campaign)}
+                className={`font-bold text-sm text-foreground ${
+                  onView ? "cursor-pointer hover:text-indigo-400 transition-colors" : ""
+                }`}
+              >
+                {campaign.name}
+              </h3>
+              <Badge className={`${sm.bg} ${sm.color} ${sm.border} text-[10px] gap-1`}>
+                {sm.icon} {campaign.status}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground line-clamp-1">{campaign.description}</p>
+            <div className="flex flex-wrap gap-3 text-[10px] text-muted-foreground font-mono mt-1">
+              <span>Started: {campaign.start_date || "—"}</span>
+              {campaign.end_date && <span>Ended: {campaign.end_date}</span>}
+              <span>By: {campaign.created_by || "System"}</span>
+              {campaign.target_organization_id && (
+                <span className="text-indigo-400">Org ID: #{campaign.target_organization_id}</span>
+              )}
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground line-clamp-1">{campaign.description}</p>
-          <div className="flex flex-wrap gap-3 text-[10px] text-muted-foreground font-mono mt-1">
-            <span>Started: {campaign.start_date || '—'}</span>
-            {campaign.end_date && <span>Ended: {campaign.end_date}</span>}
-            <span>By: {campaign.created_by || 'System'}</span>
-          </div>
-        </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2 shrink-0">
-          {campaign.status === "Active" && (
-            <Button size="sm" variant="outline" onClick={() => onStatusChange(campaign.id, "Paused")}
-              className="text-xs h-8 gap-1.5 border-border/60 text-amber-400 hover:text-amber-300">
-              <Pause className="h-3 w-3" /> Pause
-            </Button>
-          )}
-          {campaign.status === "Paused" && (
-            <Button size="sm" onClick={() => onStatusChange(campaign.id, "Active")}
-              className="text-xs h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white">
-              <Play className="h-3 w-3" /> Resume
-            </Button>
-          )}
-          {campaign.status === "Draft" && (
-            <Button size="sm" onClick={() => onStatusChange(campaign.id, "Active")}
-              className="text-xs h-8 gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white">
-              <Rocket className="h-3 w-3" /> Launch
-            </Button>
-          )}
-        </div>
-      </div>
+          {/* Actions Bar */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Quick Status Toggle Button */}
+            {onStatusChange && (
+              <>
+                {campaign.status === "Active" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onStatusChange(campaign.id, "Paused")}
+                    className="text-xs h-8 gap-1.5 border-border/60 text-amber-400 hover:text-amber-300"
+                  >
+                    <Pause className="h-3 w-3" /> Pause
+                  </Button>
+                )}
+                {campaign.status === "Paused" && (
+                  <Button
+                    size="sm"
+                    onClick={() => onStatusChange(campaign.id, "Active")}
+                    className="text-xs h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+                  >
+                    <Play className="h-3 w-3" /> Resume
+                  </Button>
+                )}
+                {campaign.status === "Draft" && (
+                  <Button
+                    size="sm"
+                    onClick={() => onStatusChange(campaign.id, "Active")}
+                    className="text-xs h-8 gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white"
+                  >
+                    <Rocket className="h-3 w-3" /> Launch
+                  </Button>
+                )}
+              </>
+            )}
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-        {[
-          { label: "Contacts", value: campaign.total_contacts || 0, color: "text-foreground" },
-          { label: "Sent", value: campaign.emails_sent || 0, color: "text-foreground" },
-          { label: "Open %", value: `${campaign.open_rate ?? 0}%`, color: (campaign.open_rate ?? 0) >= 30 ? "text-emerald-400" : "text-amber-400" },
-          { label: "Reply %", value: `${campaign.reply_rate ?? 0}%`, color: (campaign.reply_rate ?? 0) >= 10 ? "text-emerald-400" : "text-amber-400" },
-          { label: "Meetings", value: campaign.meetings_booked || 0, color: "text-purple-400" },
-          { label: "Unsubs", value: campaign.unsubscribes || 0, color: (campaign.unsubscribes ?? 0) > 5 ? "text-red-400" : "text-muted-foreground" },
-        ].map(s => (
-          <div key={s.label} className="text-center p-2 rounded-lg bg-muted/30 border border-border/30">
-            <div className={`font-extrabold font-mono text-sm ${s.color}`}>{s.value}</div>
-            <div className="text-[9px] text-muted-foreground uppercase">{s.label}</div>
-          </div>
-        ))}
-      </div>
+            {/* Quick View Button */}
+            {onView && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onView(campaign)}
+                className="text-xs h-8 gap-1 px-2 border-border/60 hover:bg-muted"
+                title="View Campaign Details"
+              >
+                <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="hidden sm:inline">View</span>
+              </Button>
+            )}
 
-      {/* Audience chips */}
-      <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-        <span className="text-muted-foreground font-semibold">Audience:</span>
-        {campaign.audience?.industries?.map(i => (
-          <Badge key={i} className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 text-[9px] font-mono">{i}</Badge>
-        ))}
-        {campaign.audience?.companies?.map(c => (
-          <Badge key={c} variant="outline" className="text-[9px] font-mono">{c}</Badge>
-        ))}
-      </div>
-
-      {/* Sequence Step Timeline */}
-      {campaign.sequence && campaign.sequence.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-[10px] uppercase text-muted-foreground font-semibold">{enabledSteps} Step Sequence · ~{duration} days</p>
-          <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
-            {campaign.sequence.map((s, i) => {
-              const sc = STEP_COLORS[s.type] || STEP_COLORS.Email;
-              const seqLen = campaign.sequence?.length || 0;
-              return (
-                <React.Fragment key={s.id}>
-                  <div className={`flex flex-col items-center gap-0.5 shrink-0 px-2 py-1 rounded-lg border text-[9px] ${sc} ${!s.enabled ? "opacity-40" : ""}`}>
-                    <span className="font-bold font-mono">D{s.day}</span>
-                    <span>{s.type}</span>
-                  </div>
-                  {i < seqLen - 1 && (
-                    <ChevronRight className="h-3 w-3 text-muted-foreground/30 shrink-0" />
+            {/* Overflow Dropdown for Edit, Copy, Delete */}
+            {(onEdit || onCopy || onDelete) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                    title="More actions"
+                  >
+                    {isCopying ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
+                    ) : (
+                      <MoreVertical className="h-4 w-4" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44 bg-card border-border/60">
+                  {onView && (
+                    <DropdownMenuItem
+                      onClick={() => onView(campaign)}
+                      className="text-xs gap-2 cursor-pointer"
+                    >
+                      <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                      View Details
+                    </DropdownMenuItem>
                   )}
-                </React.Fragment>
-              );
-            })}
+                  {onEdit && (
+                    <DropdownMenuItem
+                      onClick={() => onEdit(campaign)}
+                      className="text-xs gap-2 cursor-pointer"
+                    >
+                      <Edit className="h-3.5 w-3.5 text-indigo-400" />
+                      Edit Campaign
+                    </DropdownMenuItem>
+                  )}
+                  {onCopy && (
+                    <DropdownMenuItem
+                      onClick={handleCopyClick}
+                      disabled={isCopying}
+                      className="text-xs gap-2 cursor-pointer"
+                    >
+                      <Copy className="h-3.5 w-3.5 text-purple-400" />
+                      Duplicate / Copy
+                    </DropdownMenuItem>
+                  )}
+                  {onDelete && (
+                    <>
+                      <DropdownMenuSeparator className="bg-border/40" />
+                      <DropdownMenuItem
+                        onClick={() => setDeleteDialogOpen(true)}
+                        className="text-xs gap-2 cursor-pointer text-red-400 focus:text-red-400 focus:bg-red-500/10"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                        Delete Campaign
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
-      )}
 
-      {/* Rules summary */}
-      {campaign.rules && (
-        <div className="flex flex-wrap gap-2 text-[10px] pt-1 border-t border-border/20">
-          {campaign.rules.stop_on_reply && (
-            <span className="flex items-center gap-1 text-emerald-400"><CheckCircle2 className="h-3 w-3" /> Stop on reply</span>
-          )}
-          {campaign.rules.stop_on_meeting_booked && (
-            <span className="flex items-center gap-1 text-purple-400"><CheckCircle2 className="h-3 w-3" /> Stop on meeting</span>
-          )}
-          {campaign.rules.update_lead_status && (
-            <span className="flex items-center gap-1 text-indigo-400"><CheckCircle2 className="h-3 w-3" /> Auto-update status</span>
-          )}
-          {campaign.rules.create_follow_up_task && (
-            <span className="flex items-center gap-1 text-amber-400"><CheckCircle2 className="h-3 w-3" /> Create task on reply</span>
-          )}
+        {/* Stats Grid */}
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          {[
+            { label: "Contacts", value: campaign.total_contacts || 0, color: "text-foreground" },
+            { label: "Sent", value: campaign.emails_sent || 0, color: "text-foreground" },
+            {
+              label: "Open %",
+              value: `${campaign.open_rate ?? 0}%`,
+              color: (campaign.open_rate ?? 0) >= 30 ? "text-emerald-400" : "text-amber-400",
+            },
+            {
+              label: "Reply %",
+              value: `${campaign.reply_rate ?? 0}%`,
+              color: (campaign.reply_rate ?? 0) >= 10 ? "text-emerald-400" : "text-amber-400",
+            },
+            { label: "Meetings", value: campaign.meetings_booked || 0, color: "text-purple-400" },
+            {
+              label: "Unsubs",
+              value: campaign.unsubscribes || 0,
+              color: (campaign.unsubscribes ?? 0) > 5 ? "text-red-400" : "text-muted-foreground",
+            },
+          ].map((s) => (
+            <div
+              key={s.label}
+              className="text-center p-2 rounded-lg bg-muted/30 border border-border/30"
+            >
+              <div className={`font-extrabold font-mono text-sm ${s.color}`}>{s.value}</div>
+              <div className="text-[9px] text-muted-foreground uppercase">{s.label}</div>
+            </div>
+          ))}
         </div>
-      )}
-    </Card>
+
+        {/* Audience chips */}
+        <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+          <span className="text-muted-foreground font-semibold">Audience:</span>
+          {campaign.audience?.industries?.map((i) => (
+            <Badge
+              key={i}
+              className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 text-[9px] font-mono"
+            >
+              {i}
+            </Badge>
+          ))}
+          {campaign.audience?.companies?.map((c) => (
+            <Badge key={c} variant="outline" className="text-[9px] font-mono">
+              {c}
+            </Badge>
+          ))}
+          {campaign.audience?.people?.map((p) => (
+            <Badge key={p} variant="secondary" className="text-[9px] font-mono">
+              {p.split(" (")[0]}
+            </Badge>
+          ))}
+        </div>
+
+        {/* Sequence Step Timeline */}
+        {campaign.sequence && campaign.sequence.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-[10px] uppercase text-muted-foreground font-semibold">
+              {enabledSteps} Step Sequence · ~{duration} days
+            </p>
+            <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+              {campaign.sequence.map((s, i) => {
+                const sc = STEP_COLORS[s.type] || STEP_COLORS.Email;
+                const seqLen = campaign.sequence?.length || 0;
+                return (
+                  <React.Fragment key={s.id || i}>
+                    <div
+                      className={`flex flex-col items-center gap-0.5 shrink-0 px-2 py-1 rounded-lg border text-[9px] ${sc} ${
+                        s.enabled === false ? "opacity-40" : ""
+                      }`}
+                    >
+                      <span className="font-bold font-mono">D{s.day}</span>
+                      <span>{s.type}</span>
+                    </div>
+                    {i < seqLen - 1 && (
+                      <ChevronRight className="h-3 w-3 text-muted-foreground/30 shrink-0" />
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Rules summary */}
+        {campaign.rules && (
+          <div className="flex flex-wrap gap-2 text-[10px] pt-1 border-t border-border/20">
+            {campaign.rules.stop_on_reply && (
+              <span className="flex items-center gap-1 text-emerald-400">
+                <CheckCircle2 className="h-3 w-3" /> Stop on reply
+              </span>
+            )}
+            {campaign.rules.stop_on_meeting_booked && (
+              <span className="flex items-center gap-1 text-purple-400">
+                <CheckCircle2 className="h-3 w-3" /> Stop on meeting
+              </span>
+            )}
+            {campaign.rules.update_lead_status && (
+              <span className="flex items-center gap-1 text-indigo-400">
+                <CheckCircle2 className="h-3 w-3" /> Auto-update status
+              </span>
+            )}
+            {campaign.rules.create_follow_up_task && (
+              <span className="flex items-center gap-1 text-amber-400">
+                <CheckCircle2 className="h-3 w-3" /> Create task on reply
+              </span>
+            )}
+          </div>
+        )}
+      </Card>
+
+      {/* Delete Confirmation Alert Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="bg-card border-border/60">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-sm font-bold flex items-center gap-2">
+              <Trash2 className="h-4 w-4 text-red-400" /> Delete Campaign
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-muted-foreground">
+              Are you sure you want to delete <span className="font-bold text-foreground">"{campaign.name}"</span>?
+              This action permanently removes this campaign sequence and its scheduled steps. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting} className="text-xs">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              onClick={handleDeleteConfirm}
+              className="bg-red-600 hover:bg-red-500 text-white text-xs font-semibold"
+            >
+              {isDeleting ? "Deleting..." : "Delete Campaign"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

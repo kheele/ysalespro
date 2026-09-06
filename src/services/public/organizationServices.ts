@@ -503,3 +503,195 @@ export async function getOrganizationsByIndustryId(
   }
 }
 
+export interface SearchOrganizationsByNamePrefixParams {
+  search: string;
+  page?: number;
+  pageSize?: number;
+  limit?: number;
+  offset?: number;
+}
+
+export async function searchOrganizationsByNamePrefixAction(
+  searchOrParams: string | SearchOrganizationsByNamePrefixParams,
+  limitOrOptions?: number | { page?: number; pageSize?: number; limit?: number; offset?: number },
+  pageParam?: number
+): Promise<PaginatedOrganizationsResponse> {
+  try {
+    let q = "";
+    let limit: number | undefined = 20;
+    let page = 1;
+    let offset = 0;
+
+    if (typeof searchOrParams === "object" && searchOrParams !== null) {
+      q = (searchOrParams.search || "").trim();
+      limit = searchOrParams.pageSize ?? searchOrParams.limit ?? 20;
+      page = searchOrParams.page ?? 1;
+      offset = searchOrParams.offset !== undefined ? searchOrParams.offset : (page - 1) * limit;
+    } else {
+      q = (searchOrParams || "").trim();
+      if (typeof limitOrOptions === "object" && limitOrOptions !== null) {
+        limit = limitOrOptions.pageSize ?? limitOrOptions.limit ?? 20;
+        page = limitOrOptions.page ?? 1;
+        offset = limitOrOptions.offset !== undefined ? limitOrOptions.offset : (page - 1) * limit;
+      } else {
+        if (typeof limitOrOptions === "number") {
+          limit = limitOrOptions > 0 ? limitOrOptions : 20;
+        } else {
+          limit = 20;
+        }
+        page = typeof pageParam === "number" && pageParam > 0 ? pageParam : 1;
+        offset = limit ? (page - 1) * limit : 0;
+      }
+    }
+
+    const effectivePageSize = limit ?? 20;
+
+    if (!q || q.length < 2) {
+      return {
+        organizations: [],
+        total: 0,
+        page: 1,
+        pageSize: effectivePageSize,
+        totalPages: 0,
+        hasMore: false,
+      };
+    }
+
+    const query = `
+      query SearchOrganizationsByNamePrefix(
+        $prefixStart: String!
+        $prefixWord: String!
+        $prefixHyphen: String!
+        $limit: Int
+        $offset: Int
+      ) {
+        aa_s_organizations(
+          where: {
+            _or: [
+              { name: { _ilike: $prefixStart } },
+              { name: { _ilike: $prefixWord } },
+              { name: { _ilike: $prefixHyphen } }
+            ]
+          }
+          limit: $limit
+          offset: $offset
+          order_by: [{ name: asc }]
+        ) {
+          id
+          apollo_id
+          name
+          website_url
+          angellist_url
+          linkedin_url
+          twitter_url
+          facebook_url
+          crunchbase_url
+          primary_domain
+          logo_url
+          phone
+          sanitized_phone
+          primary_phone_number
+          primary_phone_source
+          primary_phone_sanitized
+          alexa_ranking
+          linkedin_uid
+          founded_year
+          publicly_traded_symbol
+          publicly_traded_exchange
+          market_cap
+          estimated_num_employees
+          organization_revenue_str
+          organization_revenue
+          primary_industry
+          industry_tag_id
+          raw_address
+          street_address
+          city
+          state
+          country
+          postal_code
+          snippets_loaded
+          retail_location_count
+          show_intent
+          intent_strength
+          has_intent_signal_account
+          intent_signal_account
+          created_at
+          updated_at
+          industry_list(distinct_on: [industry_id], order_by: [{ industry_id: asc }]) {
+            id
+            industry {
+              id
+              name
+            }
+          }
+          keywords_list(distinct_on: [keyword_id], order_by: [{ keyword_id: asc }]) {
+            id
+            keyword {
+              name
+            }
+          }
+          language_list(distinct_on: [language_id], order_by: [{ language_id: asc }]) {
+            id
+            language {
+              name
+            }
+          }
+        }
+        aa_s_organizations_aggregate(
+          where: {
+            _or: [
+              { name: { _ilike: $prefixStart } },
+              { name: { _ilike: $prefixWord } },
+              { name: { _ilike: $prefixHyphen } }
+            ]
+          }
+        ) {
+          aggregate {
+            count
+          }
+        }
+      }
+    `;
+
+    const res = await sendGraphQL({
+      query,
+      variables: {
+        prefixStart: `${q}%`,
+        prefixWord: `% ${q}%`,
+        prefixHyphen: `%-${q}%`,
+        limit,
+        offset,
+      },
+      operationName: "SearchOrganizationsByNamePrefix",
+      multi_queries: true,
+    });
+
+    const rawList = res?.aa_s_organizations || [];
+    const total = res?.aa_s_organizations_aggregate?.aggregate?.count ?? rawList.length;
+    const orgs = rawList.map(mapDbOrganization).filter(Boolean);
+    const totalPages = effectivePageSize > 0 ? Math.ceil(total / effectivePageSize) : 0;
+    const hasMore = offset + orgs.length < total;
+
+    return {
+      organizations: orgs,
+      total,
+      page,
+      pageSize: effectivePageSize,
+      totalPages,
+      hasMore,
+    };
+  } catch (err) {
+    console.error("searchOrganizationsByNamePrefixAction error:", err);
+    return {
+      organizations: [],
+      total: 0,
+      page: 1,
+      pageSize: 20,
+      totalPages: 0,
+      hasMore: false,
+    };
+  }
+}
+
+

@@ -486,6 +486,7 @@ export interface CampaignSchedule {
 export interface Campaign {
   id: string | number;
   account_company_id?: number;
+  target_organization_id?: number | null;
   name: string;
   description?: string;
   status: CampaignStatus;
@@ -555,9 +556,16 @@ export interface GeneratedMessage {
   hooks_used: string[];
 }
 
+export interface OutreachOfferContext {
+  product_service: string;
+  value_proposition?: string;
+  call_to_action?: string;
+}
+
 export interface MessageGenerationResult {
   person: PersonContext;
   company: CompanyContext;
+  offer?: OutreachOfferContext;
   messages: GeneratedMessage[];
   avg_score: number;
 }

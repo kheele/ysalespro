@@ -29,6 +29,16 @@ function generateFallbackOutreach(input: GenerateSalesOutreachInput): GenerateSa
     ? `noticed your recent milestone regarding "${input.company.recent_news}"`
     : `noticed ${companyName}'s impressive growth across ${location}`;
 
+  const productService = input.offer?.product_service;
+  const valueProp = input.offer?.value_proposition;
+  const cta = input.offer?.call_to_action || 'a brief 10-minute introductory conversation next Tuesday';
+
+  const productPitch = productService
+    ? `We specialize in ${productService}, helping peer ${industry} teams ${valueProp || 'streamline operations and ensure full audit readiness'}.`
+    : `We built YSalesPro to solve this exact bottleneck by automating real-time decision maker intelligence, helping peer teams accelerate qualified pipeline by over 35%.`;
+
+  const subjectHook = productService ? productService : `${industry} workflow velocity`;
+
   return {
     generated_at: new Date().toISOString(),
     industry_matched: industry,
@@ -38,23 +48,23 @@ function generateFallbackOutreach(input: GenerateSalesOutreachInput): GenerateSa
       {
         type: 'email_subject',
         label: 'Subject Line Options (Curiosity + High Warmth)',
-        content: `1. Question regarding ${companyName}'s ${industry} initiatives, ${personName}?\n2. Quick idea for ${personName} on ${industry} team velocity\n3. ${companyName} + sales efficiency (curious on your take)`,
+        content: `1. Question regarding ${companyName}'s ${subjectHook}, ${personName}?\n2. Quick idea for ${personName} on ${subjectHook}\n3. ${companyName} + ${productService || industry} (curious on your take)`,
         score: 96,
         personalization_score: 95,
         rationale: 'Applies Vanessa Van Edwards\' "Curiosity Sparker" principle: under 7 words, personal name cue, and inviting perspective rather than a hard pitch.',
-        key_hooks: [`${companyName} growth`, `${industry} vertical`, 'Curiosity sparker'],
-        hooks_used: [`${companyName} growth`, `${industry} vertical`, 'Curiosity sparker'],
+        key_hooks: [`${companyName} growth`, `${industry} vertical`, productService || 'Curiosity sparker'],
+        hooks_used: [`${companyName} growth`, `${industry} vertical`, productService || 'Curiosity sparker'],
       },
       {
         type: 'initial_email',
         label: 'Initial Cold Email (Warmth + Competence)',
-        subject: `Quick idea on ${companyName}'s ${industry} workflow velocity, ${personName}?`,
-        content: `Hi ${personName},\n\nFirst, congratulations on leading key initiatives as ${personTitle} at ${companyName}—${trigger} is remarkable.\n\nIn our research with fellow ${industry} leaders, we frequently hear that even high-performing teams lose up to 30% of their prospecting velocity dealing with unverified telemetry and manual qualification.\n\nWe built YSalesPro to solve this exact bottleneck by automating real-time decision maker intelligence, helping peer teams accelerate qualified pipeline by over 35%.\n\nI would love to learn how your team is navigating this at ${companyName}. Would you be open to a brief 10-minute introductory conversation next Tuesday?\n\n(No pressure at all if the timing is not right—happy to share our 1-page ${industry} benchmark report if you prefer).\n\nWarmly,\n${senderName}\n${senderTitle}`,
+        subject: `Quick idea on ${companyName}'s ${subjectHook}, ${personName}?`,
+        content: `Hi ${personName},\n\nFirst, congratulations on leading key initiatives as ${personTitle} at ${companyName}—${trigger} is remarkable.\n\nIn our discussions with fellow ${industry} leaders, we frequently hear how crucial reliable execution and compliance are for teams like yours.\n\n${productPitch}\n\nI would love to learn how your team is navigating this at ${companyName}. Would you be open to ${cta}?\n\n(No pressure at all if the timing is not right—happy to share our 1-page overview if you prefer).\n\nWarmly,\n${senderName}\n${senderTitle}`,
         score: 97,
         personalization_score: 96,
-        rationale: 'Balanced Warmth (sincere acknowledgment, psychological safety, "no pressure" autonomy cue) + Competence (specific 35% metric, industry authority).',
-        key_hooks: [personTitle, industry, 'Autonomy cue (No pressure)', '35% metric'],
-        hooks_used: [personTitle, industry, 'Autonomy cue (No pressure)', '35% metric'],
+        rationale: 'Balanced Warmth (sincere acknowledgment, psychological safety, "no pressure" autonomy cue) + Competence (specific value prop, industry authority).',
+        key_hooks: [personTitle, industry, productService || 'Autonomy cue (No pressure)', 'Value-focused solution'],
+        hooks_used: [personTitle, industry, productService || 'Autonomy cue (No pressure)', 'Value-focused solution'],
       },
       {
         type: 'followup_1',
@@ -151,9 +161,14 @@ COMPANY CONTEXT:
 - Location: ${input.company.location || ''}
 - Recent News/Trigger: ${input.company.recent_news || ''}
 
-SENDER CONTEXT:
-- Sender Name: ${input.senderName || 'Sales Operations'}
-- Sender Title: ${input.senderTitle || 'Account Executive'}
+${input.offer?.product_service ? `
+WHAT YOU ARE OFFERING / SELLING (PRIMARY FOCUS):
+- Product / Service / Solution: ${input.offer.product_service}
+- Core Value Proposition: ${input.offer.value_proposition || "High compliance, operational efficiency, and risk reduction"}
+- Desired Call to Action / Next Step: ${input.offer.call_to_action || "10-minute introductory conversation"}
+
+MANDATORY INSTRUCTION:
+Tailor the outreach copy specifically around offering and selling "${input.offer.product_service}". Frame the value proposition around solving acute bottlenecks for ${input.person.title || "the prospect"} in ${input.company.industry || "their sector"}. Do NOT pitch generic software unless explicitly specified in the offering.` : ''}
 
 Generate exactly 7 messages (email_subject, initial_email, followup_1, followup_2, final, linkedin, call_script) strictly following these science-based people skills.`;
 

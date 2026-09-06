@@ -10,7 +10,9 @@ import * as organizationServices from "@/services/public/organizationServices";
 import * as peopleServices from "@/services/public/peopleServices";
 import * as leadServices from "@/services/private/leadServices";
 import * as taskServices from "@/services/private/taskServices";
-import type { Organization, OrganizationEmail, DecisionMaker, Lead, TaskItem } from "@/lib/types";
+import * as campaignServices from "@/services/private/campaignServices";
+import type { Organization, OrganizationEmail, DecisionMaker, Lead, TaskItem, Campaign, CampaignStatus } from "@/lib/types";
+import { CompanyCampaignsTab } from "@/components/campaigns/company-campaigns-tab";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +54,7 @@ import {
   Search,
   Radio,
   TrendingUp,
+  Rocket,
 } from "lucide-react";
 
 interface CompanyNewsArticle {
@@ -153,6 +156,7 @@ export default function CompanyProfilePage() {
   const [people, setPeople] = React.useState<DecisionMaker[]>([]);
   const [leads, setLeads] = React.useState<Lead[]>([]);
   const [tasks, setTasks] = React.useState<TaskItem[]>([]);
+  const [campaigns, setCampaigns] = React.useState<Campaign[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   // News State
@@ -179,11 +183,12 @@ export default function CompanyProfilePage() {
     setLoading(true);
     try {
       const token = await user.getIdToken(true);
-      const [orgData, peopleData, leadData, taskData] = await Promise.all([
+      const [orgData, peopleData, leadData, taskData, campaignData] = await Promise.all([
         organizationServices.getOrganizationById(orgId),
         peopleServices.getDecisionMakers({ company_id: orgId }),
         leadServices.getLeadsActionByToken(token),
         taskServices.getTasksActionByToken(token),
+        campaignServices.getCampaignsActionByToken(token, { orgId }).catch(() => []),
       ]);
 
       setOrg(orgData);
@@ -191,10 +196,12 @@ export default function CompanyProfilePage() {
       const pList = peopleData?.people || [];
       const lList = Array.isArray(leadData) ? leadData : [];
       const tList = Array.isArray(taskData) ? taskData : [];
+      const cList = Array.isArray(campaignData) ? campaignData : [];
 
       setPeople(pList.filter(p => p.company_name === orgName || String(p.company_id) === String(orgId)));
       setLeads(lList.filter(l => l.company_name === orgName));
       setTasks(tList.filter(t => String(t.related_company_id) === String(orgId) || t.related_company?.name === orgName));
+      setCampaigns(cList);
     } catch (e) {
       console.error("Failed to load organization details:", e);
     } finally {
@@ -236,6 +243,18 @@ export default function CompanyProfilePage() {
       console.error("Failed to add note:", e);
     } finally {
       setIsAddingNote(false);
+    }
+  };
+
+  const handleCampaignStatusChange = async (id: string | number, status: CampaignStatus) => {
+    if (!user || !orgId) return;
+    try {
+      const token = await user.getIdToken(true);
+      await campaignServices.updateCampaignStatusActionByToken(token, id, status);
+      const updated = await campaignServices.getCampaignsActionByToken(token, { orgId });
+      setCampaigns(updated || []);
+    } catch (e) {
+      console.error("Failed to update campaign status:", e);
     }
   };
 
@@ -443,6 +462,14 @@ export default function CompanyProfilePage() {
                 <div className="flex items-center gap-2 shrink-0">
                   <Button
                     size="sm"
+                    variant="outline"
+                    onClick={() => router.push(`/ai-messaging?org_id=${org.id}`)}
+                    className="text-xs gap-1.5 font-semibold border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-purple-400" /> AI Messaging
+                  </Button>
+                  <Button
+                    size="sm"
                     onClick={() => router.push(`/outreach?id=${org.id}`)}
                     className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 font-semibold"
                   >
@@ -479,6 +506,9 @@ export default function CompanyProfilePage() {
               </TabsTrigger>
               <TabsTrigger value="activities" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white gap-1.5 text-xs">
                 <Activity className="h-3.5 w-3.5" /> Activities ({org.activities?.length || 0})
+              </TabsTrigger>
+              <TabsTrigger value="campaigns" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white gap-1.5 text-xs text-purple-400">
+                <Rocket className="h-3.5 w-3.5" /> Campaigns ({campaigns.length})
               </TabsTrigger>
             </TabsList>
 
@@ -1314,6 +1344,20 @@ export default function CompanyProfilePage() {
                   </div>
                 ))}
               </div>
+            </TabsContent>
+
+            {/* TAB 9: CAMPAIGNS */}
+            <TabsContent value="campaigns" className="mt-4">
+              {org && (
+                <CompanyCampaignsTab
+                  orgId={org.id}
+                  orgName={org.name}
+                  campaigns={campaigns}
+                  onStatusChange={handleCampaignStatusChange}
+                  onCampaignsChange={setCampaigns}
+                  onRefresh={loadOrgDetails}
+                />
+              )}
             </TabsContent>
           </Tabs>
         </main>

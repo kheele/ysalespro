@@ -7,7 +7,10 @@ import { CommandPalette } from "@/components/layout/command-palette";
 import {
   getCampaignsActionByToken,
   createCampaignActionByToken,
+  updateCampaignActionByToken,
   updateCampaignStatusActionByToken,
+  deleteCampaignActionByToken,
+  prepareCampaignForDuplication,
 } from "@/services/private/campaignServices";
 import { processAllActiveCampaignsAction } from "@/services/private/campaignCronService";
 import type {
@@ -21,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, Rocket, Play, Loader2 } from "lucide-react";
 import { CampaignCard, CampaignBuilderModal } from "./_components";
+import { CampaignDetailsModal } from "@/components/campaigns/campaign-details-modal";
 
 export default function CampaignsPage() {
   const { user } = useAuth();
@@ -32,6 +36,11 @@ export default function CampaignsPage() {
   const [statusFilter, setStatusFilter] = React.useState<CampaignStatus | "all">("all");
   const [builderOpen, setBuilderOpen] = React.useState(false);
   const [runningScheduler, setRunningScheduler] = React.useState(false);
+
+  // View & Edit Modal States
+  const [viewModalOpen, setViewModalOpen] = React.useState(false);
+  const [selectedCampaign, setSelectedCampaign] = React.useState<Campaign | null>(null);
+  const [editingCampaign, setEditingCampaign] = React.useState<Campaign | null>(null);
 
   const load = React.useCallback(async () => {
     if (!user) return;
@@ -51,14 +60,79 @@ export default function CampaignsPage() {
     load();
   }, [load]);
 
-  const handleSave = async (input: Partial<Campaign>) => {
+  const handleCreateNew = () => {
+    setEditingCampaign(null);
+    setBuilderOpen(true);
+  };
+
+  const handleView = (c: Campaign) => {
+    setSelectedCampaign(c);
+    setViewModalOpen(true);
+  };
+
+  const handleEdit = (c: Campaign) => {
+    setEditingCampaign(c);
+    setBuilderOpen(true);
+  };
+
+  const handleDuplicate = (c: Campaign) => {
+    const duplicated = prepareCampaignForDuplication(c);
+    setEditingCampaign(duplicated);
+    setViewModalOpen(false);
+    setSelectedCampaign(null);
+    setBuilderOpen(true);
+    toast({
+      title: "Duplicating Campaign",
+      description: `Loaded "${c.name} (Copy)" into campaign builder. You can customize messaging or details before saving.`,
+    });
+  };
+
+  const handleDelete = async (c: Campaign) => {
     if (!user) return;
     try {
       const token = await user.getIdToken(true);
-      await createCampaignActionByToken(token, input);
+      await deleteCampaignActionByToken(token, c.id);
+      toast({
+        title: "Campaign Deleted",
+        description: `"${c.name}" has been permanently removed.`,
+      });
       load();
-    } catch (e) {
-      console.error("Failed to create campaign:", e);
+    } catch (e: any) {
+      console.error("Failed to delete campaign:", e);
+      toast({
+        variant: "destructive",
+        title: "Delete Failed",
+        description: e?.message || "Could not delete campaign.",
+      });
+    }
+  };
+
+  const handleSave = async (input: Partial<Campaign>, existingId?: string | number) => {
+    if (!user) return;
+    try {
+      const token = await user.getIdToken(true);
+      if (existingId) {
+        await updateCampaignActionByToken(token, existingId, input);
+        toast({
+          title: "Campaign Updated",
+          description: `"${input.name}" has been updated successfully.`,
+        });
+      } else {
+        await createCampaignActionByToken(token, input);
+        toast({
+          title: "Campaign Created",
+          description: `"${input.name}" has been created.`,
+        });
+      }
+      setEditingCampaign(null);
+      load();
+    } catch (e: any) {
+      console.error("Failed to save campaign:", e);
+      toast({
+        variant: "destructive",
+        title: "Save Failed",
+        description: e?.message || "Could not save campaign.",
+      });
     }
   };
 
@@ -178,7 +252,7 @@ export default function CampaignsPage() {
             </Button>
             <Button
               size="sm"
-              onClick={() => setBuilderOpen(true)}
+              onClick={handleCreateNew}
               className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5 font-semibold h-9 shrink-0"
             >
               <Plus className="h-3.5 w-3.5" /> New Campaign
@@ -196,7 +270,15 @@ export default function CampaignsPage() {
               ))
             ) : campaigns.length > 0 ? (
               campaigns.map((c) => (
-                <CampaignCard key={c.id} campaign={c} onStatusChange={handleStatusChange} />
+                <CampaignCard
+                  key={c.id}
+                  campaign={c}
+                  onStatusChange={handleStatusChange}
+                  onView={handleView}
+                  onEdit={handleEdit}
+                  onCopy={handleDuplicate}
+                  onDelete={handleDelete}
+                />
               ))
             ) : (
               <div className="p-16 text-center border border-dashed border-border/40 rounded-xl space-y-3">
@@ -206,7 +288,7 @@ export default function CampaignsPage() {
                 </p>
                 <Button
                   size="sm"
-                  onClick={() => setBuilderOpen(true)}
+                  onClick={handleCreateNew}
                   className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs gap-1.5"
                 >
                   <Plus className="h-3.5 w-3.5" /> Create First Campaign
@@ -219,9 +301,25 @@ export default function CampaignsPage() {
 
       <CampaignBuilderModal
         open={builderOpen}
-        onClose={() => setBuilderOpen(false)}
+        onClose={() => {
+          setBuilderOpen(false);
+          setEditingCampaign(null);
+        }}
+        initialCampaign={editingCampaign}
         onSave={handleSave}
       />
+
+      <CampaignDetailsModal
+        open={viewModalOpen}
+        onClose={() => {
+          setViewModalOpen(false);
+          setSelectedCampaign(null);
+        }}
+        campaign={selectedCampaign}
+        onEdit={handleEdit}
+        onCopy={handleDuplicate}
+      />
+
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
     </div>
   );

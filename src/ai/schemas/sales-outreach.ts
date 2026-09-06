@@ -49,6 +49,11 @@ export const GenerateSalesOutreachInputSchema = z.object({
   }).describe('Context about the prospect company.'),
   senderName: z.string().optional().describe('Sender full name.'),
   senderTitle: z.string().optional().describe('Sender job title.'),
+  offer: z.object({
+    product_service: z.string().optional().describe('What product, service, or solution you are offering (e.g. Safety File preparation, PPE supply, PPE monitoring software).'),
+    value_proposition: z.string().optional().describe('Core value proposition or angle (e.g. 100% OHS audit compliance, prevent stoppage fines, 24h site delivery).'),
+    call_to_action: z.string().optional().describe('Call to action or next step (e.g. 15-minute introductory call, free site audit, request a quote).'),
+  }).optional(),
 });
 export type GenerateSalesOutreachInput = z.infer<typeof GenerateSalesOutreachInputSchema>;
 

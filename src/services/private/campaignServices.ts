@@ -1,6 +1,6 @@
 'use server';
 
-import { listGraphQL, getGraphQLOne, insertGraphQL, updateGraphQL } from "@/graphql";
+import { listGraphQL, getGraphQLOne, insertGraphQL, updateGraphQL, deleteGraphQL, sendGraphQL } from "@/graphql";
 import * as industryServices from "@/services/public/industryServices";
 import { getAccountCompanyIdFromClaims } from "@/lib/auth-utils";
 import {
@@ -95,13 +95,13 @@ function mapDbCampaign(c: any): Campaign {
     : [];
 
   const rawIndustries: string[] = Array.isArray(c.target_industry_list) && c.target_industry_list.length > 0
-    ? c.target_industry_list.map((ti: any) => ti.industry?.name || ti.industry_name || (ti.industry_id ? `Industry #${ti.industry_id}` : "All")).filter(Boolean)
-    : ["All"];
+    ? c.target_industry_list.map((ti: any) => ti.industry?.name || ti.industry_name || (ti.industry_id ? `Industry #${ti.industry_id}` : null)).filter(Boolean)
+    : [];
   const industries = Array.from(new Set(rawIndustries));
 
   const targetCompanies = c.target_companies_count ?? 0;
   const targetPeople = c.target_people_count ?? 0;
-  const totalContacts = c.total_contacts ?? (targetCompanies + targetPeople || 100);
+  const totalContacts = c.total_contacts ?? (targetCompanies + targetPeople || 1);
 
   const scheduleObj: CampaignSchedule = {
     send_days: Array.isArray(c.send_days) && c.send_days.length > 0 ? c.send_days : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
@@ -113,14 +113,15 @@ function mapDbCampaign(c: any): Campaign {
 
   const audience: CampaignAudience = {
     industries,
-    companies: ["All"],
-    people: ["All"],
+    companies: c.target_organization_id ? [`Organization #${c.target_organization_id}`] : (industries.length > 0 ? ["All"] : ["Selected Account"]),
+    people: industries.length > 0 ? ["All"] : ["Selected Decision Maker"],
     estimated_contacts: totalContacts,
   };
 
   return {
     id: c.id,
     account_company_id: c.account_company_id,
+    target_organization_id: c.target_organization_id ?? null,
     name: c.name || "Campaign",
     description: c.description || "",
     status: (c.status || "Draft") as CampaignStatus,
@@ -152,20 +153,34 @@ function mapDbCampaign(c: any): Campaign {
 
 export async function getCampaignsActionByToken(
   token: string,
-  params?: { search?: string; status?: CampaignStatus | 'all' }
+  params?: { search?: string; status?: CampaignStatus | 'all'; orgId?: string | number; org_id?: string | number } | string | number
 ): Promise<Campaign[]> {
   const companyId = await getAccountCompanyIdFromClaims(token);
   if (!companyId) {
     throw new Error("Unauthorized: Account company ID missing from token claims");
   }
 
+  const normalizedParams = typeof params === "object" && params !== null
+    ? params
+    : (typeof params === "string" || typeof params === "number")
+      ? { orgId: params }
+      : undefined;
+
+  const targetOrgId = normalizedParams?.orgId ?? normalizedParams?.org_id;
+
   try {
     const whereConditions: Record<string, any>[] = [
       { account_company_id: { _eq: companyId } }
     ];
 
-    if (params?.search) {
-      const s = `%${params.search}%`;
+    if (targetOrgId) {
+      whereConditions.push({
+        target_organization_id: { _eq: Number(targetOrgId) }
+      });
+    }
+
+    if (normalizedParams?.search) {
+      const s = `%${normalizedParams.search}%`;
       whereConditions.push({
         _or: [
           { name: { _ilike: s } },
@@ -174,8 +189,8 @@ export async function getCampaignsActionByToken(
       });
     }
 
-    if (params?.status && params.status !== "all") {
-      whereConditions.push({ status: { _eq: params.status } });
+    if (normalizedParams?.status && normalizedParams.status !== "all") {
+      whereConditions.push({ status: { _eq: normalizedParams.status } });
     }
 
     const where = { _and: whereConditions };
@@ -185,6 +200,7 @@ export async function getCampaignsActionByToken(
         aa_s_campaigns(where: $where, order_by: [{ created_at: desc }]) {
           id
           account_company_id
+          target_organization_id
           name
           description
           status
@@ -250,6 +266,13 @@ export async function getCampaignsActionByToken(
   }
 }
 
+export async function getCampaignsByOrgIdActionByToken(
+  token: string,
+  orgId: string | number
+): Promise<Campaign[]> {
+  return getCampaignsActionByToken(token, { orgId });
+}
+
 export async function getCampaignByIdActionByToken(
   token: string,
   id: string | number
@@ -265,6 +288,7 @@ export async function getCampaignByIdActionByToken(
         aa_s_campaigns_by_pk(id: $id) {
           id
           account_company_id
+          target_organization_id
           name
           description
           status
@@ -345,6 +369,7 @@ export async function createCampaignActionByToken(
         insert_aa_s_campaigns_one(object: $object) {
           id
           account_company_id
+          target_organization_id
           name
           description
           status
@@ -402,13 +427,17 @@ export async function createCampaignActionByToken(
       }
     `;
 
-    const sched = (input.schedule || {}) as Partial<CampaignSchedule>;
+    const sched = (typeof input.schedule === "object" && input.schedule !== null ? input.schedule : {}) as Partial<CampaignSchedule>;
 
     const object: Record<string, any> = {
       account_company_id: companyId,
+      target_organization_id: input.target_organization_id ? Number(input.target_organization_id) : undefined,
       name: input.name || "New Campaign",
       description: input.description || "",
       status: input.status || "Draft",
+      target_companies_count: input.target_companies_count ?? (Array.isArray(input.audience?.companies) ? input.audience.companies.length : 1),
+      target_people_count: input.target_people_count ?? (Array.isArray(input.audience?.people) ? input.audience.people.length : 1),
+      total_contacts: input.total_contacts ?? (Array.isArray(input.audience?.people) ? input.audience.people.length : 1),
       send_time_from: sched.send_time_from || "09:00",
       send_time_to: sched.send_time_to || "17:00",
       timezone: sched.timezone || "SAST (UTC+2 - Johannesburg / South Africa)",
@@ -465,31 +494,46 @@ export async function createCampaignActionByToken(
 
     if (!res) return null;
 
-    // Auto-enroll specifically selected audience people into aa_s_leads
-    if (Array.isArray(input.audience?.people) && input.audience.people.length > 0) {
+    // Attach campaign directly to selected company and person (instead of target industries)
+    const targetCompany = Array.isArray(input.audience?.companies) && input.audience.companies.length > 0
+      ? input.audience.companies[0]
+      : "";
+    const targetPeopleList = Array.isArray(input.audience?.people) && input.audience.people.length > 0
+      ? input.audience.people
+      : [];
+
+    if (targetCompany || targetPeopleList.length > 0) {
       try {
-        for (const personStr of input.audience.people) {
+        const peopleToProcess = targetPeopleList.length > 0 ? targetPeopleList : [targetCompany ? `${targetCompany} Contact` : "Decision Maker"];
+        for (const personStr of peopleToProcess) {
           const personName = personStr.split(" (")[0]?.trim();
-          if (!personName) continue;
+          let personObj: any = null;
 
-          const findQ = `
-            query FindPersonByName($name: String!) {
-              aa_s_people(where: { name: { _ilike: $name } }, limit: 1) {
-                id
-                name
-                company_name
-                industry
+          if (personName && !personName.endsWith("Contact") && personName !== "Decision Maker") {
+            const findQ = `
+              query FindPersonByName($name: String!) {
+                aa_s_people(where: { name: { _ilike: $name } }, limit: 1) {
+                  id
+                  name
+                  company_name
+                  industry
+                }
               }
-            }
-          `;
-          const found = await listGraphQL({
-            query: findQ,
-            variables: { name: personName },
-            operationName: "FindPersonByName",
-          });
-          const personObj = Array.isArray(found) && found.length > 0 ? found[0] : null;
+            `;
+            const found = await listGraphQL({
+              query: findQ,
+              variables: { name: personName },
+              operationName: "FindPersonByName",
+            });
+            personObj = Array.isArray(found) && found.length > 0 ? found[0] : null;
+          }
 
-          if (personObj) {
+          const compName = personObj?.company_name || targetCompany || "Target Account";
+          const pName = personObj?.name || (personName || "Decision Maker");
+
+          // Auto-enroll lead into aa_s_leads
+          let leadId: number | undefined = undefined;
+          try {
             const insertLeadQ = `
               mutation EnrollCampaignLead($object: aa_s_leads_insert_input!) {
                 insert_aa_s_leads_one(object: $object) {
@@ -497,20 +541,25 @@ export async function createCampaignActionByToken(
                 }
               }
             `;
-            await insertGraphQL({
+            const leadRes = await insertGraphQL({
               mutation: insertLeadQ,
               operationName: "EnrollCampaignLead",
               input: {
                 account_company_id: companyId,
-                person_id: personObj.id,
-                person_name: personObj.name,
-                company_name: personObj.company_name,
-                industry: personObj.industry,
+                person_id: personObj?.id ? Number(personObj.id) : undefined,
+                person_name: pName,
+                company_name: compName,
+                industry: personObj?.industry || undefined,
                 stage: "Cold",
                 lead_temperature: "COLD",
                 lead_score: 50,
               },
             });
+            if (leadRes?.id) {
+              leadId = Number(leadRes.id);
+            }
+          } catch (leadErr) {
+            console.warn("Lead already exists or failed to insert:", leadErr);
           }
         }
       } catch (enrollErr) {
@@ -609,4 +658,283 @@ export async function updateCampaignStatusActionByToken(
     console.error("Hasura updateCampaignStatusActionByToken error:", err);
     throw err;
   }
+}
+
+export async function updateCampaignActionByToken(
+  token: string,
+  id: string | number,
+  input: Partial<Campaign>
+): Promise<Campaign | null> {
+  const companyId = await getAccountCompanyIdFromClaims(token);
+  if (!companyId) {
+    throw new Error("Unauthorized: Account company ID missing from token claims");
+  }
+
+  const numId = Number(id);
+
+  try {
+    const sched = (typeof input.schedule === "object" && input.schedule !== null ? input.schedule : {}) as Partial<CampaignSchedule>;
+    const attrs: Record<string, any> = {};
+
+    if (input.name !== undefined) attrs.name = input.name;
+    if (input.description !== undefined) attrs.description = input.description;
+    if (input.status !== undefined) attrs.status = input.status;
+    if (input.target_organization_id !== undefined) {
+      attrs.target_organization_id = input.target_organization_id ? Number(input.target_organization_id) : null;
+    }
+    if (input.total_contacts !== undefined) attrs.total_contacts = input.total_contacts;
+    if (input.target_companies_count !== undefined) attrs.target_companies_count = input.target_companies_count;
+    if (input.target_people_count !== undefined) attrs.target_people_count = input.target_people_count;
+
+    if (sched.send_time_from !== undefined) attrs.send_time_from = sched.send_time_from;
+    if (sched.send_time_to !== undefined) attrs.send_time_to = sched.send_time_to;
+    if (sched.timezone !== undefined) attrs.timezone = sched.timezone;
+    if (sched.send_days !== undefined) attrs.send_days = sched.send_days;
+    if (input.start_date !== undefined || sched.start_date !== undefined) {
+      attrs.start_date = input.start_date || sched.start_date;
+    }
+
+    if (input.rules) {
+      if (input.rules.stop_on_reply !== undefined) attrs.stop_on_reply = input.rules.stop_on_reply;
+      if (input.rules.stop_on_meeting_booked !== undefined) attrs.stop_on_meeting = input.rules.stop_on_meeting_booked;
+      if (input.rules.update_lead_status !== undefined) attrs.update_lead_status = input.rules.update_lead_status;
+      if (input.rules.create_follow_up_task !== undefined) attrs.create_followup_task = input.rules.create_follow_up_task;
+    }
+
+    // 1. Update scalar fields
+    if (Object.keys(attrs).length > 0) {
+      const updateMutation = `
+        mutation UpdateCampaignScalars($id: Int!, $_set: aa_s_campaigns_set_input!) {
+          update_aa_s_campaigns_by_pk(pk_columns: { id: $id }, _set: $_set) {
+            id
+          }
+        }
+      `;
+      await updateGraphQL({
+        mutation: updateMutation,
+        id: numId,
+        attrs,
+        operationName: "UpdateCampaignScalars",
+      });
+    }
+
+    // 2. Update sequence steps if provided
+    if (Array.isArray(input.sequence)) {
+      const deleteStepsQ = `
+        mutation DeleteOldSteps($campaignId: Int!) {
+          delete_aa_s_campaign_sequence_steps(where: { campaign_id: { _eq: $campaignId } }) {
+            affected_rows
+          }
+        }
+      `;
+      await sendGraphQL({
+        mutation: deleteStepsQ,
+        variables: { campaignId: numId },
+        operationName: "DeleteOldSteps",
+      });
+
+      if (input.sequence.length > 0) {
+        const stepObjects = input.sequence.map((stepItem, idx) => ({
+          campaign_id: numId,
+          day: stepItem.day ?? (idx * 2),
+          step_number: idx + 1,
+          type: normalizeSequenceStepType(stepItem.type),
+          subject: stepItem.subject || '',
+          preview: stepItem.body || '',
+          is_active: stepItem.enabled ?? true,
+        }));
+
+        const insertStepsQ = `
+          mutation InsertNewSteps($objects: [aa_s_campaign_sequence_steps_insert_input!]!) {
+            insert_aa_s_campaign_sequence_steps(objects: $objects) {
+              affected_rows
+            }
+          }
+        `;
+        await sendGraphQL({
+          mutation: insertStepsQ,
+          variables: { objects: stepObjects },
+          operationName: "InsertNewSteps",
+        });
+      }
+    }
+
+    // 3. Update target industries if provided
+    if (Array.isArray(input.audience?.industries)) {
+      const deleteIndsQ = `
+        mutation DeleteOldIndustries($campaignId: Int!) {
+          delete_aa_s_campaign_target_industries(where: { campaign_id: { _eq: $campaignId } }) {
+            affected_rows
+          }
+        }
+      `;
+      await sendGraphQL({
+        mutation: deleteIndsQ,
+        variables: { campaignId: numId },
+        operationName: "DeleteOldIndustries",
+      });
+
+      const selectedInds = input.audience.industries.filter(i => i && i !== "All");
+      if (selectedInds.length > 0) {
+        try {
+          const { industries: allInds } = await industryServices.getIndustries({ limit: 100 });
+          const indMap = new Map(allInds.map(i => [i.name?.toLowerCase(), i.id]));
+          const targetIndData = selectedInds
+            .map(indName => {
+              const matchedId = indMap.get(indName.toLowerCase());
+              return matchedId ? { campaign_id: numId, industry_id: Number(matchedId) } : null;
+            })
+            .filter(Boolean);
+
+          if (targetIndData.length > 0) {
+            const insertIndsQ = `
+              mutation InsertNewIndustries($objects: [aa_s_campaign_target_industries_insert_input!]!) {
+                insert_aa_s_campaign_target_industries(objects: $objects) {
+                  affected_rows
+                }
+              }
+            `;
+            await sendGraphQL({
+              mutation: insertIndsQ,
+              variables: { objects: targetIndData },
+              operationName: "InsertNewIndustries",
+            });
+          }
+        } catch (indErr) {
+          console.warn("Could not update target industries:", indErr);
+        }
+      }
+    }
+
+    return await getCampaignByIdActionByToken(token, numId);
+  } catch (err) {
+    console.error("Hasura updateCampaignActionByToken error:", err);
+    throw err;
+  }
+}
+
+export async function deleteCampaignActionByToken(
+  token: string,
+  id: string | number
+): Promise<boolean> {
+  const companyId = await getAccountCompanyIdFromClaims(token);
+  if (!companyId) {
+    throw new Error("Unauthorized: Account company ID missing from token claims");
+  }
+
+  const numId = Number(id);
+
+  try {
+    const cleanupQ = `
+      mutation CleanupCampaignChildren($campaignId: Int!) {
+        delete_aa_s_campaign_sequence_steps(where: { campaign_id: { _eq: $campaignId } }) {
+          affected_rows
+        }
+        delete_aa_s_campaign_target_industries(where: { campaign_id: { _eq: $campaignId } }) {
+          affected_rows
+        }
+        delete_aa_s_outreach_activities(where: { campaign_id: { _eq: $campaignId } }) {
+          affected_rows
+        }
+      }
+    `;
+    await sendGraphQL({
+      mutation: cleanupQ,
+      variables: { campaignId: numId },
+      operationName: "CleanupCampaignChildren",
+    }).catch(err => {
+      console.warn("Campaign cleanup of related rows warning:", err);
+    });
+
+    const deleteMainQ = `
+      mutation DeleteCampaign($id: Int!) {
+        delete_aa_s_campaigns_by_pk(id: $id) {
+          id
+        }
+      }
+    `;
+    const res = await deleteGraphQL({
+      mutation: deleteMainQ,
+      id: numId,
+      operationName: "DeleteCampaign",
+    });
+
+    return !!res;
+  } catch (err) {
+    console.error("Hasura deleteCampaignActionByToken error:", err);
+    throw err;
+  }
+}
+
+export function prepareCampaignForDuplication(campaign: Campaign): Campaign {
+  const schedObj: CampaignSchedule | undefined = campaign.schedule
+    ? typeof campaign.schedule === "object"
+      ? {
+        ...campaign.schedule,
+        start_date: new Date().toISOString().split("T")[0],
+      }
+      : undefined
+    : undefined;
+
+  return {
+    ...campaign,
+    id: undefined as any,
+    name: `${campaign.name} (Copy)`,
+    description: campaign.description || "",
+    status: "Draft",
+    target_organization_id: campaign.target_organization_id,
+    target_companies_count: campaign.target_companies_count,
+    target_people_count: campaign.target_people_count,
+    total_contacts: campaign.total_contacts,
+    audience: campaign.audience
+      ? {
+        industries: [...(campaign.audience.industries || [])],
+        companies: [...(campaign.audience.companies || [])],
+        people: [...(campaign.audience.people || [])],
+        estimated_contacts: campaign.audience.estimated_contacts || campaign.total_contacts || 0,
+      }
+      : undefined,
+    sequence: (campaign.sequence && campaign.sequence.length > 0)
+      ? campaign.sequence.map((s, idx) => ({
+        id: `dup-${idx + 1}`,
+        step_number: s.step_number || idx + 1,
+        day: s.day,
+        type: s.type,
+        subject: s.subject || "",
+        body: s.body || "",
+        enabled: s.enabled !== false,
+      }))
+      : undefined,
+    rules: campaign.rules
+      ? { ...campaign.rules }
+      : {
+        stop_on_reply: campaign.stop_on_reply ?? true,
+        stop_on_meeting_booked: campaign.stop_on_meeting ?? true,
+        update_lead_status: campaign.update_lead_status ?? true,
+        create_follow_up_task: campaign.create_followup_task ?? true,
+        exclude_customers: true,
+        exclude_competitors: true,
+        track_opens: true,
+      },
+    schedule: schedObj || campaign.schedule,
+    start_date: new Date().toISOString().split("T")[0],
+    emails_sent: 0,
+    open_rate: 0,
+    reply_rate: 0,
+    meetings_booked: 0,
+    unsubscribes: 0,
+  };
+}
+
+export async function duplicateCampaignActionByToken(
+  token: string,
+  id: string | number
+): Promise<Campaign | null> {
+  const existing = await getCampaignByIdActionByToken(token, id);
+  if (!existing) {
+    throw new Error(`Campaign #${id} not found`);
+  }
+
+  const clonedInput = prepareCampaignForDuplication(existing);
+  return await createCampaignActionByToken(token, clonedInput);
 }
