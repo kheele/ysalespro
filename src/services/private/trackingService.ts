@@ -81,10 +81,10 @@ export async function recordEmailOpen(params: {
         // Do not downgrade if already Clicked or Replied
         if (outreach.status !== 'Clicked' && outreach.status !== 'Replied') {
           const updateMutation = `
-            mutation MarkOutreachOpened($id: Int!) {
+            mutation MarkOutreachOpened($id: Int!, $_set: aa_s_outreach_activities_set_input!) {
               update_aa_s_outreach_activities_by_pk(
                 pk_columns: { id: $id }
-                _set: { status: "Opened" }
+                _set: $_set
               ) {
                 id
                 status
@@ -94,6 +94,7 @@ export async function recordEmailOpen(params: {
           await updateGraphQL({
             mutation: updateMutation,
             id: Number(outreachId),
+            attrs: { status: "Opened" },
             operationName: 'MarkOutreachOpened',
           });
         }
@@ -124,15 +125,10 @@ export async function recordEmailOpen(params: {
         const newTemp = lead.lead_temperature === 'COLD' && newScore >= 20 ? 'WARM' : lead.lead_temperature;
 
         const updateLeadMutation = `
-          mutation UpdateLeadOnOpen($id: Int!, $score: Int!, $temp: String!, $now: timestamptz!) {
+          mutation UpdateLeadOnOpen($id: Int!, $_set: aa_s_leads_set_input!) {
             update_aa_s_leads_by_pk(
               pk_columns: { id: $id }
-              _set: {
-                lead_score: $score
-                lead_temperature: $temp
-                last_contact: $now
-                updated_at: $now
-              }
+              _set: $_set
             ) {
               id
             }
@@ -142,9 +138,10 @@ export async function recordEmailOpen(params: {
           mutation: updateLeadMutation,
           id: Number(leadId),
           attrs: {
-            score: newScore,
-            temp: newTemp,
-            now: new Date().toISOString(),
+            lead_score: newScore,
+            lead_temperature: newTemp,
+            last_contact: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           },
           operationName: 'UpdateLeadOnOpen',
         });
@@ -168,19 +165,22 @@ export async function recordEmailClick(params: {
   outreachId?: number | null;
   leadId?: number | null;
   campaignId?: number | null;
+  action?: string | null;
   ip?: string;
   userAgent?: string;
 }): Promise<RecordClickResult> {
-  const { targetUrl, outreachId, leadId } = params;
+  const { targetUrl, outreachId, leadId, action } = params;
+  const isUnsubscribe = action === 'unsubscribe';
 
   try {
-    // 1. Dual Fallback: Mark Outreach as Opened & Clicked
+    // 1. Dual Fallback: Mark Outreach as Opened & Clicked / Unsubscribed
     if (outreachId && !isNaN(outreachId)) {
+      const newStatus = isUnsubscribe ? "Unsubscribed" : "Clicked";
       const updateMutation = `
-        mutation MarkOutreachClicked($id: Int!) {
+        mutation MarkOutreachClicked($id: Int!, $_set: aa_s_outreach_activities_set_input!) {
           update_aa_s_outreach_activities_by_pk(
             pk_columns: { id: $id }
-            _set: { status: "Clicked" }
+            _set: $_set
           ) {
             id
             status
@@ -190,57 +190,81 @@ export async function recordEmailClick(params: {
       await updateGraphQL({
         mutation: updateMutation,
         id: Number(outreachId),
+        attrs: { status: newStatus },
         operationName: 'MarkOutreachClicked',
       });
     }
 
-    // 2. High intent signal: update lead score (+10) and temperature
+    // 2. Handle Lead Update: Unsubscribe vs High-Intent Engagement Bump
     if (leadId && !isNaN(leadId)) {
-      const getLeadQuery = `
-        query GetLeadById($id: Int!) {
-          aa_s_leads_by_pk(id: $id) {
-            id
-            lead_score
-            lead_temperature
-          }
-        }
-      `;
-      const lead = await getGraphQLOne({
-        query: getLeadQuery,
-        variables: { id: Number(leadId) },
-        operationName: 'GetLeadById',
-      });
+      const nowIso = new Date().toISOString();
 
-      if (lead) {
-        const currentScore = lead.lead_score || 0;
-        const newScore = currentScore + 10;
-        const newTemp = lead.lead_temperature === 'COLD' ? 'WARM' : lead.lead_temperature;
-
-        const updateLeadMutation = `
-          mutation UpdateLeadOnClick($id: Int!, $score: Int!, $temp: String!, $now: timestamptz!) {
+      if (isUnsubscribe) {
+        // Mark lead as COLD & Lost / Unsubscribed
+        const updateUnsubMutation = `
+          mutation MarkLeadUnsubscribedOnClick($id: Int!, $_set: aa_s_leads_set_input!) {
             update_aa_s_leads_by_pk(
               pk_columns: { id: $id }
-              _set: {
-                lead_score: $score
-                lead_temperature: $temp
-                last_contact: $now
-                updated_at: $now
-              }
+              _set: $_set
             ) {
               id
             }
           }
         `;
         await updateGraphQL({
-          mutation: updateLeadMutation,
+          mutation: updateUnsubMutation,
           id: Number(leadId),
           attrs: {
-            score: newScore,
-            temp: newTemp,
-            now: new Date().toISOString(),
+            lead_temperature: "COLD",
+            stage: "Lost",
+            updated_at: nowIso,
           },
-          operationName: 'UpdateLeadOnClick',
+          operationName: 'MarkLeadUnsubscribedOnClick',
         });
+      } else {
+        // High intent signal: bump lead score (+10) and temperature to WARM
+        const getLeadQuery = `
+          query GetLeadById($id: Int!) {
+            aa_s_leads_by_pk(id: $id) {
+              id
+              lead_score
+              lead_temperature
+            }
+          }
+        `;
+        const lead = await getGraphQLOne({
+          query: getLeadQuery,
+          variables: { id: Number(leadId) },
+          operationName: 'GetLeadById',
+        });
+
+        if (lead) {
+          const currentScore = lead.lead_score || 0;
+          const newScore = currentScore + 10;
+          const newTemp = lead.lead_temperature === 'COLD' ? 'WARM' : lead.lead_temperature;
+
+          const updateLeadMutation = `
+            mutation UpdateLeadOnClick($id: Int!, $_set: aa_s_leads_set_input!) {
+              update_aa_s_leads_by_pk(
+                pk_columns: { id: $id }
+                _set: $_set
+              ) {
+                id
+              }
+            }
+          `;
+          await updateGraphQL({
+            mutation: updateLeadMutation,
+            id: Number(leadId),
+            attrs: {
+              lead_score: newScore,
+              lead_temperature: newTemp,
+              last_contact: nowIso,
+              updated_at: nowIso,
+            },
+            operationName: 'UpdateLeadOnClick',
+          });
+        }
       }
     }
 
@@ -348,13 +372,10 @@ export async function processInboundReplyAndEscalate(payload: {
     // 3. Mark outreach activity as 'Replied'
     if (targetOutreachId) {
       const markRepliedMutation = `
-        mutation MarkOutreachReplied($id: Int!, $preview: String!) {
+        mutation MarkOutreachReplied($id: Int!, $_set: aa_s_outreach_activities_set_input!) {
           update_aa_s_outreach_activities_by_pk(
             pk_columns: { id: $id }
-            _set: {
-              status: "Replied"
-              response_preview: $preview
-            }
+            _set: $_set
           ) {
             id
             status
@@ -365,7 +386,8 @@ export async function processInboundReplyAndEscalate(payload: {
         mutation: markRepliedMutation,
         id: Number(targetOutreachId),
         attrs: {
-          preview: body.slice(0, 300),
+          status: "Replied",
+          response_preview: body.slice(0, 300),
         },
         operationName: 'MarkOutreachReplied',
       });
@@ -393,16 +415,10 @@ export async function processInboundReplyAndEscalate(payload: {
       // --- ESCALATE TO HOT LEAD ---
       if (lead) {
         const updateLeadMutation = `
-          mutation EscalateLeadToHot($id: Int!, $score: Int!, $now: timestamptz!) {
+          mutation EscalateLeadToHot($id: Int!, $_set: aa_s_leads_set_input!) {
             update_aa_s_leads_by_pk(
               pk_columns: { id: $id }
-              _set: {
-                lead_temperature: "HOT"
-                stage: "Engaged"
-                lead_score: $score
-                last_contact: $now
-                updated_at: $now
-              }
+              _set: $_set
             ) {
               id
               lead_temperature
@@ -414,8 +430,11 @@ export async function processInboundReplyAndEscalate(payload: {
           mutation: updateLeadMutation,
           id: lead.id,
           attrs: {
-            score: (lead.lead_score || 0) + 35,
-            now: nowIso,
+            lead_temperature: "HOT",
+            stage: "Engaged",
+            lead_score: (lead.lead_score || 0) + 35,
+            last_contact: nowIso,
+            updated_at: nowIso,
           },
           operationName: 'EscalateLeadToHot',
         });
@@ -479,13 +498,10 @@ export async function processInboundReplyAndEscalate(payload: {
       const returnDate = classification.return_date || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
       if (lead) {
         const updateOooMutation = `
-          mutation RescheduleOooLead($id: Int!, $nextDate: timestamptz!, $now: timestamptz!) {
+          mutation RescheduleOooLead($id: Int!, $_set: aa_s_leads_set_input!) {
             update_aa_s_leads_by_pk(
               pk_columns: { id: $id }
-              _set: {
-                next_followup: $nextDate
-                updated_at: $now
-              }
+              _set: $_set
             ) {
               id
             }
@@ -495,8 +511,8 @@ export async function processInboundReplyAndEscalate(payload: {
           mutation: updateOooMutation,
           id: lead.id,
           attrs: {
-            nextDate: new Date(returnDate).toISOString(),
-            now: nowIso,
+            next_followup: new Date(returnDate).toISOString(),
+            updated_at: nowIso,
           },
           operationName: 'RescheduleOooLead',
         });
@@ -533,14 +549,10 @@ export async function processInboundReplyAndEscalate(payload: {
       // --- UNSUBSCRIBE / SUPPRESSION ---
       if (lead) {
         const updateUnsubMutation = `
-          mutation MarkLeadUnsubscribed($id: Int!, $now: timestamptz!) {
+          mutation MarkLeadUnsubscribed($id: Int!, $_set: aa_s_leads_set_input!) {
             update_aa_s_leads_by_pk(
               pk_columns: { id: $id }
-              _set: {
-                lead_temperature: "COLD"
-                stage: "Lost"
-                updated_at: $now
-              }
+              _set: $_set
             ) {
               id
             }
@@ -550,7 +562,9 @@ export async function processInboundReplyAndEscalate(payload: {
           mutation: updateUnsubMutation,
           id: lead.id,
           attrs: {
-            now: nowIso,
+            lead_temperature: "COLD",
+            stage: "Lost",
+            updated_at: nowIso,
           },
           operationName: 'MarkLeadUnsubscribed',
         });

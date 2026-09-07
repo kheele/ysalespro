@@ -322,10 +322,10 @@ export async function saveConnectedAccountActionByToken(
       }
     `;
 
-    await sendGraphQL({
+    await insertGraphQL({
       mutation: upsertEmailMutation,
       operationName: 'UpsertEmailConfig',
-      variables: { object: emailConfigObj },
+      input: emailConfigObj,
     });
   }
 
@@ -359,10 +359,10 @@ export async function saveConnectedAccountActionByToken(
       }
     `;
 
-    await sendGraphQL({
+    await insertGraphQL({
       mutation: upsertLinkedInMutation,
       operationName: 'UpsertLinkedInConfig',
-      variables: { object: linkedinConfigObj },
+      input: linkedinConfigObj,
     });
   }
 
@@ -411,20 +411,21 @@ export async function toggleAccountActiveActionByToken(
   }
 
   const mutation = `
-    mutation ToggleAccountActive($id: Int!, $isActive: Boolean!, $updatedAt: timestamptz!) {
+    mutation ToggleAccountActive($id: Int!, $_set: aa_s_connected_accounts_set_input!) {
       update_aa_s_connected_accounts_by_pk(
         pk_columns: { id: $id },
-        _set: { is_active: $isActive, updated_at: $updatedAt }
+        _set: $_set
       ) {
         id
       }
     }
   `;
 
-  await sendGraphQL({
+  await updateGraphQL({
     mutation,
     operationName: 'ToggleAccountActive',
-    variables: { id: Number(accountId), isActive, updatedAt: new Date().toISOString() },
+    id: Number(accountId),
+    attrs: { is_active: isActive, updated_at: new Date().toISOString() },
   });
 
   return fetchConnectedAccountById(Number(accountId));

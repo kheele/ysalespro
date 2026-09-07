@@ -270,18 +270,19 @@ async function resolveSendingMailboxAndQuota(accountCompanyId: number): Promise<
     const lastUsedDate = new Date(account.last_used_at).toISOString().split('T')[0];
     if (lastUsedDate !== todayStr) {
       sentToday = 0;
-      await sendGraphQL({
+      await updateGraphQL({
         mutation: `
-          mutation ResetAccountDailySent($id: Int!) {
+          mutation ResetAccountDailySent($id: Int!, $_set: aa_s_connected_accounts_set_input!) {
             update_aa_s_connected_accounts_by_pk(
               pk_columns: { id: $id },
-              _set: { sent_today: 0 }
+              _set: $_set
             ) {
               id
             }
           }
         `,
-        variables: { id: account.id },
+        id: account.id,
+        attrs: { sent_today: 0 },
         operationName: 'ResetAccountDailySent',
       }).catch(() => { });
     }

@@ -9,8 +9,9 @@ import {
 // Mock Hasura GraphQL client
 vi.mock('@/graphql', () => ({
   sendGraphQL: vi.fn(),
-  updateGraphQL: vi.fn(),
-  insertGraphQL: vi.fn(),
+  updateGraphQL: vi.fn().mockResolvedValue({ id: 1 }),
+  insertGraphQL: vi.fn().mockResolvedValue({ id: 1 }),
+  getGraphQLOne: vi.fn(),
   listGraphQL: vi.fn(),
 }));
 
@@ -19,7 +20,7 @@ vi.mock('@/ai/flows/classify-inbound-reply', () => ({
   classifyInboundReplyFlow: vi.fn(),
 }));
 
-import { sendGraphQL } from '@/graphql';
+import { updateGraphQL, insertGraphQL, getGraphQLOne } from '@/graphql';
 import { classifyInboundReplyFlow } from '@/ai/flows/classify-inbound-reply';
 
 describe('Tracking & Inbound AI Reply Escalation Service', () => {
@@ -28,7 +29,7 @@ describe('Tracking & Inbound AI Reply Escalation Service', () => {
   });
 
   describe('injectTrackingToEmailHtml', () => {
-    it('rewrites external links through /api/track/click and appends 1x1 tracking pixel', () => {
+    it('rewrites external links through /api/track/click and appends 1x1 tracking pixel', async () => {
       const sampleHtml = `
         <html>
           <body>
@@ -38,7 +39,7 @@ describe('Tracking & Inbound AI Reply Escalation Service', () => {
         </html>
       `;
 
-      const result = injectTrackingToEmailHtml(sampleHtml, {
+      const result = await injectTrackingToEmailHtml(sampleHtml, {
         outreachId: 101,
         leadId: 202,
         campaignId: 303,
@@ -58,12 +59,12 @@ describe('Tracking & Inbound AI Reply Escalation Service', () => {
       expect(result).toContain('width="1" height="1"');
     });
 
-    it('does not double-wrap existing tracking links', () => {
+    it('does not double-wrap existing tracking links', async () => {
       const alreadyTrackedHtml = `
         <a href="https://app.salespro.com/api/track/click?url=https%3A%2F%2Fgoogle.com">Link</a>
       `;
 
-      const result = injectTrackingToEmailHtml(alreadyTrackedHtml, {
+      const result = await injectTrackingToEmailHtml(alreadyTrackedHtml, {
         outreachId: 101,
         baseUrl: 'https://app.salespro.com',
       });
@@ -74,49 +75,37 @@ describe('Tracking & Inbound AI Reply Escalation Service', () => {
   });
 
   describe('recordEmailOpen', () => {
-    it('marks outreach activity as Opened and increments lead score', async () => {
-      (sendGraphQL as any).mockImplementation((args: any) => {
+    it('marks outreach activity as Opened and increments lead score using updateGraphQL', async () => {
+      (getGraphQLOne as any).mockImplementation((args: any) => {
         if (args.operationName === 'GetOutreachById') {
-          return Promise.resolve({
-            data: {
-              aa_s_outreach_activities_by_pk: { id: 101, status: 'Sent', lead_id: 202 },
-            },
-          });
+          return Promise.resolve({ id: 101, status: 'Sent', lead_id: 202 });
         }
         if (args.operationName === 'GetLeadById') {
-          return Promise.resolve({
-            data: {
-              aa_s_leads_by_pk: { id: 202, lead_score: 10, lead_temperature: 'COLD' },
-            },
-          });
+          return Promise.resolve({ id: 202, lead_score: 10, lead_temperature: 'COLD' });
         }
-        return Promise.resolve({ data: {} });
+        return Promise.resolve(null);
       });
 
       const res = await recordEmailOpen({ outreachId: 101, leadId: 202 });
       expect(res.success).toBe(true);
 
-      // Verify Hasura was called to update status
-      expect(sendGraphQL).toHaveBeenCalledWith(
-        expect.objectContaining({ operationName: 'MarkOutreachOpened' })
+      // Verify updateGraphQL was called for outreach and lead
+      expect(updateGraphQL).toHaveBeenCalledWith(
+        expect.objectContaining({ operationName: 'MarkOutreachOpened', id: 101 })
       );
-      expect(sendGraphQL).toHaveBeenCalledWith(
-        expect.objectContaining({ operationName: 'UpdateLeadOnOpen' })
+      expect(updateGraphQL).toHaveBeenCalledWith(
+        expect.objectContaining({ operationName: 'UpdateLeadOnOpen', id: 202 })
       );
     });
   });
 
   describe('recordEmailClick (Dual Fallback)', () => {
-    it('marks outreach as Clicked and bumps lead score', async () => {
-      (sendGraphQL as any).mockImplementation((args: any) => {
+    it('marks outreach as Clicked and bumps lead score using updateGraphQL', async () => {
+      (getGraphQLOne as any).mockImplementation((args: any) => {
         if (args.operationName === 'GetLeadById') {
-          return Promise.resolve({
-            data: {
-              aa_s_leads_by_pk: { id: 202, lead_score: 15, lead_temperature: 'COLD' },
-            },
-          });
+          return Promise.resolve({ id: 202, lead_score: 15, lead_temperature: 'COLD' });
         }
-        return Promise.resolve({ data: {} });
+        return Promise.resolve(null);
       });
 
       const res = await recordEmailClick({
@@ -128,43 +117,35 @@ describe('Tracking & Inbound AI Reply Escalation Service', () => {
       expect(res.success).toBe(true);
       expect(res.target_url).toBe('https://company.com/book');
 
-      // Verify Hasura marked clicked & bumped lead score
-      expect(sendGraphQL).toHaveBeenCalledWith(
-        expect.objectContaining({ operationName: 'MarkOutreachClicked' })
+      // Verify updateGraphQL marked clicked & bumped lead score
+      expect(updateGraphQL).toHaveBeenCalledWith(
+        expect.objectContaining({ operationName: 'MarkOutreachClicked', id: 101 })
       );
-      expect(sendGraphQL).toHaveBeenCalledWith(
-        expect.objectContaining({ operationName: 'UpdateLeadOnClick' })
+      expect(updateGraphQL).toHaveBeenCalledWith(
+        expect.objectContaining({ operationName: 'UpdateLeadOnClick', id: 202 })
       );
     });
   });
 
   describe('processInboundReplyAndEscalate', () => {
-    it('escalates to HOT when AI detects an interested reply', async () => {
+    it('escalates to HOT when AI detects an interested reply using updateGraphQL & insertGraphQL', async () => {
       // 1. Mock lead and outreach lookup
-      (sendGraphQL as any).mockImplementation((args: any) => {
+      (getGraphQLOne as any).mockImplementation((args: any) => {
         if (args.operationName === 'FindRecentOutreach') {
-          return Promise.resolve({
-            data: {
-              aa_s_outreach_activities: [{ id: 101, lead_id: 202, account_company_id: 1 }],
-            },
-          });
+          return Promise.resolve({ id: 101, lead_id: 202, account_company_id: 1 });
         }
         if (args.operationName === 'GetLeadForTriage') {
           return Promise.resolve({
-            data: {
-              aa_s_leads_by_pk: {
-                id: 202,
-                account_company_id: 1,
-                person_name: 'Sarah Connor',
-                company_name: 'Cyberdyne',
-                lead_temperature: 'COLD',
-                lead_score: 10,
-                assigned_user_id: 5,
-              },
-            },
+            id: 202,
+            account_company_id: 1,
+            person_name: 'Sarah Connor',
+            company_name: 'Cyberdyne',
+            lead_temperature: 'COLD',
+            lead_score: 10,
+            assigned_user_id: 5,
           });
         }
-        return Promise.resolve({ data: {} });
+        return Promise.resolve(null);
       });
 
       // 2. Mock AI flow returning positive intent
@@ -188,37 +169,33 @@ describe('Tracking & Inbound AI Reply Escalation Service', () => {
       expect(res.escalation_action).toBe('escalated_to_hot');
       expect(res.classification?.intent).toBe('interested');
 
-      // 3. Verify lead was promoted to HOT
-      expect(sendGraphQL).toHaveBeenCalledWith(
-        expect.objectContaining({ operationName: 'EscalateLeadToHot' })
+      // 3. Verify lead was promoted to HOT via updateGraphQL
+      expect(updateGraphQL).toHaveBeenCalledWith(
+        expect.objectContaining({ operationName: 'EscalateLeadToHot', id: 202 })
       );
 
-      // 4. Verify urgent task was created for sales rep with pre-drafted reply
-      expect(sendGraphQL).toHaveBeenCalledWith(
+      // 4. Verify urgent task was created for sales rep with pre-drafted reply via insertGraphQL
+      expect(insertGraphQL).toHaveBeenCalledWith(
         expect.objectContaining({ operationName: 'CreateHotReplyTask' })
       );
 
-      // 5. Verify in-app notification was created
-      expect(sendGraphQL).toHaveBeenCalledWith(
+      // 5. Verify in-app notification was created via insertGraphQL
+      expect(insertGraphQL).toHaveBeenCalledWith(
         expect.objectContaining({ operationName: 'CreateHotReplyNotification' })
       );
     });
 
-    it('handles out of office by rescheduling next follow-up', async () => {
-      (sendGraphQL as any).mockImplementation((args: any) => {
+    it('handles out of office by rescheduling next follow-up via updateGraphQL & insertGraphQL', async () => {
+      (getGraphQLOne as any).mockImplementation((args: any) => {
         if (args.operationName === 'GetLeadForTriage') {
           return Promise.resolve({
-            data: {
-              aa_s_leads_by_pk: {
-                id: 202,
-                account_company_id: 1,
-                person_name: 'Sarah Connor',
-                company_name: 'Cyberdyne',
-              },
-            },
+            id: 202,
+            account_company_id: 1,
+            person_name: 'Sarah Connor',
+            company_name: 'Cyberdyne',
           });
         }
-        return Promise.resolve({ data: {} });
+        return Promise.resolve(null);
       });
 
       (classifyInboundReplyFlow as any).mockResolvedValueOnce({
@@ -240,8 +217,11 @@ describe('Tracking & Inbound AI Reply Escalation Service', () => {
 
       expect(res.success).toBe(true);
       expect(res.escalation_action).toBe('rescheduled_for_return_date');
-      expect(sendGraphQL).toHaveBeenCalledWith(
-        expect.objectContaining({ operationName: 'RescheduleOooLead' })
+      expect(updateGraphQL).toHaveBeenCalledWith(
+        expect.objectContaining({ operationName: 'RescheduleOooLead', id: 202 })
+      );
+      expect(insertGraphQL).toHaveBeenCalledWith(
+        expect.objectContaining({ operationName: 'CreateOooTask' })
       );
     });
   });

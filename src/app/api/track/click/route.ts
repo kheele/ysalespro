@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
   const outreachId = outreachIdStr ? parseInt(outreachIdStr, 10) : null;
   const leadId = leadIdStr ? parseInt(leadIdStr, 10) : null;
   const campaignId = campaignIdStr ? parseInt(campaignIdStr, 10) : null;
+  const action = searchParams.get('action') || undefined;
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || undefined;
   const userAgent = req.headers.get('user-agent') || undefined;
@@ -49,6 +50,7 @@ export async function GET(req: NextRequest) {
       outreachId,
       leadId,
       campaignId,
+      action,
       ip,
       userAgent,
     }).catch((err) => {

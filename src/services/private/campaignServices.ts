@@ -752,9 +752,9 @@ export async function updateCampaignActionByToken(
             }
           }
         `;
-        await sendGraphQL({
+        await insertGraphQL({
           mutation: insertStepsQ,
-          variables: { objects: stepObjects },
+          input: stepObjects,
           operationName: "InsertNewSteps",
         });
       }
@@ -795,9 +795,9 @@ export async function updateCampaignActionByToken(
                 }
               }
             `;
-            await sendGraphQL({
+            await insertGraphQL({
               mutation: insertIndsQ,
-              variables: { objects: targetIndData },
+              input: targetIndData,
               operationName: "InsertNewIndustries",
             });
           }
