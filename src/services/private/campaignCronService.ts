@@ -586,7 +586,7 @@ async function autoEnrollEligibleOrganizations(campaign: any, targetIndustryName
             input: {
               account_company_id: campaign.account_company_id,
               target_organization_id: campaign.target_organization_id ? Number(campaign.target_organization_id) : (org.id ? Number(org.id) : null),
-              person_name: org.name || 'Executive Team',
+              person_name: 'Executive Team',
               company_name: org.name || cleanDomain,
               industry: org.primary_industry || null,
               stage: 'Contacted',
@@ -600,7 +600,7 @@ async function autoEnrollEligibleOrganizations(campaign: any, targetIndustryName
               ...newLead,
               person: {
                 id: 0,
-                name: org.name || 'Executive Team',
+                name: 'Executive Team',
                 email: companyEmail,
                 job_title: 'Executive Team',
                 company_name: org.name || cleanDomain,

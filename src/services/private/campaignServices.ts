@@ -505,12 +505,12 @@ export async function createCampaignActionByToken(
 
     if (targetCompany || targetPeopleList.length > 0) {
       try {
-        const peopleToProcess = targetPeopleList.length > 0 ? targetPeopleList : [targetCompany ? `${targetCompany} Contact` : "Decision Maker"];
+        const peopleToProcess = targetPeopleList.length > 0 ? targetPeopleList : ["Executive Team"];
         for (const personStr of peopleToProcess) {
           const personName = personStr.split(" (")[0]?.trim();
           let personObj: any = null;
 
-          if (personName && !personName.endsWith("Contact") && personName !== "Decision Maker") {
+          if (personName && personName !== "Executive Team") {
             const findQ = `
               query FindPersonByName($name: String!) {
                 aa_s_people(where: { name: { _ilike: $name } }, limit: 1) {
@@ -530,7 +530,7 @@ export async function createCampaignActionByToken(
           }
 
           const compName = personObj?.company_name || targetCompany || "Target Account";
-          const pName = personObj?.name || (personName || "Decision Maker");
+          const pName = personObj?.name || (personName || "Executive Team");
 
           // Auto-enroll lead into aa_s_leads
           let leadId: number | undefined = undefined;

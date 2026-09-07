@@ -143,6 +143,14 @@ export async function getLeadsActionByToken(
             linkedin_url
             score
           }
+          outreach_activity_list(order_by: [{ id: desc }], limit: 10) {
+            id
+            recipient_email
+            status
+            subject_or_type
+            response_preview
+            created_at
+          }
         }
       }
     `;

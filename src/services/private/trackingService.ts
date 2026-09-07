@@ -1,8 +1,18 @@
 'use server';
 
-import { updateGraphQL, insertGraphQL, getGraphQLOne } from '@/graphql';
+import { updateGraphQL, insertGraphQL, getGraphQLOne, listGraphQL } from '@/graphql';
 import { classifyInboundReplyFlow } from '@/ai/flows/classify-inbound-reply';
 import type { ClassifyInboundReplyOutput } from '@/ai/schemas/inbound-reply';
+
+function cleanSubject(s?: string | null): string {
+  if (!s) return '';
+  return s
+    .replace(/^(re|fwd|fw|external):\s*/gi, '')
+    .replace(/\[external\]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
 
 export interface RecordOpenResult {
   success: boolean;
@@ -308,35 +318,72 @@ export async function processInboundReplyAndEscalate(payload: {
   let companyId: number | undefined;
 
   try {
-    // 1. If leadId not directly provided, search by recipient_email in outreach or leads
-    if (!targetLeadId && fromEmail) {
-      const cleanEmail = fromEmail.trim().toLowerCase();
+    // 1. If outreachId or leadId not explicitly provided, resolve from outreach activities (up to 20)
+    if (!targetOutreachId && (targetLeadId || fromEmail)) {
+      const cleanEmail = fromEmail ? fromEmail.trim().toLowerCase() : '';
+      const whereCondition = targetLeadId
+        ? { lead_id: { _eq: Number(targetLeadId) } }
+        : { recipient_email: { _ilike: cleanEmail } };
 
-      // Check aa_s_outreach_activities first
       const findOutreachQuery = `
-        query FindRecentOutreach($email: String!) {
+        query FindCandidateOutreaches($where: aa_s_outreach_activities_bool_exp!) {
           aa_s_outreach_activities(
-            where: { recipient_email: { _ilike: $email } }
+            where: $where
             order_by: [{ id: desc }]
-            limit: 1
+            limit: 20
           ) {
             id
             lead_id
             campaign_id
             account_company_id
+            status
+            subject_or_type
+            response_preview
           }
         }
       `;
-      const recentOutreach = await getGraphQLOne({
+      const candidateOutreaches: any[] = (await listGraphQL({
         query: findOutreachQuery,
-        variables: { email: cleanEmail },
-        operationName: 'FindRecentOutreach',
-      });
+        variables: { where: whereCondition },
+        operationName: 'FindCandidateOutreaches',
+      })) || [];
 
-      if (recentOutreach) {
-        targetOutreachId = recentOutreach.id;
-        targetLeadId = recentOutreach.lead_id;
-        companyId = recentOutreach.account_company_id;
+      if (candidateOutreaches.length > 0) {
+        const incomingSubj = cleanSubject(subject);
+        let bestOutreach: any = null;
+
+        // A. Match by subject thread if available
+        if (incomingSubj) {
+          const subjectMatches = candidateOutreaches.filter((cand) => {
+            const candSubj = cleanSubject(cand.subject_or_type);
+            if (!candSubj) return false;
+            return (
+              candSubj === incomingSubj ||
+              (candSubj.length >= 4 && incomingSubj.includes(candSubj)) ||
+              (incomingSubj.length >= 4 && candSubj.includes(incomingSubj))
+            );
+          });
+
+          if (subjectMatches.length > 0) {
+            // Prioritize unreplied activity within matching subject thread
+            bestOutreach =
+              subjectMatches.find((c) => c.status !== 'Replied') ||
+              subjectMatches[0];
+          }
+        }
+
+        // B. If no subject match, pick the most recent UNREPLIED outreach activity
+        if (!bestOutreach) {
+          bestOutreach =
+            candidateOutreaches.find((c) => c.status !== 'Replied') ||
+            candidateOutreaches[0];
+        }
+
+        if (bestOutreach) {
+          targetOutreachId = bestOutreach.id;
+          if (!targetLeadId) targetLeadId = bestOutreach.lead_id;
+          companyId = bestOutreach.account_company_id;
+        }
       }
     }
 
@@ -358,7 +405,7 @@ export async function processInboundReplyAndEscalate(payload: {
           }
         }
       `;
-      const lead = await getGraphQLOne({
+      lead = await getGraphQLOne({
         query: getLeadQuery,
         variables: { id: Number(targetLeadId) },
         operationName: 'GetLeadForTriage',
@@ -411,6 +458,55 @@ export async function processInboundReplyAndEscalate(payload: {
     const nowIso = new Date().toISOString();
     const todayDate = nowIso.split('T')[0];
 
+    // Resolve assigned user ID for task creation (aa_s_tasks requires non-null assigned_to_id)
+    let assignedUserId: number | undefined = lead?.assigned_user_id ? Number(lead.assigned_user_id) : undefined;
+    if (!assignedUserId && companyId) {
+      try {
+        const findUserQuery = `
+          query GetFallbackUserForTask($companyId: Int!) {
+            aa_s_users(
+              where: { account_company_id: { _eq: $companyId } }
+              order_by: [{ id: asc }]
+              limit: 1
+            ) {
+              id
+            }
+          }
+        `;
+        const fallbackUser = await getGraphQLOne({
+          query: findUserQuery,
+          variables: { companyId: Number(companyId) },
+          operationName: 'GetFallbackUserForTask',
+        });
+        if (fallbackUser?.id) {
+          assignedUserId = Number(fallbackUser.id);
+        }
+      } catch (userErr) {
+        console.warn('[TrackingService] Could not lookup company user:', userErr);
+      }
+    }
+
+    if (!assignedUserId) {
+      try {
+        const findAnyUserQuery = `
+          query GetAnyFallbackUser {
+            aa_s_users(order_by: [{ id: asc }], limit: 1) {
+              id
+            }
+          }
+        `;
+        const anyUser = await getGraphQLOne({
+          query: findAnyUserQuery,
+          operationName: 'GetAnyFallbackUser',
+        });
+        if (anyUser?.id) {
+          assignedUserId = Number(anyUser.id);
+        }
+      } catch (anyUserErr) {
+        console.warn('[TrackingService] Could not lookup global fallback user:', anyUserErr);
+      }
+    }
+
     if (classification.intent === 'interested' || classification.recommended_action === 'promote_to_hot') {
       // --- ESCALATE TO HOT LEAD ---
       if (lead) {
@@ -433,6 +529,7 @@ export async function processInboundReplyAndEscalate(payload: {
             lead_temperature: "HOT",
             stage: "Engaged",
             lead_score: (lead.lead_score || 0) + 35,
+            assigned_user_id: lead.assigned_user_id || assignedUserId,
             last_contact: nowIso,
             updated_at: nowIso,
           },
@@ -440,7 +537,7 @@ export async function processInboundReplyAndEscalate(payload: {
         });
 
         // Create high-priority task for sales rep with pre-drafted response
-        if (companyId) {
+        if (companyId && assignedUserId) {
           const createTaskMutation = `
             mutation CreateHotReplyTask($object: aa_s_tasks_insert_input!) {
               insert_aa_s_tasks_one(object: $object) {
@@ -458,11 +555,13 @@ export async function processInboundReplyAndEscalate(payload: {
               priority: 'Urgent',
               status: 'To Do',
               due_date: todayDate,
-              assigned_to_id: lead.assigned_user_id || undefined,
+              assigned_to_id: Number(assignedUserId),
               related_lead_id: lead.id,
               notes: `AI Summary: ${classification.summary}\n\nSuggested Draft Reply:\n${classification.draft_reply || 'Follow up immediately'}`,
             },
             operationName: 'CreateHotReplyTask',
+          }).catch((taskErr) => {
+            console.warn('[TrackingService] Could not insert hot reply task:', taskErr);
           });
 
           // Create in-app notification
@@ -488,6 +587,8 @@ export async function processInboundReplyAndEscalate(payload: {
               related_entity_name: prospectName,
             },
             operationName: 'CreateHotReplyNotification',
+          }).catch((notifErr) => {
+            console.warn('[TrackingService] Could not insert hot reply notification:', notifErr);
           });
         }
       }
@@ -518,7 +619,7 @@ export async function processInboundReplyAndEscalate(payload: {
         });
 
         // Add task for rescheduled date
-        if (companyId) {
+        if (companyId && assignedUserId) {
           const createOooTaskMutation = `
             mutation CreateOooTask($object: aa_s_tasks_insert_input!) {
               insert_aa_s_tasks_one(object: $object) {
@@ -535,11 +636,13 @@ export async function processInboundReplyAndEscalate(payload: {
               priority: 'Medium',
               status: 'To Do',
               due_date: returnDate,
-              assigned_to_id: lead.assigned_user_id || undefined,
+              assigned_to_id: Number(assignedUserId),
               related_lead_id: lead.id,
               notes: `Automated Out of Office reply received. Contact scheduled to return around ${returnDate}.`,
             },
             operationName: 'CreateOooTask',
+          }).catch((taskErr) => {
+            console.warn('[TrackingService] Could not insert OOO task:', taskErr);
           });
         }
       }

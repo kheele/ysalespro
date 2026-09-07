@@ -21,6 +21,7 @@ import type { ScoreAndQualifyLeadOutput } from "@/ai/schemas/lead-qualification"
 import type { Lead, LeadStage, LeadTemperature } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
 import { useSettings } from "@/hooks/use-settings";
+import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Flame,
   Thermometer,
@@ -57,6 +69,10 @@ import {
   Copy,
   Check,
   MessageSquare,
+  MoreHorizontal,
+  ArrowRight,
+  User,
+  RefreshCw,
 } from "lucide-react";
 
 const STAGE_ICONS: Record<string, React.ReactNode> = {
@@ -108,6 +124,12 @@ function KanbanCard({
   const personTitle = lead.person?.job_title;
   const initials = personName.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase() || "L";
 
+  const repliedActivity = lead.outreach_activity_list?.find((a: any) => a.status === 'Replied');
+  const latestOutreach = lead.outreach_activity_list?.[0];
+  const leadEmail = lead.person?.email || lead.outreach_activity_list?.find((a: any) => a.recipient_email)?.recipient_email || null;
+  const isReplied = Boolean(repliedActivity) || lead.stage === 'Engaged';
+  const replyPreview = repliedActivity?.response_preview || latestOutreach?.response_preview;
+
   return (
     <div className={`rounded-xl ${sc.border} ${sc.bg} p-3 space-y-2.5 text-xs hover:shadow-md transition-shadow`}>
       <div className="flex items-center justify-between gap-2">
@@ -122,11 +144,26 @@ function KanbanCard({
           ) : (
             <span className={`font-bold truncate block ${sc.text}`}>{personName}</span>
           )}
+          {leadEmail && (
+            <p className="text-[10px] text-muted-foreground truncate font-mono" title={leadEmail}>
+              {leadEmail}
+            </p>
+          )}
           {personTitle && <p className="text-muted-foreground text-[10px] truncate">{personTitle}</p>}
         </div>
-        <Badge className={`${tc.badge} text-[9px] px-1.5 shrink-0`}>
-          {lead.lead_temperature || 'COLD'}
-        </Badge>
+        <div className="flex items-center gap-1 shrink-0">
+          {isReplied && (
+            <Badge
+              className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[9px] px-1.5 py-0 font-semibold cursor-help"
+              title={replyPreview ? `Reply: "${replyPreview}"` : "Prospect replied to outreach"}
+            >
+              💬 Replied
+            </Badge>
+          )}
+          <Badge className={`${tc.badge} text-[9px] px-1.5 shrink-0`}>
+            {lead.lead_temperature || 'COLD'}
+          </Badge>
+        </div>
       </div>
 
       {lead.company_name && (
@@ -362,6 +399,52 @@ export default function LeadsPage() {
     }
   };
 
+  const { toast } = useToast();
+  const [syncingReplies, setSyncingReplies] = React.useState(false);
+
+  const handleSyncReplies = async () => {
+    setSyncingReplies(true);
+    try {
+      const res = await fetch("/api/cron/poll-inbox-replies", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-salespro-ui": "true",
+        },
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.replies_detected > 0) {
+          toast({
+            title: `📥 Found ${data.replies_detected} New Reply(ies)!`,
+            description: `${data.replies_escalated} lead(s) escalated to Hot. Pipeline refreshed.`,
+          });
+          load();
+        } else {
+          toast({
+            title: "Mailboxes Synced",
+            description: `Polled ${data.accounts_checked} connected email account(s). No new prospect replies found.`,
+          });
+        }
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Inbox Sync Warning",
+          description: data.details?.[0]?.error || "Could not complete inbox reply poll.",
+        });
+      }
+    } catch (e: any) {
+      console.error("Failed to sync replies:", e);
+      toast({
+        variant: "destructive",
+        title: "Sync Failed",
+        description: e.message || "Failed to connect to email inbox.",
+      });
+    } finally {
+      setSyncingReplies(false);
+    }
+  };
+
   const [isAddingLead, setIsAddingLead] = React.useState(false);
 
   const handleAddLead = async (e: React.FormEvent) => {
@@ -467,6 +550,18 @@ export default function LeadsPage() {
               <Button
                 size="sm"
                 variant="outline"
+                onClick={handleSyncReplies}
+                disabled={syncingReplies}
+                className="border-border/60 bg-muted/40 text-foreground hover:bg-muted text-xs gap-1.5 font-semibold h-9"
+                title="Poll connected inboxes via IMAP for prospect replies"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 text-indigo-400 ${syncingReplies ? "animate-spin" : ""}`} />
+                {syncingReplies ? "Syncing..." : "Sync Replies"}
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={() => handleOpenTriage()}
                 className="border-indigo-500/40 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 text-xs gap-1.5 font-semibold h-9"
               >
@@ -535,22 +630,20 @@ export default function LeadsPage() {
                     <tr className="border-b border-border/40 bg-muted/30 text-muted-foreground text-[11px] uppercase font-semibold">
                       <th className="p-3.5">Person</th>
                       <th className="p-3.5">Company</th>
-                      <th className="p-3.5">Industry</th>
-                      <th className="p-3.5">Temperature</th>
-                      <th className="p-3.5">Stage</th>
+                      <th className="p-3.5">Temperature & Stage</th>
                       <th className="p-3.5">Score</th>
                       <th className="p-3.5">Last Contact</th>
                       <th className="p-3.5">Next Follow-Up</th>
                       <th className="p-3.5">Follow-Ups</th>
                       <th className="p-3.5">Assigned</th>
-                      <th className="p-3.5" />
+                      <th className="p-3.5 text-right pr-4">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/30">
                     {loading ? (
                       Array.from({ length: 5 }).map((_, i) => (
                         <tr key={i} className="animate-pulse">
-                          <td colSpan={11} className="p-4 bg-card/20" />
+                          <td colSpan={10} className="p-4 bg-card/20" />
                         </tr>
                       ))
                     ) : leads.length > 0 ? (
@@ -562,6 +655,13 @@ export default function LeadsPage() {
                         const personName = lead.person_name || lead.person?.name || "Lead Contact";
                         const personTitle = lead.person?.job_title;
                         const initials = personName.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase() || "L";
+                        const stageIdx = pipelineStages.indexOf(stage);
+                        const nextStage = stageIdx >= 0 && stageIdx < pipelineStages.length - 1 ? (pipelineStages[stageIdx + 1] as LeadStage) : null;
+                        const repliedActivity = lead.outreach_activity_list?.find((a: any) => a.status === 'Replied');
+                        const latestOutreach = lead.outreach_activity_list?.[0];
+                        const leadEmail = lead.person?.email || lead.outreach_activity_list?.find((a: any) => a.recipient_email)?.recipient_email || null;
+                        const isReplied = Boolean(repliedActivity) || lead.stage === 'Engaged';
+                        const replyPreview = repliedActivity?.response_preview || latestOutreach?.response_preview;
 
                         return (
                           <tr key={lead.id} className="hover:bg-muted/40 transition-colors group">
@@ -573,14 +673,19 @@ export default function LeadsPage() {
                                 </div>
                                 <div className="min-w-0">
                                   {lead.person_id ? (
-                                    <Link href={`/people/${lead.person_id}`} className="font-bold truncate max-w-[120px] block hover:text-indigo-400">
+                                    <Link href={`/people/${lead.person_id}`} className="font-bold truncate max-w-[140px] block hover:text-indigo-400">
                                       {personName}
                                     </Link>
                                   ) : (
-                                    <p className="font-bold truncate max-w-[120px]">{personName}</p>
+                                    <p className="font-bold truncate max-w-[140px]">{personName}</p>
+                                  )}
+                                  {leadEmail && (
+                                    <p className="text-[10px] text-muted-foreground truncate max-w-[140px] font-mono" title={leadEmail}>
+                                      {leadEmail}
+                                    </p>
                                   )}
                                   {personTitle && (
-                                    <p className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                                    <p className="text-[10px] text-muted-foreground truncate max-w-[140px]">
                                       {personTitle}
                                     </p>
                                   )}
@@ -589,25 +694,34 @@ export default function LeadsPage() {
                             </td>
                             {/* Company */}
                             <td className="p-3.5">
-                              <span className="font-semibold text-foreground whitespace-nowrap">
+                              <span className="flex flex-row justify-start gap-1 font-semibold text-foreground whitespace-nowrap">
                                 {lead.company_name || "—"}
+                                {lead.industry && <Badge
+                                  variant="secondary"
+                                  className="p-1 h-4 text-[10px] bg-inherit text-muted-foreground border border-border/40"
+                                >
+                                  {lead.industry}
+                                </Badge>}
                               </span>
-                            </td>
-                            {/* Industry */}
-                            <td className="p-3.5 text-muted-foreground text-[11px] whitespace-nowrap">
-                              {lead.industry || "—"}
                             </td>
                             {/* Temperature */}
                             <td className="p-3.5">
-                              <Badge className={`${tc.badge} text-[10px]`}>
-                                {lead.lead_temperature || "COLD"}
-                              </Badge>
-                            </td>
-                            {/* Stage */}
-                            <td className="p-3.5">
-                              <Badge className={`${sc.bg} ${sc.text} border ${sc.border} text-[10px] gap-1`}>
-                                {STAGE_ICONS[stage]} {stage}
-                              </Badge>
+                              <span className="flex flex-row justify-start gap-1 text-foreground whitespace-nowrap items-center">
+                                {isReplied && (
+                                  <Badge
+                                    className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 p-1.5 h-4 text-[10px] gap-1 font-semibold cursor-help"
+                                    title={replyPreview ? `Reply: "${replyPreview}"` : "Prospect replied to outreach"}
+                                  >
+                                    💬 Replied
+                                  </Badge>
+                                )}
+                                <Badge className={`${tc.badge} border-0 p-1.5 h-4 text-[10px]`}>
+                                  {lead.lead_temperature || "COLD"}
+                                </Badge>
+                                <Badge className={`${sc.bg} ${sc.text} p-1.5 h-4 text-[10px] gap-1`}>
+                                  {STAGE_ICONS[stage]} {stage}
+                                </Badge>
+                              </span>
                             </td>
                             {/* Score */}
                             <td className="p-3.5 w-28">
@@ -629,50 +743,104 @@ export default function LeadsPage() {
                             </td>
                             {/* Assigned */}
                             <td className="p-3.5 text-muted-foreground text-[11px] whitespace-nowrap">
-                              {lead.assigned_user || "—"}
+                              {typeof lead.assigned_user === 'string'
+                                ? lead.assigned_user
+                                : lead.assigned_user
+                                ? `${lead.assigned_user.fname || ''} ${lead.assigned_user.lname || ''}`.trim() || lead.assigned_user.email || '—'
+                                : '—'}
                             </td>
-                            {/* Actions */}
-                            <td className="p-3.5 whitespace-nowrap">
-                              <div className="flex items-center gap-1.5 justify-end">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleOpenQualify(lead)}
-                                  className="text-[10px] h-7 px-2 gap-1 text-amber-300 hover:bg-amber-500/15"
-                                  title="AI Score & Qualify"
-                                >
-                                  <Target className="h-3 w-3 text-amber-400" /> Qualify
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleOpenBrief(lead)}
-                                  className="text-[10px] h-7 px-2 gap-1 text-indigo-300 hover:bg-indigo-500/15"
-                                >
-                                  <Sparkles className="h-3 w-3 text-indigo-400" /> Brief
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleOpenTriage(lead)}
-                                  className="text-[10px] h-7 px-2 gap-1 text-purple-300 hover:bg-purple-500/15"
-                                >
-                                  <MessageSquare className="h-3 w-3 text-purple-400" /> Triage
-                                </Button>
-                                {(() => {
-                                  const idx = pipelineStages.indexOf(stage);
-                                  const next = pipelineStages[idx + 1];
-                                  return next ? (
+                            {/* Actions Dropdown */}
+                            <td className="p-3.5 text-right pr-4 w-16">
+                              <div className="flex items-center justify-end">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      onClick={() => handleMove(lead.id, next)}
-                                      className={`text-[10px] h-7 gap-0.5 opacity-0 group-hover:opacity-100 ${sc.text}`}
+                                      className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-md data-[state=open]:bg-muted"
+                                      title="Actions"
                                     >
-                                      → {next}
+                                      <span className="sr-only">Open actions menu</span>
+                                      <MoreHorizontal className="h-4 w-4" />
                                     </Button>
-                                  ) : null;
-                                })()}
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-52 bg-card border-border shadow-xl">
+                                    <DropdownMenuLabel className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
+                                      AI Intelligence
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuItem
+                                      onClick={() => handleOpenQualify(lead)}
+                                      className="text-xs cursor-pointer gap-2 text-foreground focus:bg-amber-500/15 focus:text-amber-300"
+                                    >
+                                      <Target className="h-3.5 w-3.5 text-amber-400" />
+                                      <span>Score & Qualify</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleOpenBrief(lead)}
+                                      className="text-xs cursor-pointer gap-2 text-foreground focus:bg-indigo-500/15 focus:text-indigo-300"
+                                    >
+                                      <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                                      <span>Pre-Call Brief</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleOpenTriage(lead)}
+                                      className="text-xs cursor-pointer gap-2 text-foreground focus:bg-purple-500/15 focus:text-purple-300"
+                                    >
+                                      <MessageSquare className="h-3.5 w-3.5 text-purple-400" />
+                                      <span>Triage Reply</span>
+                                    </DropdownMenuItem>
+
+                                    <DropdownMenuSeparator />
+
+                                    <DropdownMenuLabel className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
+                                      Pipeline Stage
+                                    </DropdownMenuLabel>
+                                    {nextStage && (
+                                      <DropdownMenuItem
+                                        onClick={() => handleMove(lead.id, nextStage)}
+                                        className="text-xs cursor-pointer gap-2 font-medium text-emerald-400 focus:bg-emerald-500/15 focus:text-emerald-300"
+                                      >
+                                        <ArrowRight className="h-3.5 w-3.5 text-emerald-400" />
+                                        <span>Advance to {nextStage}</span>
+                                      </DropdownMenuItem>
+                                    )}
+
+                                    <DropdownMenuSub>
+                                      <DropdownMenuSubTrigger className="text-xs gap-2 cursor-pointer">
+                                        <Repeat className="h-3.5 w-3.5 text-muted-foreground" />
+                                        <span>Move Stage</span>
+                                      </DropdownMenuSubTrigger>
+                                      <DropdownMenuSubContent className="w-44 bg-card border-border shadow-xl">
+                                        {pipelineStages.map((s) => (
+                                          <DropdownMenuItem
+                                            key={s}
+                                            onClick={() => handleMove(lead.id, s as LeadStage)}
+                                            className={`text-xs cursor-pointer gap-2 ${s === stage ? "font-bold text-indigo-400 bg-indigo-500/10" : "text-foreground"
+                                              }`}
+                                          >
+                                            {STAGE_ICONS[s]}
+                                            <span>{s}</span>
+                                            {s === stage && (
+                                              <Check className="h-3.5 w-3.5 ml-auto text-indigo-400" />
+                                            )}
+                                          </DropdownMenuItem>
+                                        ))}
+                                      </DropdownMenuSubContent>
+                                    </DropdownMenuSub>
+
+                                    {lead.person_id && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem asChild className="text-xs cursor-pointer gap-2">
+                                          <Link href={`/people/${lead.person_id}`}>
+                                            <User className="h-3.5 w-3.5 text-muted-foreground" />
+                                            <span>View Contact</span>
+                                          </Link>
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             </td>
                           </tr>
@@ -680,7 +848,7 @@ export default function LeadsPage() {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={11} className="p-10 text-center text-muted-foreground text-xs">
+                        <td colSpan={10} className="p-10 text-center text-muted-foreground text-xs">
                           No leads found. Try adjusting your filters.
                         </td>
                       </tr>
@@ -689,7 +857,7 @@ export default function LeadsPage() {
                   {leads.length > 0 && (
                     <tfoot>
                       <tr className="border-t border-border/40 bg-muted/20 text-[11px] font-semibold text-muted-foreground">
-                        <td colSpan={11} className="p-3.5 font-bold text-foreground">
+                        <td colSpan={10} className="p-3.5 font-bold text-foreground">
                           {leads.length} Total Leads ({hotCount} Hot, {warmCount} Warm)
                         </td>
                       </tr>
