@@ -1,0 +1,575 @@
+'use server';
+
+import { updateGraphQL, insertGraphQL, getGraphQLOne } from '@/graphql';
+import { classifyInboundReplyFlow } from '@/ai/flows/classify-inbound-reply';
+import type { ClassifyInboundReplyOutput } from '@/ai/schemas/inbound-reply';
+
+export interface RecordOpenResult {
+  success: boolean;
+  message?: string;
+  outreach_id?: number;
+  lead_id?: number;
+}
+
+export interface RecordClickResult {
+  success: boolean;
+  target_url: string;
+  outreach_id?: number;
+  lead_id?: number;
+}
+
+export interface InboundReplyResult {
+  success: boolean;
+  classification?: ClassifyInboundReplyOutput;
+  lead_id?: number;
+  outreach_id?: number;
+  escalation_action?: string;
+  error?: string;
+}
+
+import { injectTrackingToEmailHtml as syncInjectTrackingToEmailHtml } from '@/lib/tracking-utils';
+
+/**
+ * Async wrapper for injectTrackingToEmailHtml compliant with RSC / Server Action conventions.
+ */
+export async function injectTrackingToEmailHtml(
+  html: string,
+  meta: {
+    outreachId?: number;
+    leadId?: number;
+    campaignId?: number;
+    baseUrl: string;
+  }
+): Promise<string> {
+  return syncInjectTrackingToEmailHtml(html, meta);
+}
+
+/**
+ * Record an email open event (Tracking Pixel).
+ * Updates aa_s_outreach_activities status to 'Opened' (if not already Clicked/Replied)
+ * and updates the lead score and last_contact timestamp.
+ */
+export async function recordEmailOpen(params: {
+  outreachId?: number | null;
+  leadId?: number | null;
+  campaignId?: number | null;
+  ip?: string;
+  userAgent?: string;
+}): Promise<RecordOpenResult> {
+  const { outreachId, leadId } = params;
+
+  try {
+    // 1. Update outreach activity if ID is present
+    if (outreachId && !isNaN(outreachId)) {
+      const getOutreachQuery = `
+        query GetOutreachById($id: Int!) {
+          aa_s_outreach_activities_by_pk(id: $id) {
+            id
+            status
+            lead_id
+            account_company_id
+          }
+        }
+      `;
+      const outreach = await getGraphQLOne({
+        query: getOutreachQuery,
+        variables: { id: Number(outreachId) },
+        operationName: 'GetOutreachById',
+      });
+
+      if (outreach) {
+        // Do not downgrade if already Clicked or Replied
+        if (outreach.status !== 'Clicked' && outreach.status !== 'Replied') {
+          const updateMutation = `
+            mutation MarkOutreachOpened($id: Int!) {
+              update_aa_s_outreach_activities_by_pk(
+                pk_columns: { id: $id }
+                _set: { status: "Opened" }
+              ) {
+                id
+                status
+              }
+            }
+          `;
+          await updateGraphQL({
+            mutation: updateMutation,
+            id: Number(outreachId),
+            operationName: 'MarkOutreachOpened',
+          });
+        }
+      }
+    }
+
+    // 2. Update lead engagement metrics if leadId is present
+    if (leadId && !isNaN(leadId)) {
+      const getLeadQuery = `
+        query GetLeadById($id: Int!) {
+          aa_s_leads_by_pk(id: $id) {
+            id
+            lead_score
+            lead_temperature
+          }
+        }
+      `;
+      const lead = await getGraphQLOne({
+        query: getLeadQuery,
+        variables: { id: Number(leadId) },
+        operationName: 'GetLeadById',
+      });
+
+      if (lead) {
+        const currentScore = lead.lead_score || 0;
+        const newScore = currentScore + 5;
+        // Warm up Cold leads to Warm on verified open if score passes threshold
+        const newTemp = lead.lead_temperature === 'COLD' && newScore >= 20 ? 'WARM' : lead.lead_temperature;
+
+        const updateLeadMutation = `
+          mutation UpdateLeadOnOpen($id: Int!, $score: Int!, $temp: String!, $now: timestamptz!) {
+            update_aa_s_leads_by_pk(
+              pk_columns: { id: $id }
+              _set: {
+                lead_score: $score
+                lead_temperature: $temp
+                last_contact: $now
+                updated_at: $now
+              }
+            ) {
+              id
+            }
+          }
+        `;
+        await updateGraphQL({
+          mutation: updateLeadMutation,
+          id: Number(leadId),
+          attrs: {
+            score: newScore,
+            temp: newTemp,
+            now: new Date().toISOString(),
+          },
+          operationName: 'UpdateLeadOnOpen',
+        });
+      }
+    }
+
+    return { success: true, outreach_id: outreachId || undefined, lead_id: leadId || undefined };
+  } catch (err: any) {
+    console.error('[trackingService] recordEmailOpen error:', err);
+    return { success: false, message: err?.message || 'Failed to record open' };
+  }
+}
+
+/**
+ * Record an email link click event (Fallback & High-Intent Tracking).
+ * If the tracking pixel was blocked/deferred, this GUARANTEES the email was opened.
+ * Marks outreach as Opened (if needed) and Clicked, and bumps the lead score (+10).
+ */
+export async function recordEmailClick(params: {
+  targetUrl: string;
+  outreachId?: number | null;
+  leadId?: number | null;
+  campaignId?: number | null;
+  ip?: string;
+  userAgent?: string;
+}): Promise<RecordClickResult> {
+  const { targetUrl, outreachId, leadId } = params;
+
+  try {
+    // 1. Dual Fallback: Mark Outreach as Opened & Clicked
+    if (outreachId && !isNaN(outreachId)) {
+      const updateMutation = `
+        mutation MarkOutreachClicked($id: Int!) {
+          update_aa_s_outreach_activities_by_pk(
+            pk_columns: { id: $id }
+            _set: { status: "Clicked" }
+          ) {
+            id
+            status
+          }
+        }
+      `;
+      await updateGraphQL({
+        mutation: updateMutation,
+        id: Number(outreachId),
+        operationName: 'MarkOutreachClicked',
+      });
+    }
+
+    // 2. High intent signal: update lead score (+10) and temperature
+    if (leadId && !isNaN(leadId)) {
+      const getLeadQuery = `
+        query GetLeadById($id: Int!) {
+          aa_s_leads_by_pk(id: $id) {
+            id
+            lead_score
+            lead_temperature
+          }
+        }
+      `;
+      const lead = await getGraphQLOne({
+        query: getLeadQuery,
+        variables: { id: Number(leadId) },
+        operationName: 'GetLeadById',
+      });
+
+      if (lead) {
+        const currentScore = lead.lead_score || 0;
+        const newScore = currentScore + 10;
+        const newTemp = lead.lead_temperature === 'COLD' ? 'WARM' : lead.lead_temperature;
+
+        const updateLeadMutation = `
+          mutation UpdateLeadOnClick($id: Int!, $score: Int!, $temp: String!, $now: timestamptz!) {
+            update_aa_s_leads_by_pk(
+              pk_columns: { id: $id }
+              _set: {
+                lead_score: $score
+                lead_temperature: $temp
+                last_contact: $now
+                updated_at: $now
+              }
+            ) {
+              id
+            }
+          }
+        `;
+        await updateGraphQL({
+          mutation: updateLeadMutation,
+          id: Number(leadId),
+          attrs: {
+            score: newScore,
+            temp: newTemp,
+            now: new Date().toISOString(),
+          },
+          operationName: 'UpdateLeadOnClick',
+        });
+      }
+    }
+
+    return {
+      success: true,
+      target_url: targetUrl,
+      outreach_id: outreachId || undefined,
+      lead_id: leadId || undefined,
+    };
+  } catch (err: any) {
+    console.error('[trackingService] recordEmailClick error:', err);
+    return {
+      success: false,
+      target_url: targetUrl,
+      outreach_id: outreachId || undefined,
+      lead_id: leadId || undefined,
+    };
+  }
+}
+
+/**
+ * Inbound Email Reply Triage & AI Lead Escalation.
+ * 1. Matches incoming reply to active Lead & Outreach Activity.
+ * 2. Marks outreach as 'Replied'.
+ * 3. Runs Genkit classifyInboundReplyFlow for sentiment & intent analysis.
+ * 4. Automatically triggers lead escalation (HOT status, alert task, OOO rescheduling, unsubscribe).
+ */
+export async function processInboundReplyAndEscalate(payload: {
+  fromEmail: string;
+  fromName?: string;
+  subject?: string;
+  body: string;
+  leadId?: number;
+  outreachId?: number;
+  campaignId?: number;
+  headers?: Record<string, string>;
+}): Promise<InboundReplyResult> {
+  const { fromEmail, fromName, subject = 'Re: Outreach', body, headers = {} } = payload;
+  let targetLeadId = payload.leadId;
+  let targetOutreachId = payload.outreachId;
+  let companyId: number | undefined;
+
+  try {
+    // 1. If leadId not directly provided, search by recipient_email in outreach or leads
+    if (!targetLeadId && fromEmail) {
+      const cleanEmail = fromEmail.trim().toLowerCase();
+
+      // Check aa_s_outreach_activities first
+      const findOutreachQuery = `
+        query FindRecentOutreach($email: String!) {
+          aa_s_outreach_activities(
+            where: { recipient_email: { _ilike: $email } }
+            order_by: [{ id: desc }]
+            limit: 1
+          ) {
+            id
+            lead_id
+            campaign_id
+            account_company_id
+          }
+        }
+      `;
+      const recentOutreach = await getGraphQLOne({
+        query: findOutreachQuery,
+        variables: { email: cleanEmail },
+        operationName: 'FindRecentOutreach',
+      });
+
+      if (recentOutreach) {
+        targetOutreachId = recentOutreach.id;
+        targetLeadId = recentOutreach.lead_id;
+        companyId = recentOutreach.account_company_id;
+      }
+    }
+
+    // 2. Fetch full Lead record
+    let lead: any = null;
+    if (targetLeadId) {
+      const getLeadQuery = `
+        query GetLeadForTriage($id: Int!) {
+          aa_s_leads_by_pk(id: $id) {
+            id
+            account_company_id
+            person_name
+            company_name
+            industry
+            lead_temperature
+            lead_score
+            stage
+            assigned_user_id
+          }
+        }
+      `;
+      const lead = await getGraphQLOne({
+        query: getLeadQuery,
+        variables: { id: Number(targetLeadId) },
+        operationName: 'GetLeadForTriage',
+      });
+
+      if (lead && !companyId) {
+        companyId = lead.account_company_id;
+      }
+    }
+
+    // 3. Mark outreach activity as 'Replied'
+    if (targetOutreachId) {
+      const markRepliedMutation = `
+        mutation MarkOutreachReplied($id: Int!, $preview: String!) {
+          update_aa_s_outreach_activities_by_pk(
+            pk_columns: { id: $id }
+            _set: {
+              status: "Replied"
+              response_preview: $preview
+            }
+          ) {
+            id
+            status
+          }
+        }
+      `;
+      await updateGraphQL({
+        mutation: markRepliedMutation,
+        id: Number(targetOutreachId),
+        attrs: {
+          preview: body.slice(0, 300),
+        },
+        operationName: 'MarkOutreachReplied',
+      });
+    }
+
+    // 4. Run AI Inbound Reply Classification Flow
+    const prospectName = lead?.person_name || fromName || fromEmail.split('@')[0];
+    const companyName = lead?.company_name || 'Prospect Company';
+
+    const classification = await classifyInboundReplyFlow({
+      inbound_message: body,
+      prospect_name: prospectName,
+      company_name: companyName,
+      subject,
+      original_outreach_context: 'Outbound sales sequence',
+    });
+
+    let escalationAction: string = classification.recommended_action || classification.intent;
+
+    // 5. Automated Escalation Logic
+    const nowIso = new Date().toISOString();
+    const todayDate = nowIso.split('T')[0];
+
+    if (classification.intent === 'interested' || classification.recommended_action === 'promote_to_hot') {
+      // --- ESCALATE TO HOT LEAD ---
+      if (lead) {
+        const updateLeadMutation = `
+          mutation EscalateLeadToHot($id: Int!, $score: Int!, $now: timestamptz!) {
+            update_aa_s_leads_by_pk(
+              pk_columns: { id: $id }
+              _set: {
+                lead_temperature: "HOT"
+                stage: "Engaged"
+                lead_score: $score
+                last_contact: $now
+                updated_at: $now
+              }
+            ) {
+              id
+              lead_temperature
+              lead_score
+            }
+          }
+        `;
+        await updateGraphQL({
+          mutation: updateLeadMutation,
+          id: lead.id,
+          attrs: {
+            score: (lead.lead_score || 0) + 35,
+            now: nowIso,
+          },
+          operationName: 'EscalateLeadToHot',
+        });
+
+        // Create high-priority task for sales rep with pre-drafted response
+        if (companyId) {
+          const createTaskMutation = `
+            mutation CreateHotReplyTask($object: aa_s_tasks_insert_input!) {
+              insert_aa_s_tasks_one(object: $object) {
+                id
+                title
+              }
+            }
+          `;
+          await insertGraphQL({
+            mutation: createTaskMutation,
+            input: {
+              account_company_id: companyId,
+              title: `🔥 HOT Lead Reply: ${prospectName} (${companyName})`,
+              type: 'Follow-up',
+              priority: 'Urgent',
+              status: 'To Do',
+              due_date: todayDate,
+              assigned_to_id: lead.assigned_user_id || undefined,
+              related_lead_id: lead.id,
+              notes: `AI Summary: ${classification.summary}\n\nSuggested Draft Reply:\n${classification.draft_reply || 'Follow up immediately'}`,
+            },
+            operationName: 'CreateHotReplyTask',
+          });
+
+          // Create in-app notification
+          const createNotifMutation = `
+            mutation CreateHotReplyNotification($object: aa_s_notifications_insert_input!) {
+              insert_aa_s_notifications_one(object: $object) {
+                id
+              }
+            }
+          `;
+          await insertGraphQL({
+            mutation: createNotifMutation,
+            input: {
+              account_company_id: companyId,
+              title: `🔥 Hot Lead Reply from ${prospectName}`,
+              message: classification.summary,
+              type: 'success',
+              priority: 'urgent',
+              read: false,
+              action_url: `/dashboard/leads?id=${lead.id}`,
+              related_entity_type: 'lead',
+              related_entity_id: lead.id,
+              related_entity_name: prospectName,
+            },
+            operationName: 'CreateHotReplyNotification',
+          });
+        }
+      }
+      escalationAction = 'escalated_to_hot';
+
+    } else if (classification.intent === 'out_of_office') {
+      // --- OUT OF OFFICE HANDLING ---
+      const returnDate = classification.return_date || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+      if (lead) {
+        const updateOooMutation = `
+          mutation RescheduleOooLead($id: Int!, $nextDate: timestamptz!, $now: timestamptz!) {
+            update_aa_s_leads_by_pk(
+              pk_columns: { id: $id }
+              _set: {
+                next_followup: $nextDate
+                updated_at: $now
+              }
+            ) {
+              id
+            }
+          }
+        `;
+        await updateGraphQL({
+          mutation: updateOooMutation,
+          id: lead.id,
+          attrs: {
+            nextDate: new Date(returnDate).toISOString(),
+            now: nowIso,
+          },
+          operationName: 'RescheduleOooLead',
+        });
+
+        // Add task for rescheduled date
+        if (companyId) {
+          const createOooTaskMutation = `
+            mutation CreateOooTask($object: aa_s_tasks_insert_input!) {
+              insert_aa_s_tasks_one(object: $object) {
+                id
+              }
+            }
+          `;
+          await insertGraphQL({
+            mutation: createOooTaskMutation,
+            input: {
+              account_company_id: companyId,
+              title: `OOO Follow-up: ${prospectName} (${companyName})`,
+              type: 'Follow-up',
+              priority: 'Medium',
+              status: 'To Do',
+              due_date: returnDate,
+              assigned_to_id: lead.assigned_user_id || undefined,
+              related_lead_id: lead.id,
+              notes: `Automated Out of Office reply received. Contact scheduled to return around ${returnDate}.`,
+            },
+            operationName: 'CreateOooTask',
+          });
+        }
+      }
+      escalationAction = 'rescheduled_for_return_date';
+
+    } else if (classification.intent === 'not_interested') {
+      // --- UNSUBSCRIBE / SUPPRESSION ---
+      if (lead) {
+        const updateUnsubMutation = `
+          mutation MarkLeadUnsubscribed($id: Int!, $now: timestamptz!) {
+            update_aa_s_leads_by_pk(
+              pk_columns: { id: $id }
+              _set: {
+                lead_temperature: "COLD"
+                stage: "Lost"
+                updated_at: $now
+              }
+            ) {
+              id
+            }
+          }
+        `;
+        await updateGraphQL({
+          mutation: updateUnsubMutation,
+          id: lead.id,
+          attrs: {
+            now: nowIso,
+          },
+          operationName: 'MarkLeadUnsubscribed',
+        });
+      }
+      escalationAction = 'suppressed_and_unsubscribed';
+    }
+
+    return {
+      success: true,
+      classification,
+      lead_id: targetLeadId || undefined,
+      outreach_id: targetOutreachId || undefined,
+      escalation_action: escalationAction,
+    };
+  } catch (err: any) {
+    console.error('[trackingService] processInboundReplyAndEscalate error:', err);
+    return {
+      success: false,
+      error: err?.message || 'Failed to process inbound reply',
+    };
+  }
+}

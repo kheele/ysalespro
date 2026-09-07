@@ -7,6 +7,7 @@ import {
   incrementAccountSentCount,
 } from './connectedAccountsService';
 import { logOutreachActionByToken } from './outreachServices';
+import { injectTrackingToEmailHtml } from '@/lib/tracking-utils';
 import type {
   SendEmailPayload,
   SendLinkedInPayload,
@@ -60,6 +61,37 @@ export async function sendEmailOutreachActionByToken(
   const now = new Date().toISOString();
   let messageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+  // Automatically pre-log outreach activity in Hasura database to get outreach ID for tracking
+  const loggedActivity = await logOutreachActionByToken(token, {
+    channel: 'Email',
+    // recipient_name: payload.to_name || payload.to.split('@')[0],
+    // recipient_email: payload.to,
+    recipient_name: payload.to_name || 'rkheele',
+    recipient_email: 'rkheele@gmail.com',
+    subject: payload.subject,
+    subject_or_type: payload.subject,
+    message: payload.text || payload.html || '',
+    status: 'Sent',
+    outcome: 'Dispatched via ' + account.name,
+    lead_id: payload.lead_id ? Number(payload.lead_id) : undefined,
+    campaign_id: payload.campaign_id ? Number(payload.campaign_id) : undefined,
+    date: now.split('T')[0],
+  });
+
+  const outreachId = loggedActivity?.id ? Number(loggedActivity.id) : undefined;
+  // const trackingBaseUrl = "https://ae39-129-232-117-242.ngrok-free.app";
+  const trackingBaseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    'https://ysalespro.com';
+
+  const rawContent = payload.html || payload.text || '';
+  const trackedHtml = injectTrackingToEmailHtml(rawContent, {
+    outreachId,
+    leadId: payload.lead_id ? Number(payload.lead_id) : undefined,
+    campaignId: payload.campaign_id ? Number(payload.campaign_id) : undefined,
+    baseUrl: trackingBaseUrl,
+  });
+
   try {
     if (config.password && (config.provider === 'google_workspace' || config.provider === 'smtp')) {
       const transporter = nodemailer.createTransport({
@@ -74,18 +106,19 @@ export async function sendEmailOutreachActionByToken(
       });
 
       const info: any = await transporter.sendMail({
-        from: `"${config.from_name || 'SalesPro'}" <${config.from_email}>`,
+        from: config.from_name ? `"${config.from_name}" <${config.from_email}>` : config.from_email,
         // to: payload.to_name ? `"${payload.to_name}" <${payload.to}>` : payload.to,
         to: payload.to_name ? `"${payload.to_name}" <rkheele@gmail.com>` : 'rkheele@gmail.com',
         subject: payload.subject,
         text: payload.text || payload.html?.replace(/<[^>]*>?/gm, ''),
-        html: payload.html || (payload.text ? payload.text.replace(/\n/g, '<br/>') : undefined),
+        html: trackedHtml,
         replyTo: payload.reply_to || config.reply_to || config.from_email,
         headers: {
           'X-SalesPro-Outreach': 'true',
           'X-SalesPro-Account-Id': String(account.id),
           'X-SalesPro-Lead-Id': String(payload.lead_id || ''),
           'X-SalesPro-Campaign-Id': String(payload.campaign_id || ''),
+          'X-SalesPro-Outreach-Id': String(outreachId || ''),
         },
       });
 
@@ -96,23 +129,6 @@ export async function sendEmailOutreachActionByToken(
 
     // Increment sender account volume
     await incrementAccountSentCount(companyId, account.id);
-
-    // Automatically record outreach activity in Hasura database
-    const loggedActivity = await logOutreachActionByToken(token, {
-      channel: 'Email',
-      // recipient_name: payload.to_name || payload.to.split('@')[0],
-      // recipient_email: payload.to,
-      recipient_name: payload.to_name || 'rkheele',
-      recipient_email: 'rkheele@gmail.com',
-      subject: payload.subject,
-      subject_or_type: payload.subject,
-      message: payload.text || payload.html || '',
-      status: 'Sent',
-      outcome: 'Dispatched via ' + account.name,
-      lead_id: payload.lead_id ? Number(payload.lead_id) : undefined,
-      campaign_id: payload.campaign_id ? Number(payload.campaign_id) : undefined,
-      date: now.split('T')[0],
-    });
 
     return {
       success: true,

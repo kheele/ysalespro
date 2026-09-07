@@ -5,6 +5,7 @@ export type GetLeadsParams = {
   lead_temperature?: LeadTemperature;
   search?: string;
   assigned_user?: string;
+  assigned_user_id?: number | string;
   company_name?: string;
 };
 

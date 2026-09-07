@@ -375,6 +375,7 @@ export type LeadStage = 'New' | 'Cold' | 'Contacted' | 'Warm Engaged' | 'Hot Qua
 export interface Lead {
   id: number;
   account_company_id: number;
+  target_organization_id?: number | null;
   person_id?: number | null;
   person_name?: string | null;
   company_name?: string | null;
@@ -384,7 +385,14 @@ export interface Lead {
   stage?: LeadStage | string | null;
   last_contact?: string | null;
   next_followup?: string | null;
-  assigned_user?: string | null;
+  assigned_user_id?: number | null;
+  assigned_user?: {
+    id: number | string;
+    fname?: string | null;
+    lname?: string | null;
+    email?: string | null;
+    [key: string]: any;
+  } | null;
   followup_count?: number | null;
   created_at?: string | null;
   updated_at?: string | null;

@@ -104,6 +104,7 @@ export async function getOutreachActivitiesActionByToken(
           channel
           lead_name
           company_name
+          recipient_email
           subject_or_type
           status
           response_preview
@@ -142,6 +143,7 @@ export async function logOutreachActionByToken(
           channel
           lead_name
           company_name
+          recipient_email
           subject_or_type
           status
           response_preview
@@ -160,6 +162,7 @@ export async function logOutreachActionByToken(
         campaign_id: activity.campaign_id ? Number(activity.campaign_id) : undefined,
         lead_name: activity.lead_name || activity.recipient_name || undefined,
         company_name: activity.company_name || activity.recipient_org || undefined,
+        recipient_email: activity.recipient_email || undefined,
         subject_or_type: activity.subject_or_type || activity.subject || "Outreach",
         status: activity.status || "Completed",
         response_preview: activity.response_preview || activity.message || undefined,

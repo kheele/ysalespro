@@ -87,6 +87,7 @@ Create:
 2. Target Persona Mindset Summary
 3. 4-step sequence (Day 1 Intro, Day 3 Giver Asset Follow-up, Day 7 Peer Case Study, Day 14 Respectful Breakup)
    - Every email MUST use Vanessa Van Edwards' human behavior principles (Warmth + Competence, Autonomy preservation 'Feel free to say no', anti-boring openers).
+   - Use tokens: {{fname}}, {{company_name}}, and {{sender_name}} for sign-offs. NEVER output raw bracket placeholders like [Your Name] or [Your Title].
 4. Recommended automation rules and schedule.
 
 Return strictly valid JSON conforming to the output schema.`;

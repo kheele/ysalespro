@@ -12,6 +12,7 @@ function mapDbLead(l: any): Lead {
   return {
     id: l.id,
     account_company_id: l.account_company_id,
+    target_organization_id: l.target_organization_id ?? null,
     person_id: l.person_id ?? null,
     person_name: l.person_name ?? null,
     company_name: l.company_name ?? null,
@@ -21,7 +22,8 @@ function mapDbLead(l: any): Lead {
     stage: l.stage ?? 'Cold',
     last_contact: l.last_contact ?? null,
     next_followup: l.next_followup ?? null,
-    assigned_user: l.assigned_user ?? null,
+    assigned_user_id: l.assigned_user_id ?? l.assigned_user?.id ?? null,
+    assigned_user: l.assigned_user,
     followup_count: l.followup_count ?? 0,
     created_at: l.created_at ?? null,
     updated_at: l.updated_at ?? null,
@@ -78,7 +80,22 @@ export async function getLeadsActionByToken(
 
     const assigned = params?.assigned_user;
     if (assigned && assigned !== 'all') {
-      whereConditions.push({ assigned_user: { _eq: assigned } });
+      const isNum = !isNaN(Number(assigned));
+      if (isNum) {
+        whereConditions.push({
+          assigned_user_id: { _eq: Number(assigned) }
+        });
+      } else {
+        whereConditions.push({
+          assigned_user: {
+            _or: [
+              { fname: { _ilike: `%${assigned}%` } },
+              { lname: { _ilike: `%${assigned}%` } },
+              { email: { _ilike: `%${assigned}%` } },
+            ],
+          },
+        });
+      }
     }
 
     const companyName = params?.company_name;
@@ -96,6 +113,7 @@ export async function getLeadsActionByToken(
         ) {
           id
           account_company_id
+          target_organization_id
           person_id
           person_name
           company_name
@@ -105,10 +123,16 @@ export async function getLeadsActionByToken(
           stage
           last_contact
           next_followup
-          assigned_user
           followup_count
           created_at
           updated_at
+          assigned_user_id
+          assigned_user {
+            id
+            fname
+            lname
+            email
+          }
           person {
             id
             name
@@ -161,6 +185,7 @@ export async function updateLeadStageActionByToken(
         ) {
           id
           account_company_id
+          target_organization_id
           person_id
           person_name
           company_name
@@ -170,10 +195,16 @@ export async function updateLeadStageActionByToken(
           stage
           last_contact
           next_followup
-          assigned_user
           followup_count
           created_at
           updated_at
+          assigned_user_id
+          assigned_user {
+            id
+            fname
+            lname
+            email
+          }
         }
       }
     `;
@@ -215,6 +246,7 @@ export async function updateLeadStatusActionByToken(
         ) {
           id
           account_company_id
+          target_organization_id
           person_id
           person_name
           company_name
@@ -224,10 +256,16 @@ export async function updateLeadStatusActionByToken(
           stage
           last_contact
           next_followup
-          assigned_user
           followup_count
           created_at
           updated_at
+          assigned_user_id
+          assigned_user {
+            id
+            fname
+            lname
+            email
+          }
         }
       }
     `;
@@ -259,6 +297,7 @@ export async function createLeadActionByToken(
     lead_temperature?: string | null;
     lead_score?: number | null;
     assigned_user?: string | null;
+    assigned_user_id?: number | null;
     next_followup?: string | null;
     last_contact?: string | null;
   }
@@ -274,6 +313,7 @@ export async function createLeadActionByToken(
         insert_aa_s_leads_one(object: $object) {
           id
           account_company_id
+          target_organization_id
           person_id
           person_name
           company_name
@@ -281,11 +321,17 @@ export async function createLeadActionByToken(
           stage
           lead_temperature
           lead_score
-          assigned_user
           next_followup
           last_contact
           created_at
           updated_at
+          assigned_user_id
+          assigned_user {
+            id
+            fname
+            lname
+            email
+          }
         }
       }
     `;
@@ -301,7 +347,7 @@ export async function createLeadActionByToken(
         stage: input.stage || "Cold",
         lead_temperature: input.lead_temperature || "COLD",
         lead_score: input.lead_score ?? 0,
-        assigned_user: input.assigned_user || null,
+        assigned_user_id: input.assigned_user_id ?? (!isNaN(Number(input.assigned_user)) && input.assigned_user ? Number(input.assigned_user) : null),
         next_followup: input.next_followup || null,
         last_contact: input.last_contact || null,
       },
