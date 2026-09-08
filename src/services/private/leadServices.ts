@@ -70,12 +70,12 @@ export async function getLeadsActionByToken(
     }
 
     if (params?.stage && params.stage !== ('all' as any)) {
-      whereConditions.push({ stage: { _eq: params.stage } });
+      whereConditions.push({ stage: { _ilike: params.stage } });
     }
 
     const temp = params?.lead_temperature;
     if (temp && temp !== ('all' as any)) {
-      whereConditions.push({ lead_temperature: { _eq: temp } });
+      whereConditions.push({ lead_temperature: { _ilike: temp } });
     }
 
     const assigned = params?.assigned_user;
@@ -186,10 +186,10 @@ export async function updateLeadStageActionByToken(
         : "WARM";
 
     const mutation = `
-      mutation UpdateLeadStage($id: Int!, $stage: String!, $lead_temperature: String!) {
+      mutation UpdateLeadStage($id: Int!, $_set: aa_s_leads_set_input!) {
         update_aa_s_leads_by_pk(
           pk_columns: { id: $id }
-          _set: { stage: $stage, lead_temperature: $lead_temperature }
+          _set: $_set
         ) {
           id
           account_company_id

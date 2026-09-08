@@ -486,27 +486,6 @@ export async function processInboundReplyAndEscalate(payload: {
       }
     }
 
-    if (!assignedUserId) {
-      try {
-        const findAnyUserQuery = `
-          query GetAnyFallbackUser {
-            aa_s_users(order_by: [{ id: asc }], limit: 1) {
-              id
-            }
-          }
-        `;
-        const anyUser = await getGraphQLOne({
-          query: findAnyUserQuery,
-          operationName: 'GetAnyFallbackUser',
-        });
-        if (anyUser?.id) {
-          assignedUserId = Number(anyUser.id);
-        }
-      } catch (anyUserErr) {
-        console.warn('[TrackingService] Could not lookup global fallback user:', anyUserErr);
-      }
-    }
-
     if (classification.intent === 'interested' || classification.recommended_action === 'promote_to_hot') {
       // --- ESCALATE TO HOT LEAD ---
       if (lead) {
@@ -522,17 +501,21 @@ export async function processInboundReplyAndEscalate(payload: {
             }
           }
         `;
+        const leadAttrs: Record<string, any> = {
+          lead_temperature: "HOT",
+          stage: "Hot",
+          lead_score: (lead.lead_score || 0) + 35,
+          last_contact: nowIso,
+          updated_at: nowIso,
+        };
+        if (assignedUserId && !lead.assigned_user_id) {
+          leadAttrs.assigned_user_id = assignedUserId;
+        }
+
         await updateGraphQL({
           mutation: updateLeadMutation,
           id: lead.id,
-          attrs: {
-            lead_temperature: "HOT",
-            stage: "Engaged",
-            lead_score: (lead.lead_score || 0) + 35,
-            assigned_user_id: lead.assigned_user_id || assignedUserId,
-            last_contact: nowIso,
-            updated_at: nowIso,
-          },
+          attrs: leadAttrs,
           operationName: 'EscalateLeadToHot',
         });
 

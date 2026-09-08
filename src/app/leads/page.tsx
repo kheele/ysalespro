@@ -97,6 +97,57 @@ function ScoreBar({ score }: { score?: number | null }) {
   );
 }
 
+function getSafeStage(stage?: string | null): LeadStage {
+  if (!stage) return "Cold";
+  const title = stage.charAt(0).toUpperCase() + stage.slice(1).toLowerCase();
+  return title as LeadStage;
+}
+
+function getSafeStageColor(
+  stage: string,
+  stageColors: Record<string, { bg: string; text: string; border: string; dot: string }> = {}
+) {
+  const safeStage = getSafeStage(stage);
+  if (stageColors[safeStage]) return stageColors[safeStage];
+  if (stageColors[stage]) return stageColors[stage];
+
+  switch (safeStage) {
+    case "Hot":
+      return { bg: "bg-red-500/10", text: "text-red-400", border: "border-red-500/25", dot: "bg-red-400" };
+    case "Warm":
+      return { bg: "bg-amber-500/10", text: "text-amber-400", border: "border-amber-500/25", dot: "bg-amber-400" };
+    case "Contacted":
+      return { bg: "bg-purple-500/10", text: "text-purple-400", border: "border-purple-500/25", dot: "bg-purple-400" };
+    case "Customer":
+      return { bg: "bg-emerald-500/10", text: "text-emerald-400", border: "border-emerald-500/25", dot: "bg-emerald-400" };
+    case "Lost":
+      return { bg: "bg-zinc-500/10", text: "text-zinc-400", border: "border-zinc-500/25", dot: "bg-zinc-400" };
+    default:
+      return { bg: "bg-blue-500/10", text: "text-blue-400", border: "border-blue-500/25", dot: "bg-blue-400" };
+  }
+}
+
+function getSafeTempBadge(
+  temp?: string | null,
+  tempColors: Record<string, { badge: string }> = {}
+) {
+  const norm = (temp || "COLD").trim();
+  const upper = norm.toUpperCase();
+  const title = upper.charAt(0) + upper.slice(1).toLowerCase();
+
+  if (tempColors[title]?.badge) return tempColors[title].badge;
+  if (tempColors[upper]?.badge) return tempColors[upper].badge;
+  if (tempColors[norm]?.badge) return tempColors[norm].badge;
+
+  if (upper === "HOT") {
+    return "bg-red-500/15 text-red-400 border border-red-500/30";
+  }
+  if (upper === "WARM") {
+    return "bg-amber-500/15 text-amber-400 border border-amber-500/30";
+  }
+  return "bg-blue-500/15 text-blue-400 border border-blue-500/30";
+}
+
 // ─── Kanban Card ───────────────────────────────────────────────────────────
 function KanbanCard({
   lead,
@@ -112,13 +163,12 @@ function KanbanCard({
   onOpenQualify: (lead: Lead) => void;
 }) {
   const { pipelineStages, stageColors, tempColors } = useSettings();
-  const stage = (lead.stage || "Cold") as LeadStage;
-  const sc = stageColors[stage];
+  const stage = getSafeStage(lead.stage);
+  const sc = getSafeStageColor(stage, stageColors);
   const idx = pipelineStages.indexOf(stage);
   const prevStage = idx > 0 ? pipelineStages[idx - 1] : null;
   const nextStage = idx < pipelineStages.length - 1 ? pipelineStages[idx + 1] : null;
-  const tempKey = lead.lead_temperature || "COLD";
-  const tc = tempColors[tempKey] || tempColors.Cold;
+  const tempBadge = getSafeTempBadge(lead.lead_temperature, tempColors);
 
   const personName = lead.person_name || lead.person?.name || "Lead Contact";
   const personTitle = lead.person?.job_title;
@@ -160,7 +210,7 @@ function KanbanCard({
               💬 Replied
             </Badge>
           )}
-          <Badge className={`${tc.badge} text-[9px] px-1.5 shrink-0`}>
+          <Badge className={`${tempBadge} text-[9px] px-1.5 shrink-0 font-bold uppercase`}>
             {lead.lead_temperature || 'COLD'}
           </Badge>
         </div>
@@ -247,6 +297,7 @@ export default function LeadsPage() {
   // Filters
   const [search, setSearch] = React.useState("");
   const [filterStage, setFilterStage] = React.useState<string>("all");
+  const [filterTemp, setFilterTemp] = React.useState<LeadTemperature | "all">("all");
   const [filterAssigned, setFilterAssigned] = React.useState("all");
 
   // Add Lead Modal
@@ -374,6 +425,7 @@ export default function LeadsPage() {
       const data = await getLeadsActionByToken(token, {
         search,
         stage: filterStage !== "all" ? (filterStage as LeadStage) : undefined,
+        lead_temperature: filterTemp !== "all" ? (filterTemp as LeadTemperature) : undefined,
         assigned_user: filterAssigned !== "all" ? filterAssigned : undefined,
       });
       setLeads(Array.isArray(data) ? data : []);
@@ -382,7 +434,7 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, search, filterStage, filterAssigned]);
+  }, [user, search, filterStage, filterTemp, filterAssigned]);
 
   React.useEffect(() => {
     load();
@@ -468,9 +520,26 @@ export default function LeadsPage() {
     }
   };
 
-  // Stats summary
-  const hotCount = leads.filter(l => l.lead_temperature?.toUpperCase() === "HOT" || l.stage === "Hot").length;
-  const warmCount = leads.filter(l => l.lead_temperature?.toUpperCase() === "WARM" || l.stage === "Warm").length;
+  // Filtered leads displayed on board and table
+  const displayedLeads = React.useMemo(() => {
+    return leads.filter((l) => {
+      // Stage filter
+      if (filterStage !== "all") {
+        const lStage = getSafeStage(l.stage);
+        if (lStage.toLowerCase() !== filterStage.toLowerCase()) return false;
+      }
+      // Temperature filter
+      if (filterTemp !== "all") {
+        const lTemp = (l.lead_temperature || "COLD").toUpperCase();
+        if (lTemp !== filterTemp.toUpperCase()) return false;
+      }
+      return true;
+    });
+  }, [leads, filterStage, filterTemp]);
+
+  // Stats summary - strictly based on pipeline stage
+  const hotCount = leads.filter(l => getSafeStage(l.stage) === "Hot").length;
+  const warmCount = leads.filter(l => getSafeStage(l.stage) === "Warm").length;
   const avgScore = leads.length ? Math.round(leads.reduce((s, l) => s + (l.lead_score || 0), 0) / leads.length) : 0;
 
   return (
@@ -488,16 +557,37 @@ export default function LeadsPage() {
           {/* Stats Bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: "Total Leads", value: leads.length.toString(), color: "text-foreground" },
-              { label: "Hot Leads", value: hotCount.toString(), color: "text-red-400" },
-              { label: "Warm Leads", value: warmCount.toString(), color: "text-amber-400" },
-              { label: "Avg Score", value: `${avgScore}/100`, color: "text-indigo-300" },
-            ].map((stat) => (
-              <Card key={stat.label} className="bg-card p-4 text-center">
-                <div className={`text-2xl font-extrabold font-mono ${stat.color}`}>{stat.value}</div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">{stat.label}</div>
-              </Card>
-            ))}
+              { label: "Total Leads", value: leads.length.toString(), color: "text-foreground", stageFilter: "all", tempFilter: "all" },
+              { label: "Hot Leads", value: hotCount.toString(), color: "text-red-400", stageFilter: "Hot", tempFilter: "HOT" },
+              { label: "Warm Leads", value: warmCount.toString(), color: "text-amber-400", stageFilter: "Warm", tempFilter: "WARM" },
+              { label: "Avg Score", value: `${avgScore}/100`, color: "text-indigo-300", stageFilter: null, tempFilter: null },
+            ].map((stat) => {
+              const isSelected = stat.stageFilter && (filterStage === stat.stageFilter || (stat.tempFilter && filterTemp === stat.tempFilter));
+              return (
+                <Card
+                  key={stat.label}
+                  onClick={() => {
+                    if (stat.stageFilter) {
+                      if (filterStage === stat.stageFilter || (stat.tempFilter && filterTemp === stat.tempFilter)) {
+                        setFilterStage("all");
+                        setFilterTemp("all");
+                      } else {
+                        setFilterStage(stat.stageFilter);
+                        setFilterTemp("all");
+                      }
+                    }
+                  }}
+                  className={`bg-card p-4 text-center transition-all select-none ${
+                    stat.stageFilter ? "cursor-pointer hover:border-indigo-500/50 hover:shadow-md" : ""
+                  } ${
+                    isSelected ? "ring-2 ring-indigo-500 border-indigo-500/80 bg-indigo-500/10" : ""
+                  }`}
+                >
+                  <div className={`text-2xl font-extrabold font-mono ${stat.color}`}>{stat.value}</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">{stat.label}</div>
+                </Card>
+              );
+            })}
           </div>
 
           {/* Controls: View Toggle + Search + Filters */}
@@ -535,7 +625,7 @@ export default function LeadsPage() {
             <select
               value={filterStage}
               onChange={(e) => setFilterStage(e.target.value)}
-              className="bg-muted/40 rounded-md px-2.5 py-1.5 text-xs outline-none text-foreground shrink-0"
+              className="bg-muted/40 rounded-md px-2.5 py-1.5 text-xs outline-none text-foreground shrink-0 border border-border/30"
             >
               <option value="all">All Stages</option>
               {pipelineStages.map((s) => (
@@ -543,6 +633,18 @@ export default function LeadsPage() {
                   {s}
                 </option>
               ))}
+            </select>
+
+            {/* Temperature filter */}
+            <select
+              value={filterTemp}
+              onChange={(e) => setFilterTemp(e.target.value as LeadTemperature | "all")}
+              className="bg-muted/40 rounded-md px-2.5 py-1.5 text-xs outline-none text-foreground shrink-0 border border-border/30"
+            >
+              <option value="all">All Temperatures</option>
+              <option value="HOT">🔥 Hot</option>
+              <option value="WARM">🌡️ Warm</option>
+              <option value="COLD">❄️ Cold</option>
             </select>
 
             {/* Actions */}
@@ -582,14 +684,17 @@ export default function LeadsPage() {
           {view === "kanban" && !loading && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               {pipelineStages.map((stage) => {
-                const sc = stageColors[stage];
-                const stageLeads = leads.filter((l) => l.stage === stage);
+                const sc = getSafeStageColor(stage, stageColors);
+                const stageLeads = displayedLeads.filter((l) => {
+                  const lStage = getSafeStage(l.stage);
+                  return lStage.toLowerCase() === stage.toLowerCase();
+                });
                 return (
                   <div key={stage} className="flex flex-col gap-3">
                     {/* Column Header */}
                     <div className={`flex items-center justify-between px-3 py-2 rounded-lg ${sc.border} ${sc.bg}`}>
                       <div className={`flex items-center gap-1.5 text-xs font-bold ${sc.text}`}>
-                        {STAGE_ICONS[stage]} {stage}
+                        {STAGE_ICONS[stage] || <Repeat className="h-3.5 w-3.5" />} {stage}
                       </div>
                       <Badge className={`${sc.bg} ${sc.text} border-none text-[10px] font-mono`}>
                         {stageLeads.length}
@@ -646,12 +751,11 @@ export default function LeadsPage() {
                           <td colSpan={10} className="p-4 bg-card/20" />
                         </tr>
                       ))
-                    ) : leads.length > 0 ? (
-                      leads.map((lead) => {
-                        const stage = (lead.stage || "Cold") as LeadStage;
-                        const sc = stageColors[stage];
-                        const tempKey = lead.lead_temperature || "COLD";
-                        const tc = tempColors[tempKey] || tempColors.Cold;
+                    ) : displayedLeads.length > 0 ? (
+                      displayedLeads.map((lead) => {
+                        const stage = getSafeStage(lead.stage);
+                        const sc = getSafeStageColor(stage, stageColors);
+                        const tempBadge = getSafeTempBadge(lead.lead_temperature, tempColors);
                         const personName = lead.person_name || lead.person?.name || "Lead Contact";
                         const personTitle = lead.person?.job_title;
                         const initials = personName.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase() || "L";
@@ -660,7 +764,7 @@ export default function LeadsPage() {
                         const repliedActivity = lead.outreach_activity_list?.find((a: any) => a.status === 'Replied');
                         const latestOutreach = lead.outreach_activity_list?.[0];
                         const leadEmail = lead.person?.email || lead.outreach_activity_list?.find((a: any) => a.recipient_email)?.recipient_email || null;
-                        const isReplied = Boolean(repliedActivity) || lead.stage === 'Engaged';
+                        const isReplied = Boolean(repliedActivity) || lead.stage === 'Engaged' || stage === 'Hot';
                         const replyPreview = repliedActivity?.response_preview || latestOutreach?.response_preview;
 
                         return (
@@ -715,11 +819,11 @@ export default function LeadsPage() {
                                     💬 Replied
                                   </Badge>
                                 )}
-                                <Badge className={`${tc.badge} border-0 p-1.5 h-4 text-[10px]`}>
+                                <Badge className={`${tempBadge} border-0 p-1.5 h-4 text-[10px] uppercase font-bold`}>
                                   {lead.lead_temperature || "COLD"}
                                 </Badge>
-                                <Badge className={`${sc.bg} ${sc.text} p-1.5 h-4 text-[10px] gap-1`}>
-                                  {STAGE_ICONS[stage]} {stage}
+                                <Badge className={`${sc.bg} ${sc.text} ${sc.border} border p-1.5 h-4 text-[10px] gap-1 font-semibold`}>
+                                  {STAGE_ICONS[stage] || <Repeat className="h-3.5 w-3.5" />} {stage}
                                 </Badge>
                               </span>
                             </td>
