@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { SidebarContent } from "@/components/layout/salespro-sidebar";
 import { UserNav } from "@/components/layout/user-nav";
+import { useRouter } from "next/navigation";
 
 interface SalesProHeaderProps {
   title: string;
@@ -56,6 +57,8 @@ export function SalesProHeader({
     loadNotifications();
   }, [user]);
 
+  const router = useRouter();
+
   const handleMarkRead = async (id: number) => {
     if (user) {
       try {
@@ -69,6 +72,13 @@ export function SalesProHeader({
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
     setUnreadCount((prev) => Math.max(0, prev - 1));
+  };
+
+  const handleNotificationClick = async (n: NotificationItem) => {
+    await handleMarkRead(n.id);
+    if (n.action_url) {
+      router.push(n.action_url);
+    }
   };
 
   return (
@@ -132,7 +142,7 @@ export function SalesProHeader({
               {notifications.map((n) => (
                 <div
                   key={n.id}
-                  onClick={() => handleMarkRead(n.id)}
+                  onClick={() => handleNotificationClick(n)}
                   className={`p-2.5 rounded-lg text-xs cursor-pointer transition-colors ${n.read ? "opacity-60 bg-transparent hover:bg-muted/50" : "bg-muted/40 font-medium hover:bg-muted/80"
                     }`}
                 >
