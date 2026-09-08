@@ -1,0 +1,145 @@
+{
+  "name": "SalesPro - IMAP Inbox Reply Poller (Scaled)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "3c2d1e0f-0001-4000-8000-000000000001",
+      "name": "Every 1 Minute (Rolling Batch)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {},
+      "id": "3c2d1e0f-0002-4000-8000-000000000002",
+      "name": "Manual Trigger (Test Poller)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [200, 480]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.SALESPRO_BASE_URL || $env.SALESPRO_APP_URL || 'http://localhost:9006' }}/api/cron/poll-inbox-replies",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.CRON_SECRET || $env.CRON_SECRET || 'dev_cron_secret' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"batch_size\": {{ $vars.POLLER_BATCH_SIZE || $env.POLLER_BATCH_SIZE || 50 }} }",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "3c2d1e0f-0003-4000-8000-000000000003",
+      "name": "Trigger IMAP Inbox Poller",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 380]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n\nconst accountsChecked = response.accounts_checked || 0;\nconst repliesDetected = response.replies_detected || 0;\nconst repliesEscalated = response.replies_escalated || 0;\nconst batchSize = response.batch_size || 0;\nconst hasReplies = repliesDetected > 0;\n\nconst summary = response.success\n  ? `Batch: ${accountsChecked}/${batchSize} account(s) processed. ${repliesDetected} reply(s) detected, ${repliesEscalated} lead(s) escalated.`\n  : `Poller encountered an issue: ${response.error || 'Unknown error'}`;\n\nreturn [{\n  json: {\n    timestamp: response.timestamp || new Date().toISOString(),\n    status: response.success ? 'SUCCESS' : 'FAILED',\n    accounts_checked: accountsChecked,\n    batch_size: batchSize,\n    replies_detected: repliesDetected,\n    replies_escalated: repliesEscalated,\n    has_replies: hasReplies,\n    summary: summary,\n    details: response.details || []\n  }\n}];"
+      },
+      "id": "3c2d1e0f-0004-4000-8000-000000000004",
+      "name": "Format Poller Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 380]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-replies-found",
+              "leftValue": "={{ $json.has_replies }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "3c2d1e0f-0005-4000-8000-000000000005",
+      "name": "Any New Replies?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [920, 380]
+    },
+    {
+      "parameters": {},
+      "id": "3c2d1e0f-0006-4000-8000-000000000006",
+      "name": "New Replies Detected & Escalated",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1140, 280]
+    },
+    {
+      "parameters": {},
+      "id": "3c2d1e0f-0007-4000-8000-000000000007",
+      "name": "No New Replies (Healthy)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1140, 480]
+    }
+  ],
+  "connections": {
+    "Every 1 Minute (Rolling Batch)": {
+      "main": [
+        [{ "node": "Trigger IMAP Inbox Poller", "type": "main", "index": 0 }]
+      ]
+    },
+    "Manual Trigger (Test Poller)": {
+      "main": [
+        [{ "node": "Trigger IMAP Inbox Poller", "type": "main", "index": 0 }]
+      ]
+    },
+    "Trigger IMAP Inbox Poller": {
+      "main": [
+        [{ "node": "Format Poller Metrics", "type": "main", "index": 0 }]
+      ]
+    },
+    "Format Poller Metrics": {
+      "main": [
+        [{ "node": "Any New Replies?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Any New Replies?": {
+      "main": [
+        [{ "node": "New Replies Detected & Escalated", "type": "main", "index": 0 }],
+        [{ "node": "No New Replies (Healthy)", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
