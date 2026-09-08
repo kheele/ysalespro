@@ -45,7 +45,6 @@ export async function getNotificationsActionByToken(
     const query = `
       query GetNotifications($where: aa_s_notifications_bool_exp) {
         aa_s_notifications(
-          distinct_on: [id]
           where: $where
           order_by: [{ id: desc }]
         ) {
@@ -84,10 +83,10 @@ export async function markAsReadActionByToken(
 
   try {
     const mutation = `
-      mutation MarkNotificationAsRead($id: Int!) {
+      mutation MarkNotificationAsRead($id: Int!, $_set: aa_s_notifications_set_input!) {
         update_aa_s_notifications_by_pk(
           pk_columns: { id: $id }
-          _set: { read: true }
+          _set: $_set
         ) {
           id
           title
@@ -188,8 +187,8 @@ export async function createNotificationActionByToken(
         account_company_id: companyId,
         title: input.title,
         message: input.message || "",
-        type: input.type || "lead_scored",
-        priority: input.priority || "normal",
+        type: input.type || "Reply received",
+        priority: input.priority || "medium",
         read: false,
         timestamp: new Date().toISOString(),
         action_url: input.action_url,

@@ -20,6 +20,7 @@ import {
   ChevronRight,
   LogOut,
   User as UserIcon,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -29,6 +30,7 @@ import * as peopleServices from "@/services/public/peopleServices";
 import * as leadServices from "@/services/private/leadServices";
 import * as taskServices from "@/services/private/taskServices";
 import * as campaignServices from "@/services/private/campaignServices";
+import * as notificationServices from "@/services/private/notificationServices";
 
 export interface NavItem {
   name: string;
@@ -61,6 +63,7 @@ export function SidebarContent({ onOpenCommandPalette }: SalesProSidebarProps) {
     leads?: number;
     tasks?: number;
     campaigns?: number;
+    notifications?: number;
   }>({});
 
   React.useEffect(() => {
@@ -87,10 +90,11 @@ export function SidebarContent({ onOpenCommandPalette }: SalesProSidebarProps) {
         if (user) {
           try {
             const token = await user.getIdToken(true);
-            const [leadsRes, tasksRes, campaignsRes] = await Promise.allSettled([
+            const [leadsRes, tasksRes, campaignsRes, notifsRes] = await Promise.allSettled([
               leadServices.getLeadsActionByToken(token),
               taskServices.getTasksActionByToken(token),
               campaignServices.getCampaignsActionByToken(token),
+              notificationServices.getNotificationsActionByToken(token, 'unread'),
             ]);
 
             if (leadsRes.status === "fulfilled" && Array.isArray(leadsRes.value)) {
@@ -104,6 +108,9 @@ export function SidebarContent({ onOpenCommandPalette }: SalesProSidebarProps) {
             }
             if (campaignsRes.status === "fulfilled" && Array.isArray(campaignsRes.value)) {
               updated.campaigns = campaignsRes.value.length;
+            }
+            if (notifsRes.status === "fulfilled" && Array.isArray(notifsRes.value)) {
+              updated.notifications = notifsRes.value.length;
             }
           } catch {
             // Auth error or token expired; keep public counts
@@ -119,8 +126,11 @@ export function SidebarContent({ onOpenCommandPalette }: SalesProSidebarProps) {
     }
 
     loadSidebarData();
+    const handleRefresh = () => loadSidebarData();
+    window.addEventListener("salespro:refresh-notifications", handleRefresh);
     return () => {
       isMounted = false;
+      window.removeEventListener("salespro:refresh-notifications", handleRefresh);
     };
   }, [user]);
 
@@ -164,6 +174,13 @@ export function SidebarContent({ onOpenCommandPalette }: SalesProSidebarProps) {
       href: "/tasks",
       icon: CheckSquare,
       badge: counts.tasks && counts.tasks > 0 ? String(counts.tasks) : undefined,
+    },
+    {
+      name: "Notifications",
+      href: "/notifications",
+      icon: Bell,
+      badge: counts.notifications && counts.notifications > 0 ? String(counts.notifications) : undefined,
+      badgeVariant: "destructive",
     },
     { name: "Settings", href: "/settings", icon: Settings },
   ], [counts]);

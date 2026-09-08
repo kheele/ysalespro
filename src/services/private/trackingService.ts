@@ -561,7 +561,7 @@ export async function processInboundReplyAndEscalate(payload: {
               account_company_id: companyId,
               title: `🔥 Hot Lead Reply from ${prospectName}`,
               message: classification.summary,
-              type: 'success',
+              type: 'Reply received',
               priority: 'urgent',
               read: false,
               timestamp: new Date().toISOString(),

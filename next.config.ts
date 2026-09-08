@@ -2,6 +2,7 @@
 const nextConfig = {
   /* config options here */
   output: 'standalone',
+  serverExternalPackages: ['genkit', '@genkit-ai/core', '@genkit-ai/google-genai'],
   typescript: {
     ignoreBuildErrors: true,
   },

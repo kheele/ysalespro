@@ -15,13 +15,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { getNotificationsActionByToken, markAsReadActionByToken } from "@/services/private/notificationServices";
+import { getNotificationsActionByToken, markAsReadActionByToken, markAllAsReadActionByToken } from "@/services/private/notificationServices";
 import type { NotificationItem } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { SidebarContent } from "@/components/layout/salespro-sidebar";
 import { UserNav } from "@/components/layout/user-nav";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface SalesProHeaderProps {
   title: string;
@@ -29,6 +30,20 @@ interface SalesProHeaderProps {
   onOpenCommandPalette?: () => void;
   onAddCompanyClick?: () => void;
   onNewCampaignClick?: () => void;
+}
+
+function formatNotificationTime(isoString?: string): string {
+  if (!isoString) return "";
+  try {
+    const d = new Date(isoString);
+    const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diff < 60) return "just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  } catch {
+    return "";
+  }
 }
 
 export function SalesProHeader({
@@ -41,23 +56,30 @@ export function SalesProHeader({
   const { user } = useAuth();
   const [notifications, setNotifications] = React.useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = React.useState(0);
+  const router = useRouter();
 
-  React.useEffect(() => {
-    async function loadNotifications() {
-      if (!user) return;
-      try {
-        const token = await user.getIdToken(true);
-        const res = await getNotificationsActionByToken(token);
-        setNotifications(res || []);
-        setUnreadCount((res || []).filter((n) => !n.read).length);
-      } catch (e) {
-        console.error("Failed to load notifications:", e);
-      }
+  const loadNotifications = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const token = await user.getIdToken(true);
+      const res = await getNotificationsActionByToken(token);
+      setNotifications(res || []);
+      setUnreadCount((res || []).filter((n) => !n.read).length);
+    } catch (e) {
+      console.error("Failed to load notifications:", e);
     }
-    loadNotifications();
   }, [user]);
 
-  const router = useRouter();
+  React.useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 30000);
+    const handleRefresh = () => loadNotifications();
+    window.addEventListener("salespro:refresh-notifications", handleRefresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("salespro:refresh-notifications", handleRefresh);
+    };
+  }, [loadNotifications]);
 
   const handleMarkRead = async (id: number) => {
     if (user) {
@@ -72,6 +94,19 @@ export function SalesProHeader({
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
     setUnreadCount((prev) => Math.max(0, prev - 1));
+  };
+
+  const handleMarkAllRead = async () => {
+    if (user) {
+      try {
+        const token = await user.getIdToken(true);
+        await markAllAsReadActionByToken(token);
+      } catch (e) {
+        console.error("Failed to mark all notifications as read:", e);
+      }
+    }
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnreadCount(0);
   };
 
   const handleNotificationClick = async (n: NotificationItem) => {
@@ -124,36 +159,74 @@ export function SalesProHeader({
             <Button variant="ghost" size="icon" className="h-9 w-9 relative text-muted-foreground hover:text-foreground">
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-indigo-500 animate-ping" />
+                <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center shadow-sm">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80 p-2">
-            <DropdownMenuLabel className="flex items-center justify-between text-xs font-semibold">
-              <span>Notifications</span>
+          <DropdownMenuContent align="end" className="w-84 sm:w-96 p-2">
+            <DropdownMenuLabel className="flex items-center justify-between text-xs font-semibold pb-1.5">
+              <div className="flex items-center gap-1.5">
+                <span>Notifications</span>
+                {unreadCount > 0 && (
+                  <Badge variant="secondary" className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 font-mono">
+                    {unreadCount} new
+                  </Badge>
+                )}
+              </div>
               {unreadCount > 0 && (
-                <Badge variant="secondary" className="text-[10px] bg-indigo-500/10 text-indigo-400">
-                  {unreadCount} new
-                </Badge>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMarkAllRead();
+                  }}
+                  className="text-[11px] text-indigo-400 hover:text-indigo-300 font-normal hover:underline"
+                >
+                  Mark all read
+                </button>
               )}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <div className="space-y-1 max-h-64 overflow-y-auto">
-              {notifications.map((n) => (
-                <div
-                  key={n.id}
-                  onClick={() => handleNotificationClick(n)}
-                  className={`p-2.5 rounded-lg text-xs cursor-pointer transition-colors ${n.read ? "opacity-60 bg-transparent hover:bg-muted/50" : "bg-muted/40 font-medium hover:bg-muted/80"
-                    }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-foreground">{n.title}</span>
-                    <span className="text-[10px] text-muted-foreground">{n.timestamp}</span>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{n.message}</p>
+            <div className="space-y-1 max-h-72 overflow-y-auto pr-1">
+              {notifications.length === 0 ? (
+                <div className="py-8 text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
+                  <Bell className="h-6 w-6 text-muted-foreground/30" />
+                  <span className="font-semibold text-foreground/80">All caught up!</span>
+                  <span className="text-[11px] text-muted-foreground max-w-[200px]">
+                    New prospect replies and hot lead alerts will appear here.
+                  </span>
                 </div>
-              ))}
+              ) : (
+                notifications.map((n) => (
+                  <div
+                    key={n.id}
+                    onClick={() => handleNotificationClick(n)}
+                    className={`p-2.5 rounded-lg text-xs cursor-pointer transition-colors border ${
+                      n.read
+                        ? "opacity-60 bg-transparent border-transparent hover:bg-muted/40"
+                        : "bg-muted/50 border-indigo-500/20 font-medium hover:bg-muted/80 shadow-xs"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-foreground truncate">{n.title}</span>
+                      <span className="text-[10px] text-muted-foreground shrink-0 font-mono">
+                        {formatNotificationTime(n.timestamp || n.created_at)}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                  </div>
+                ))
+              )}
             </div>
+            <DropdownMenuSeparator />
+            <Link
+              href="/notifications"
+              className="block text-center py-2 text-xs font-semibold text-indigo-400 hover:text-indigo-300 hover:bg-muted/30 rounded-md transition-colors"
+            >
+              View All Notifications →
+            </Link>
           </DropdownMenuContent>
         </DropdownMenu>
 

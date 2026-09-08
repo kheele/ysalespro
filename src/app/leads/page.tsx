@@ -295,12 +295,28 @@ function KanbanCard({
 }
 
 // ─── Page ──────────────────────────────────────────────────────────────────
-export default function LeadsPage() {
+function LeadsPageContent() {
   const { pipelineStages, stageColors, tempColors } = useSettings();
+  const searchParams = useSearchParams();
+  const targetLeadId = searchParams?.get("id") || "";
+
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [leads, setLeads] = React.useState<Lead[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [view, setView] = React.useState<"table" | "kanban">("kanban");
+
+  // Auto-scroll and focus target lead from notification link (?id=xxx)
+  React.useEffect(() => {
+    if (targetLeadId && leads.length > 0) {
+      const timer = setTimeout(() => {
+        const el = document.getElementById(`lead-card-${targetLeadId}`) || document.getElementById(`lead-row-${targetLeadId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [targetLeadId, leads]);
 
   // Filters
   const [search, setSearch] = React.useState("");
@@ -480,6 +496,9 @@ export default function LeadsPage() {
             description: `${data.replies_escalated} lead(s) escalated to Hot. Pipeline refreshed.`,
           });
           load();
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("salespro:refresh-notifications"));
+          }
         } else {
           toast({
             title: "Mailboxes Synced",
@@ -716,6 +735,7 @@ export default function LeadsPage() {
                           <KanbanCard
                             key={lead.id}
                             lead={lead}
+                            isTarget={String(lead.id) === targetLeadId}
                             onMove={handleMove}
                             onOpenBrief={handleOpenBrief}
                             onOpenTriage={handleOpenTriage}
@@ -775,8 +795,16 @@ export default function LeadsPage() {
                         const isReplied = Boolean(repliedActivity) || lead.stage === 'Engaged' || stage === 'Hot';
                         const replyPreview = repliedActivity?.response_preview || latestOutreach?.response_preview;
 
+                        const isTarget = String(lead.id) === targetLeadId;
+
                         return (
-                          <tr key={lead.id} className="hover:bg-muted/40 transition-colors group">
+                          <tr
+                            key={lead.id}
+                            id={`lead-row-${lead.id}`}
+                            className={`hover:bg-muted/40 transition-all group ${
+                              isTarget ? "bg-indigo-500/15 ring-2 ring-indigo-500/60 shadow-lg" : ""
+                            }`}
+                          >
                             {/* Person */}
                             <td className="p-3.5">
                               <div className="flex items-center gap-2">
@@ -1333,5 +1361,13 @@ export default function LeadsPage() {
 
       <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
     </div>
+  );
+}
+
+export default function LeadsPage() {
+  return (
+    <React.Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center text-xs text-muted-foreground">Loading leads...</div>}>
+      <LeadsPageContent />
+    </React.Suspense>
   );
 }
