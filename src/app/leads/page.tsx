@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
 import { CommandPalette } from "@/components/layout/command-palette";
@@ -151,12 +152,14 @@ function getSafeTempBadge(
 // ─── Kanban Card ───────────────────────────────────────────────────────────
 function KanbanCard({
   lead,
+  isTarget,
   onMove,
   onOpenBrief,
   onOpenTriage,
   onOpenQualify,
 }: {
   lead: Lead;
+  isTarget?: boolean;
   onMove: (id: string | number, stage: LeadStage) => void;
   onOpenBrief: (lead: Lead) => void;
   onOpenTriage: (lead: Lead) => void;
@@ -181,7 +184,12 @@ function KanbanCard({
   const replyPreview = repliedActivity?.response_preview || latestOutreach?.response_preview;
 
   return (
-    <div className={`rounded-xl ${sc.border} ${sc.bg} p-3 space-y-2.5 text-xs hover:shadow-md transition-shadow`}>
+    <div
+      id={`lead-card-${lead.id}`}
+      className={`rounded-xl ${sc.border} ${sc.bg} p-3 space-y-2.5 text-xs hover:shadow-md transition-all ${
+        isTarget ? "ring-2 ring-indigo-500 shadow-xl shadow-indigo-500/30 scale-[1.02]" : ""
+      }`}
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="h-7 w-7 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 flex items-center justify-center font-bold text-[10px] shrink-0">
           {initials}
