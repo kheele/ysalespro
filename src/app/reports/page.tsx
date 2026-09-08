@@ -74,6 +74,16 @@ export default function ReportsPage() {
     loadReports();
   }, [user]);
 
+  const formatRepName = (rep: any): string => {
+    if (!rep) return "Unassigned";
+    if (typeof rep === "string") return rep;
+    if (typeof rep === "object") {
+      const name = `${rep.fname || ""} ${rep.lname || ""}`.trim();
+      return name || rep.email || (rep.id ? `User #${rep.id}` : "Representative");
+    }
+    return String(rep);
+  };
+
   const handleExportCSV = (tab: ReportCategory) => {
     let content = "";
     if (tab === "company") {
@@ -82,6 +92,9 @@ export default function ReportsPage() {
     } else if (tab === "industry") {
       content = "Industry,Companies,Total Leads,Conversion Rate,Avg Deal Size,Growth Rate\n" +
         industryData.map(i => `"${i.industry_name}",${i.company_count},${i.total_leads},"${i.conversion_rate}","${i.avg_deal_size}","${i.growth_rate}"`).join("\n");
+    } else if (tab === "activity") {
+      content = "Sales Representative,Emails Sent,Calls Made,LinkedIn Messages,Meetings Held,Deals Closed,Revenue Generated\n" +
+        activityData.map(a => `"${formatRepName(a.rep_name)}",${a.emails_sent},${a.calls_made},${a.linkedin_messages},${a.meetings_held},${a.deals_closed},"${a.revenue_generated}"`).join("\n");
     } else {
       content = "Report Type,Generated At\n" + `"${tab}","${new Date().toISOString()}"`;
     }
@@ -187,14 +200,14 @@ export default function ReportsPage() {
                     <tbody className="divide-y divide-border/40 font-medium">
                       {companyData.map((row, i) => (
                         <tr key={i} className="hover:bg-muted/30 transition-colors">
-                          <td className="p-3 font-bold text-foreground">{row.company_name || (row as any).company}</td>
+                          <td className="p-3 font-bold text-foreground">{row.company_name}</td>
                           <td className="p-3 text-indigo-300">{row.industry}</td>
-                          <td className="p-3 text-muted-foreground">{(row as any).country || "USA"}</td>
-                          <td className="p-3 font-mono">{(row.employee_count ?? (row as any).employees ?? 0).toLocaleString()}</td>
+                          <td className="p-3 text-muted-foreground">{row.country || "-"}</td>
+                          <td className="p-3 font-mono">{(row.employee_count ?? 0).toLocaleString()}</td>
                           <td className="p-3 font-mono text-emerald-400">{row.revenue}</td>
-                          <td className="p-3 font-mono font-bold text-indigo-300">{row.leads_count ?? (row as any).leadCount ?? 0}</td>
-                          <td className="p-3 font-mono text-purple-400">{row.deals_won ?? (row as any).dealsWon ?? 0}</td>
-                          <td className="p-3 font-mono font-extrabold text-foreground">{row.pipeline_value || (row as any).pipelineValue}</td>
+                          <td className="p-3 font-mono font-bold text-indigo-300">{row.leads_count ?? 0}</td>
+                          <td className="p-3 font-mono text-purple-400">{row.deals_won ?? 0}</td>
+                          <td className="p-3 font-mono font-extrabold text-foreground">{row.pipeline_value}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -348,17 +361,25 @@ export default function ReportsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/40 font-medium">
-                      {activityData.map((row, i) => (
-                        <tr key={i} className="hover:bg-muted/30 transition-colors">
-                          <td className="p-3 font-bold text-foreground">{row.rep_name || (row as any).repName}</td>
-                          <td className="p-3 font-mono">{(row.emails_sent ?? (row as any).emailsSent ?? 0).toLocaleString()}</td>
-                          <td className="p-3 font-mono">{row.calls_made ?? (row as any).callsMade ?? 0}</td>
-                          <td className="p-3 font-mono">{row.linkedin_messages ?? (row as any).linkedInMessages ?? 0}</td>
-                          <td className="p-3 font-mono text-indigo-300 font-bold">{row.meetings_held ?? (row as any).meetingsHeld ?? 0}</td>
-                          <td className="p-3 font-mono text-purple-400 font-bold">{row.deals_closed ?? (row as any).dealsClosed ?? 0}</td>
-                          <td className="p-3 font-mono text-emerald-400 font-extrabold text-sm">{row.revenue_generated || (row as any).revenueGenerated}</td>
+                      {activityData.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                            No sales activity records found for this workspace.
+                          </td>
                         </tr>
-                      ))}
+                      ) : (
+                        activityData.map((row, i) => (
+                          <tr key={i} className="hover:bg-muted/30 transition-colors">
+                            <td className="p-3 font-bold text-foreground">{formatRepName(row.rep_name || (row as any).repName)}</td>
+                            <td className="p-3 font-mono">{(row.emails_sent ?? (row as any).emailsSent ?? 0).toLocaleString()}</td>
+                            <td className="p-3 font-mono">{row.calls_made ?? (row as any).callsMade ?? 0}</td>
+                            <td className="p-3 font-mono">{row.linkedin_messages ?? (row as any).linkedInMessages ?? 0}</td>
+                            <td className="p-3 font-mono text-indigo-300 font-bold">{row.meetings_held ?? (row as any).meetingsHeld ?? 0}</td>
+                            <td className="p-3 font-mono text-purple-400 font-bold">{row.deals_closed ?? (row as any).dealsClosed ?? 0}</td>
+                            <td className="p-3 font-mono text-emerald-400 font-extrabold text-sm">{row.revenue_generated || (row as any).revenueGenerated}</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>

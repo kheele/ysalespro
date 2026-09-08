@@ -28,7 +28,7 @@ export default function PrivacyPolicyPage() {
         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 text-[11px] font-semibold">
           <Shield className="h-3.5 w-3.5" /> GDPR & POPIA Compliant
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight">Privacy Policy</h1>
+        <h1 className="text-3xl tracking-tight">Privacy Policy</h1>
         <p className="text-xs text-muted-foreground">Last updated: August 19, 2026 · Committed to data protection</p>
       </div>
 

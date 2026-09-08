@@ -28,7 +28,7 @@ export default function CookiePolicyPage() {
         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-purple-500/10 text-purple-400 text-[11px] font-semibold">
           <Cookie className="h-3.5 w-3.5" /> Transparency & Tracking Controls
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight">Cookie Policy</h1>
+        <h1 className="text-3xl tracking-tight">Cookie Policy</h1>
         <p className="text-xs text-muted-foreground">Last updated: August 19, 2026 · Understanding our cookie usage</p>
       </div>
 

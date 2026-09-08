@@ -79,7 +79,7 @@ export default function HelpPage() {
       <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-semibold border border-indigo-500/20">
         <LifeBuoy className="h-3.5 w-3.5" /> Knowledge Base & Customer Support
       </div>
-      <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
+      <h1 className="text-3xl sm:text-4xl tracking-tight">
         How can we help you today?
       </h1>
       <p className="text-sm text-muted-foreground max-w-xl mx-auto">

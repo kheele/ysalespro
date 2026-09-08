@@ -92,7 +92,7 @@ export function UserNav() {
             <Settings className="mr-2 h-4 w-4" />
             <span>Settings</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => router.push('/contact')} className="cursor-pointer text-xs">
+          <DropdownMenuItem onClick={() => router.push('/support')} className="cursor-pointer text-xs">
             <LifeBuoy className="mr-2 h-4 w-4" />
             <span>Support</span>
           </DropdownMenuItem>

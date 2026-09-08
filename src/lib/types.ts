@@ -731,6 +731,7 @@ export interface NotificationItem {
 export interface CompanyAnalyticsReport {
   company_id: string;
   company_name: string;
+  country?: string;
   industry: string;
   employee_count: number;
   revenue: string;

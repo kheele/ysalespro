@@ -50,6 +50,7 @@ export async function getCompanyAnalyticsReportsActionByToken(token: string): Pr
       return {
         company_id: String(org.id),
         company_name: orgName,
+        country: org.country,
         industry: toTitleCase(org.primary_industry || org.industry || "General Industry"),
         employee_count: org.estimated_num_employees ?? org.employee_count ?? 0,
         revenue: org.organization_revenue_str || (org.organization_revenue ? `$${(org.organization_revenue / 1000000).toFixed(1)}M` : "N/A"),
@@ -240,17 +241,62 @@ export async function getSalesActivityReportsActionByToken(token: string): Promi
     const actList = Array.isArray(activities) ? activities : [];
     const leadsList = Array.isArray(leads) ? leads : [];
 
-    const repsFromActs = actList.map((a) => a.assigned_to).filter(Boolean) as string[];
-    const repsFromLeads = leadsList.map((l) => l.assigned_user).filter(Boolean) as string[];
-    const activeReps = Array.from(new Set([...repsFromActs, ...repsFromLeads]));
+    const formatUser = (user: any): string => {
+      if (!user) return "";
+      if (typeof user === "string") return user.trim();
+      if (typeof user === "object") {
+        const full = `${user.fname || ""} ${user.lname || ""}`.trim();
+        return full || user.email || (user.id ? `User #${user.id}` : "");
+      }
+      return "";
+    };
 
-    if (activeReps.length === 0) {
-      return [];
+    // Build mapping of leadId -> rep display name
+    const leadRepMap = new Map<number, string>();
+    for (const l of leadsList) {
+      const rep = formatUser(l.assigned_user);
+      if (rep && l.id) {
+        leadRepMap.set(Number(l.id), rep);
+      }
     }
 
-    return activeReps.map((repName) => {
-      const repActs = actList.filter((a) => a.assigned_to === repName);
-      const repLeads = leadsList.filter((l) => l.assigned_user === repName);
+    const getActRep = (a: any): string => {
+      const direct = formatUser(a.assigned_to);
+      if (direct) return direct;
+      if (a.lead_id && leadRepMap.has(Number(a.lead_id))) {
+        return leadRepMap.get(Number(a.lead_id))!;
+      }
+      return "";
+    };
+
+    // Collect all unique sales representatives
+    const repSet = new Set<string>();
+    for (const l of leadsList) {
+      const rep = formatUser(l.assigned_user);
+      if (rep) repSet.add(rep);
+    }
+    for (const a of actList) {
+      const rep = getActRep(a);
+      if (rep) repSet.add(rep);
+    }
+
+    if (repSet.size === 0) {
+      if (actList.length === 0 && leadsList.length === 0) {
+        return [];
+      }
+      repSet.add("Sales Team");
+    }
+
+    return Array.from(repSet).map((repName) => {
+      const repActs = actList.filter((a) => {
+        const actRep = getActRep(a);
+        return actRep ? actRep === repName : repName === "Sales Team";
+      });
+
+      const repLeads = leadsList.filter((l) => {
+        const leadRep = formatUser(l.assigned_user);
+        return leadRep ? leadRep === repName : repName === "Sales Team";
+      });
 
       const emails = repActs.filter((a) => a.channel === "Email").length;
       const calls = repActs.filter((a) => a.channel === "Phone").length;

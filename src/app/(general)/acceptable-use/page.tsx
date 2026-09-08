@@ -28,7 +28,7 @@ export default function AcceptableUsePolicyPage() {
         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-400 text-[11px] font-semibold">
           <MailCheck className="h-3.5 w-3.5" /> Ethical Sales Standards & Anti-Spam
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight">Acceptable Use Policy</h1>
+        <h1 className="text-3xl tracking-tight">Acceptable Use Policy</h1>
         <p className="text-xs text-muted-foreground">Last updated: August 19, 2026 · Governing all platform outreach</p>
       </div>
 

@@ -28,7 +28,7 @@ export default function AboutPage() {
       <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-semibold border border-indigo-500/20">
         <Sparkles className="h-3.5 w-3.5" /> Empowering Modern Sales Teams
       </div>
-      <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">
+      <h1 className="text-4xl sm:text-5xl tracking-tight">
         We build the future of B2B revenue intelligence.
       </h1>
       <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto leading-relaxed">
@@ -47,19 +47,19 @@ export default function AboutPage() {
       <div className="border-b border-border/40 bg-card/40 py-8 px-6">
         <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
           <div>
-            <div className="text-3xl font-extrabold text-indigo-400">120K+</div>
+            <div className="text-3xl text-indigo-400">120K+</div>
             <div className="text-xs text-muted-foreground mt-1">Verified Decision Makers</div>
           </div>
           <div>
-            <div className="text-3xl font-extrabold text-purple-400">99.4%</div>
+            <div className="text-3xl text-purple-400">99.4%</div>
             <div className="text-xs text-muted-foreground mt-1">Email Deliverability Rate</div>
           </div>
           <div>
-            <div className="text-3xl font-extrabold text-emerald-400">3.8x</div>
+            <div className="text-3xl text-emerald-400">3.8x</div>
             <div className="text-xs text-muted-foreground mt-1">Pipeline Velocity Boost</div>
           </div>
           <div>
-            <div className="text-3xl font-extrabold text-sky-400">1,400+</div>
+            <div className="text-3xl text-sky-400">1,400+</div>
             <div className="text-xs text-muted-foreground mt-1">Enterprise Sales Teams</div>
           </div>
         </div>

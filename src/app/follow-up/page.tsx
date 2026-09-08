@@ -334,7 +334,9 @@ export default function FollowUpPage() {
 
                       {/* Rep + Actions */}
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[11px] text-muted-foreground font-mono">Rep: {item.assigned_rep}</span>
+                        <span className="text-[11px] text-muted-foreground font-mono">
+                          Rep: {typeof item.assigned_rep === 'string' ? item.assigned_rep : (item.assigned_rep as any)?.fname || 'Sales Team'}
+                        </span>
                         {item.status !== "Replied" && (
                           <Button size="sm" variant="outline" onClick={() => handleMarkResponded(item.id)}
                             className="text-xs h-8 gap-1 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10">

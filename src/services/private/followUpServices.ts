@@ -39,9 +39,16 @@ export async function getFollowUpsActionByToken(
         follow_up_count: lead.followup_count || 0,
         last_contact_date: lead.last_contact ? new Date(lead.last_contact).toISOString().split('T')[0] : '',
         next_followup_date: lead.next_followup ? new Date(lead.next_followup).toISOString().split('T')[0] : '',
-        next_follow_up_date: lead.next_followup ? new Date(lead.next_followup).toISOString().split('T')[0] : '',
-        assigned_user: lead.assigned_user || '',
-        assigned_rep: lead.assigned_user || '',
+        assigned_user: typeof lead.assigned_user === 'string'
+          ? lead.assigned_user
+          : lead.assigned_user && typeof lead.assigned_user === 'object'
+          ? `${lead.assigned_user.fname || ''} ${lead.assigned_user.lname || ''}`.trim() || lead.assigned_user.email || (lead.assigned_user.id ? `User #${lead.assigned_user.id}` : '')
+          : '',
+        assigned_rep: typeof lead.assigned_user === 'string'
+          ? lead.assigned_user
+          : lead.assigned_user && typeof lead.assigned_user === 'object'
+          ? `${lead.assigned_user.fname || ''} ${lead.assigned_user.lname || ''}`.trim() || lead.assigned_user.email || (lead.assigned_user.id ? `User #${lead.assigned_user.id}` : '')
+          : '',
         channel: 'Email',
         subject: lead.company_name ? `Follow-up: ${lead.company_name}` : 'Follow-up',
         sequence_name: '',
