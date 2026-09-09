@@ -692,7 +692,7 @@ function evaluateLeadEligibility(
   completedStepsCount?: number;
   skipLog?: CronDispatchLog;
 } {
-  const recipientEmail = 'rkheele@gmail.com';//lead.person?.email || '';
+  const recipientEmail = process.env.EMAIL_OUT_BOX_DEV === 'true' ? process.env.EMAIL_OUT_BOX_DEV_RECIPIENT_EMAIL : lead.person?.email || '';
   if (!recipientEmail || !recipientEmail.includes('@')) {
     return { eligible: false };
   }

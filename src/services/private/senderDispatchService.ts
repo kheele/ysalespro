@@ -82,13 +82,14 @@ export async function sendEmailOutreachActionByToken(
   const now = new Date().toISOString();
   let messageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+  const recipient_email = process.env.EMAIL_OUT_BOX_DEV === 'true' ? process.env.EMAIL_OUT_BOX_DEV_RECIPIENT_EMAIL : payload.to;
+  const recipient_name = process.env.EMAIL_OUT_BOX_DEV === 'true' ? process.env.EMAIL_OUT_BOX_DEV_RECIPIENT_NAME : payload.to_name || payload.to.split('@')[0];
+
   // Automatically pre-log outreach activity in Hasura database to get outreach ID for tracking
   const loggedActivity = await logOutreachActionByToken(token, {
     channel: 'Email',
-    // recipient_name: payload.to_name || payload.to.split('@')[0],
-    // recipient_email: payload.to,
-    recipient_name: payload.to_name || 'rkheele',
-    recipient_email: 'rkheele@gmail.com',
+    recipient_name: recipient_name,
+    recipient_email: recipient_email,
     subject: payload.subject,
     subject_or_type: payload.subject,
     message: payload.text || payload.html || '',
@@ -126,10 +127,11 @@ export async function sendEmailOutreachActionByToken(
         connectionTimeout: 8000,
       });
 
+      const to = process.env.EMAIL_OUT_BOX_DEV === 'true' ? process.env.EMAIL_OUT_BOX_DEV_RECIPIENT_EMAIL : payload.to;
+
       const info: any = await transporter.sendMail({
         from: config.from_name ? `"${config.from_name}" <${config.from_email}>` : config.from_email,
-        // to: payload.to_name ? `"${payload.to_name}" <${payload.to}>` : payload.to,
-        to: payload.to_name ? `"${payload.to_name}" <rkheele@gmail.com>` : 'rkheele@gmail.com',
+        to: payload.to_name ? `"${payload.to_name}" <${to}>` : to,
         subject: payload.subject,
         text: payload.text || payload.html?.replace(/<[^>]*>?/gm, ''),
         html: trackedHtml,
@@ -166,13 +168,14 @@ export async function sendEmailOutreachActionByToken(
   } catch (err: any) {
     console.error('sendEmailOutreachActionByToken error:', err);
 
+    const recipient_email = process.env.EMAIL_OUT_BOX_DEV === 'true' ? process.env.EMAIL_OUT_BOX_DEV_RECIPIENT_EMAIL : payload.to;
+    const recipient_name = process.env.EMAIL_OUT_BOX_DEV === 'true' ? process.env.EMAIL_OUT_BOX_DEV_RECIPIENT_NAME : payload.to_name || payload.to.split('@')[0];
+
     // Still log failed attempt for auditable tracking
     await logOutreachActionByToken(token, {
       channel: 'Email',
-      // recipient_name: payload.to_name || payload.to.split('@')[0],
-      // recipient_email: payload.to,
-      recipient_name: payload.to_name || 'rkheele',
-      recipient_email: 'rkheele@gmail.com',
+      recipient_name: recipient_name,
+      recipient_email: recipient_email,
       subject: payload.subject,
       message: payload.text || payload.html || '',
       status: 'Bounced',
