@@ -751,7 +751,7 @@ export async function changeSubscriptionPlanActionByToken(
 
   const rawPrice = Number(plan.price) || 0;
   const pricePerMonth = billingCycle === 'annual'
-    ? Math.round(rawPrice * 0.8)  // 20% annual discount
+    ? Math.round(rawPrice * 0.85)  // 15% annual discount
     : rawPrice;
 
   const now = new Date();

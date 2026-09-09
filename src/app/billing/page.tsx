@@ -105,7 +105,7 @@ function PlanCard({
   const tier = plan.name.toLowerCase() as "starter" | "pro" | "enterprise";
   const meta = TIER_META[tier] || TIER_META.starter;
   const rawPrice = Number(plan.price) || 0;
-  const price = billingCycle === "annual" ? Math.round(rawPrice * 0.8) : rawPrice;
+  const price = billingCycle === "annual" ? Math.round(rawPrice * 0.85) : rawPrice;
   const tierLevel = tier === "starter" ? 0 : tier === "pro" ? 1 : 2;
   const isUpgrade = tierLevel > activeTierLevel;
   const isDowngrade = tierLevel < activeTierLevel;
@@ -152,7 +152,7 @@ function PlanCard({
               <span className="text-xs text-muted-foreground">/mo</span>
               {billingCycle === "annual" && (
                 <span className="ml-2 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full">
-                  20% off
+                    15% off
                 </span>
               )}
             </>
@@ -333,7 +333,7 @@ export default function BillingPage() {
     const planPrice = Number(plan.price) || 0;
     const planCurrency = plan.currency || 'ZAR';
     const priceLabel = billingCycle === "annual"
-      ? formatCurrency(Math.round(planPrice * 0.8), planCurrency) + "/mo (billed annually)"
+      ? formatCurrency(Math.round(planPrice * 0.85), planCurrency) + "/mo (billed annually)"
       : planPrice === 0 ? "Free" : formatCurrency(planPrice, planCurrency) + "/mo";
 
     setConfirmModal({
@@ -472,7 +472,7 @@ export default function BillingPage() {
                     className={`px-3 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1 ${billingCycle === "annual" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}
                   >
                     Annual
-                    <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1 rounded">-20%</span>
+                    <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1 rounded">-15%</span>
                   </button>
                 </div>
 
