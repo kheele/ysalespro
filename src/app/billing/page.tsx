@@ -104,7 +104,8 @@ function PlanCard({
 }) {
   const tier = plan.name.toLowerCase() as "starter" | "pro" | "enterprise";
   const meta = TIER_META[tier] || TIER_META.starter;
-  const price = billingCycle === "annual" ? Math.round(plan.price * 0.8) : plan.price;
+  const rawPrice = Number(plan.price) || 0;
+  const price = billingCycle === "annual" ? Math.round(rawPrice * 0.8) : rawPrice;
   const tierLevel = tier === "starter" ? 0 : tier === "pro" ? 1 : 2;
   const isUpgrade = tierLevel > activeTierLevel;
   const isDowngrade = tierLevel < activeTierLevel;
@@ -146,7 +147,7 @@ function PlanCard({
           ) : (
             <>
               <span className="text-3xl font-extrabold text-foreground">
-                {formatCurrency(price, plan.currency)}
+                {formatCurrency(price, plan.currency || 'ZAR')}
               </span>
               <span className="text-xs text-muted-foreground">/mo</span>
               {billingCycle === "annual" && (
@@ -329,9 +330,11 @@ export default function BillingPage() {
   // --- Change plan ---
   const handlePlanSelect = (plan: BillingPlan) => {
     const isUpgrade = (plan.name.toLowerCase() === "pro" || plan.name.toLowerCase() === "enterprise");
+    const planPrice = Number(plan.price) || 0;
+    const planCurrency = plan.currency || 'ZAR';
     const priceLabel = billingCycle === "annual"
-      ? formatCurrency(Math.round(plan.price * 0.8), plan.currency) + "/mo (billed annually)"
-      : plan.price === 0 ? "Free" : formatCurrency(plan.price, plan.currency) + "/mo";
+      ? formatCurrency(Math.round(planPrice * 0.8), planCurrency) + "/mo (billed annually)"
+      : planPrice === 0 ? "Free" : formatCurrency(planPrice, planCurrency) + "/mo";
 
     setConfirmModal({
       open: true,
@@ -427,7 +430,7 @@ export default function BillingPage() {
     <div className="flex h-screen overflow-hidden bg-background">
       <SalesProSidebar />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <SalesProHeader onCommandOpen={() => setCommandOpen(true)} />
+        <SalesProHeader title="Billing & Subscription" onOpenCommandPalette={() => setCommandOpen(true)} />
         <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">

@@ -749,9 +749,10 @@ export async function changeSubscriptionPlanActionByToken(
   const plan = await getBillingPlanByIdAction(newPlanId);
   if (!plan) return { success: false, message: 'Plan not found.' };
 
+  const rawPrice = Number(plan.price) || 0;
   const pricePerMonth = billingCycle === 'annual'
-    ? Math.round(plan.price * 0.8)  // 20% annual discount
-    : plan.price;
+    ? Math.round(rawPrice * 0.8)  // 20% annual discount
+    : rawPrice;
 
   const now = new Date();
   const periodEnd = new Date(now.getFullYear(), now.getMonth() + (billingCycle === 'annual' ? 12 : 1), 1);
