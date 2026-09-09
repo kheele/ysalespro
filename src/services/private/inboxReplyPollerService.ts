@@ -97,10 +97,10 @@ async function pLimit<T>(tasks: Array<() => Promise<T>>, limit: number): Promise
  */
 async function stampLastPolledAt(accountId: number): Promise<void> {
   const mutation = `
-    mutation StampLastPolledAt($id: Int!, $now: timestamptz!) {
+    mutation StampLastPolledAt($id: Int!, $_set: aa_s_connected_accounts_set_input!) {
       update_aa_s_connected_accounts_by_pk(
         pk_columns: { id: $id }
-        _set: { last_polled_at: $now }
+        _set: $_set
       ) {
         id
       }
@@ -108,15 +108,16 @@ async function stampLastPolledAt(accountId: number): Promise<void> {
   `;
   try {
     await updateGraphQL({
-      mutation: mutation,
+      mutation,
       id: accountId,
-      attrs: { now: new Date().toISOString() },
+      attrs: { last_polled_at: new Date().toISOString() },
       operationName: 'StampLastPolledAt',
     });
   } catch (err) {
     console.warn(`[IMAP] Could not update last_polled_at for account #${accountId}:`, err);
   }
 }
+
 
 // ---------------------------------------------------------------------------
 // Core per-account polling logic

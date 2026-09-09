@@ -45,8 +45,6 @@ export function UserNav() {
     ? `${dbUser.fname[0] || ''}${dbUser.lname?.[0] || ''}`.toUpperCase()
     : (displayName.split(' ').map((p: string) => p[0]).join('').slice(0, 2).toUpperCase() || 'U');
 
-  const canViewBilling = dbUser?.permissions?.['Billing & Subscription'];
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -82,12 +80,10 @@ export function UserNav() {
             <User className="mr-2 h-4 w-4" />
             <span>Profile Settings</span>
           </DropdownMenuItem>
-          {canViewBilling && (
-            <DropdownMenuItem onClick={() => router.push('/billing')} className="cursor-pointer text-xs">
-              <CreditCard className="mr-2 h-4 w-4" />
-              <span>Billing</span>
-            </DropdownMenuItem>
-          )}
+          <DropdownMenuItem onClick={() => router.push('/billing')} className="cursor-pointer text-xs">
+            <CreditCard className="mr-2 h-4 w-4" />
+            <span>Billing & Subscription</span>
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer text-xs">
             <Settings className="mr-2 h-4 w-4" />
             <span>Settings</span>

@@ -186,9 +186,8 @@ function KanbanCard({
   return (
     <div
       id={`lead-card-${lead.id}`}
-      className={`rounded-xl ${sc.border} ${sc.bg} p-3 space-y-2.5 text-xs hover:shadow-md transition-all ${
-        isTarget ? "ring-2 ring-indigo-500 shadow-xl shadow-indigo-500/30 scale-[1.02]" : ""
-      }`}
+      className={`rounded-xl ${sc.border} ${sc.bg} p-3 space-y-2.5 text-xs hover:shadow-md transition-all ${isTarget ? "ring-2 ring-indigo-500 shadow-xl shadow-indigo-500/30 scale-[1.02]" : ""
+        }`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="h-7 w-7 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 flex items-center justify-center font-bold text-[10px] shrink-0">
@@ -244,10 +243,10 @@ function KanbanCard({
         <button
           type="button"
           onClick={() => onOpenQualify(lead)}
-          className="flex items-center justify-center gap-0.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-[9px] font-semibold transition-colors"
+          className="flex items-center justify-center gap-0.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-foreground text-[9px] font-semibold transition-colors"
           title="AI Score & Qualify Lead"
         >
-          <Target className="h-2.5 w-2.5 text-amber-400" /> Qualify
+          <Target className="h-2.5 w-2.5 text-foreground" /> Qualify
         </button>
         <button
           type="button"
@@ -604,11 +603,9 @@ function LeadsPageContent() {
                       }
                     }
                   }}
-                  className={`bg-card p-4 text-center transition-all select-none ${
-                    stat.stageFilter ? "cursor-pointer hover:border-indigo-500/50 hover:shadow-md" : ""
-                  } ${
-                    isSelected ? "ring-2 ring-indigo-500 border-indigo-500/80 bg-indigo-500/10" : ""
-                  }`}
+                  className={`bg-card p-4 text-center transition-all select-none ${stat.stageFilter ? "cursor-pointer hover:border-indigo-500/50 hover:shadow-md" : ""
+                    } ${isSelected ? "ring-2 ring-indigo-500 border-indigo-500/80 bg-indigo-500/10" : ""
+                    }`}
                 >
                   <div className={`text-2xl font-extrabold font-mono ${stat.color}`}>{stat.value}</div>
                   <div className="text-[11px] text-muted-foreground mt-0.5">{stat.label}</div>
@@ -801,9 +798,8 @@ function LeadsPageContent() {
                           <tr
                             key={lead.id}
                             id={`lead-row-${lead.id}`}
-                            className={`hover:bg-muted/40 transition-all group ${
-                              isTarget ? "bg-indigo-500/15 ring-2 ring-indigo-500/60 shadow-lg" : ""
-                            }`}
+                            className={`hover:bg-muted/40 transition-all group ${isTarget ? "bg-indigo-500/15 ring-2 ring-indigo-500/60 shadow-lg" : ""
+                              }`}
                           >
                             {/* Person */}
                             <td className="p-3.5">
@@ -886,8 +882,8 @@ function LeadsPageContent() {
                               {typeof lead.assigned_user === 'string'
                                 ? lead.assigned_user
                                 : lead.assigned_user
-                                ? `${lead.assigned_user.fname || ''} ${lead.assigned_user.lname || ''}`.trim() || lead.assigned_user.email || '—'
-                                : '—'}
+                                  ? `${lead.assigned_user.fname || ''} ${lead.assigned_user.lname || ''}`.trim() || lead.assigned_user.email || '—'
+                                  : '—'}
                             </td>
                             {/* Actions Dropdown */}
                             <td className="p-3.5 text-right pr-4 w-16">
