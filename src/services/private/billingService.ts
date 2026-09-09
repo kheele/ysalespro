@@ -1,6 +1,6 @@
 'use server';
 
-import { Subscription, BillingPlan, SouthernAfricanCountry } from '@/lib/types';
+import { Subscription, BillingPlan } from '@/lib/types';
 import { listGraphQL, getGraphQLOne, insertGraphQL, updateGraphQL } from '@/graphql';
 import { getCustomClaimsByAuth } from '@/lib/auth-utils';
 import { getAccountCompanyById, updateAccountCompany } from '@/services/private/accountCompanyService';
@@ -8,14 +8,10 @@ import {
   SOUTHERN_AFRICAN_COUNTRIES as _SOUTHERN_AFRICAN_COUNTRIES,
 } from '@/lib/billingConstants';
 
-export type { SouthernAfricanCountry };
-
 // Local aliases — used internally by this file only.
 // Client code must import SOUTHERN_AFRICAN_COUNTRIES directly from '@/lib/billingConstants'.
 const SOUTHERN_AFRICAN_COUNTRIES = _SOUTHERN_AFRICAN_COUNTRIES;
 void SOUTHERN_AFRICAN_COUNTRIES;
-
-
 
 const BILLING_PLAN_FIELDS = `
   id
