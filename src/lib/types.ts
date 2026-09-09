@@ -10,10 +10,10 @@ export interface SouthernAfricanCountry {
 export interface BillingPlan {
   id: string;
   name: string;
-  price: string | number;
+  price_monthly: string | number;
   currency?: string;
   currency_symbol?: string;
-  country_code?: string;
+  region?: string;
   country_name?: string;
   interval?: 'month' | 'year';
   description?: string;
@@ -23,7 +23,7 @@ export interface BillingPlan {
   tier?: string;
   tier_level?: number;
   limits?: Record<string, any>;
-  active?: boolean;
+  is_active?: boolean;
   created_at?: string;
   updated_at?: string;
 }

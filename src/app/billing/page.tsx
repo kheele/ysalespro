@@ -20,18 +20,19 @@ import {
   changeSubscriptionPlanActionByToken,
   cancelSubscriptionActionByToken,
   resumeSubscriptionActionByToken,
-  SOUTHERN_AFRICAN_COUNTRIES,
   type BillingOverviewResult,
   type BillingOverviewSubscription,
   type BillingInvoiceItem,
   type BillingUsage,
 } from "@/services/private/billingService";
+import { SOUTHERN_AFRICAN_COUNTRIES } from "@/lib/billingConstants";
 import type { BillingPlan } from "@/lib/types";
+
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function formatCurrency(amount: number, currency: string): string {
   const sym: Record<string, string> = {
@@ -55,9 +56,9 @@ function pct(used: number, limit: number) {
 }
 
 function usageColor(p: number) {
-  if (p >= 90) return "bg-red-500";
+  if (p >= 90) return "bg-destructive";
   if (p >= 70) return "bg-amber-500";
-  return "bg-indigo-500";
+  return "bg-primary";
 }
 
 // ---------------------------------------------------------------------------
@@ -65,30 +66,30 @@ function usageColor(p: number) {
 // ---------------------------------------------------------------------------
 const TIER_META: Record<string, { icon: React.ReactNode; gradient: string; badge: string; tagline: string; emailCap: string }> = {
   starter: {
-    icon: <CheckCircle2 className="h-6 w-6 text-emerald-400" />,
-    gradient: "from-emerald-950/40 via-zinc-900 to-zinc-900",
-    badge: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30",
+    icon: <CheckCircle2 className="h-6 w-6 text-emerald-500" />,
+    gradient: "from-emerald-500/10 via-card to-card dark:from-emerald-500/20",
+    badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
     tagline: "Essential Outreach",
     emailCap: "1,500 Emails / mo",
   },
   pro: {
-    icon: <Star className="h-6 w-6 text-indigo-400" />,
-    gradient: "from-indigo-950 via-zinc-900 to-zinc-900",
-    badge: "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30",
+    icon: <Star className="h-6 w-6 text-primary" />,
+    gradient: "from-primary/10 via-card to-card dark:from-primary/20",
+    badge: "bg-primary/10 text-primary border border-primary/20",
     tagline: "Most Popular",
     emailCap: "5,000 Emails / mo",
   },
   business: {
-    icon: <Zap className="h-6 w-6 text-amber-400" />,
-    gradient: "from-amber-950/40 via-zinc-900 to-zinc-900",
-    badge: "bg-amber-500/20 text-amber-300 border border-amber-500/30",
+    icon: <Zap className="h-6 w-6 text-amber-500" />,
+    gradient: "from-amber-500/10 via-card to-card dark:from-amber-500/20",
+    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20",
     tagline: "High Volume",
     emailCap: "10,000 Emails / mo",
   },
   enterprise: {
-    icon: <Building2 className="h-6 w-6 text-purple-400" />,
-    gradient: "from-purple-950 via-zinc-900 to-zinc-900",
-    badge: "bg-purple-500/20 text-purple-300 border border-purple-500/30",
+    icon: <Building2 className="h-6 w-6 text-purple-500" />,
+    gradient: "from-purple-500/10 via-card to-card dark:from-purple-500/20",
+    badge: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20",
     tagline: "Unlimited Scale",
     emailCap: "15,000 Emails / mo",
   },
@@ -114,7 +115,7 @@ function PlanCard({
 }) {
   const tier = plan.name.toLowerCase() as "starter" | "pro" | "business" | "enterprise";
   const meta = TIER_META[tier] || TIER_META.starter;
-  const rawPrice = Number(plan.price) || 0;
+  const rawPrice = Number(plan.price_monthly) || 0;
   const price = billingCycle === "annual" ? Math.round(rawPrice * 0.85) : rawPrice;
   const tierLevel = plan.tier_level !== undefined
     ? plan.tier_level
@@ -126,16 +127,15 @@ function PlanCard({
 
   return (
     <div
-      className={`relative rounded-2xl border transition-all duration-300 flex flex-col ${
-        isActive
-          ? "border-indigo-500 shadow-xl shadow-indigo-500/20 scale-[1.02]"
-          : "border-border/30 hover:border-border/60 hover:shadow-lg"
-      }`}
+      className={`relative rounded-2xl border transition-all duration-300 flex flex-col ${isActive
+        ? "border-primary shadow-xl shadow-primary/10 scale-[1.02]"
+        : "border-border/30 hover:border-border/60 hover:shadow-lg"
+        }`}
     >
       {/* Popular badge */}
       {tier === "pro" && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
-          <span className="px-3 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500 text-white shadow-lg shadow-indigo-500/40 uppercase tracking-wider">
+          <span className="px-3 py-0.5 rounded-full text-[10px] font-bold bg-primary text-primary-foreground shadow-sm uppercase tracking-wider">
             Most Popular
           </span>
         </div>
@@ -157,22 +157,22 @@ function PlanCard({
 
         {/* Email Sending Cap Chip */}
         <div className="mb-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-background/70 border border-border/40 text-xs font-semibold text-foreground w-fit">
-          <Mail className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+          <Mail className="h-3.5 w-3.5 text-primary shrink-0" />
           <span>{emailSendingCap.toLocaleString()} emails/mo cap</span>
         </div>
 
         <div className="flex items-baseline gap-1">
           {price === 0 ? (
-            <span className="text-3xl font-extrabold text-foreground">Free</span>
+            <span className="text-3xl font-bold text-foreground">Free</span>
           ) : (
             <>
-              <span className="text-3xl font-extrabold text-foreground">
+              <span className="text-3xl font-bold text-foreground">
                 {formatCurrency(price, plan.currency || 'ZAR')}
               </span>
               <span className="text-xs text-muted-foreground">/mo</span>
               {billingCycle === "annual" && (
                 <span className="ml-2 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full">
-                    15% off
+                  15% off
                 </span>
               )}
             </>
@@ -185,7 +185,7 @@ function PlanCard({
       <div className="flex-1 p-5 space-y-2">
         {features.map((f, i) => (
           <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-            <CheckCircle2 className="h-3.5 w-3.5 text-indigo-400 mt-0.5 shrink-0" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
             <span>{f}</span>
           </div>
         ))}
@@ -201,7 +201,7 @@ function PlanCard({
           <Button
             onClick={() => onSelect(plan)}
             disabled={loading}
-            className="w-full text-xs bg-indigo-600 hover:bg-indigo-500 text-white gap-1.5"
+            className="w-full text-xs bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5"
           >
             <ArrowUpCircle className="h-3.5 w-3.5" />
             Upgrade to {plan.name}
@@ -290,7 +290,7 @@ function ConfirmModal({
             variant={confirmVariant === "destructive" ? "destructive" : "default"}
             onClick={onConfirm}
             disabled={loading}
-            className={confirmVariant !== "destructive" ? "bg-indigo-600 hover:bg-indigo-500 text-white" : ""}
+            className={confirmVariant !== "destructive" ? "bg-primary hover:bg-primary/90 text-primary-foreground" : ""}
           >
             {loading ? "Please wait…" : confirmLabel}
           </Button>
@@ -326,7 +326,7 @@ export default function BillingPage() {
     confirmLabel: string;
     confirmVariant?: "default" | "destructive";
     onConfirm: () => void;
-  }>({ open: false, title: "", description: "", confirmLabel: "Confirm", onConfirm: () => {} });
+  }>({ open: false, title: "", description: "", confirmLabel: "Confirm", onConfirm: () => { } });
 
   const load = React.useCallback(async () => {
     if (!user) return;
@@ -354,7 +354,7 @@ export default function BillingPage() {
       ? plan.tier_level
       : targetTier === "enterprise" ? 3 : targetTier === "business" ? 2 : targetTier === "pro" ? 1 : 0;
     const isUpgrade = targetLevel > activeTierLevel;
-    const planPrice = Number(plan.price) || 0;
+    const planPrice = Number(plan.price_monthly) || 0;
     const planCurrency = plan.currency || 'ZAR';
     const priceLabel = billingCycle === "annual"
       ? formatCurrency(Math.round(planPrice * 0.85), planCurrency) + "/mo (billed annually)"
@@ -444,17 +444,17 @@ export default function BillingPage() {
   const activeTierLevel = sub?.plan_tier === "enterprise"
     ? 3
     : sub?.plan_tier === "business"
-    ? 2
-    : sub?.plan_tier === "pro"
-    ? 1
-    : 0;
+      ? 2
+      : sub?.plan_tier === "pro"
+        ? 1
+        : 0;
   const country = SOUTHERN_AFRICAN_COUNTRIES.find((c) => c.code === selectedCountry);
 
   const statusBadge = sub?.cancel_at_period_end
-    ? { label: "Cancels " + formatDate(sub.current_period_end), cls: "bg-amber-500/15 text-amber-400 border border-amber-500/30" }
+    ? { label: "Cancels " + formatDate(sub.current_period_end), cls: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" }
     : sub?.status === "active"
-    ? { label: "Active", cls: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" }
-    : { label: sub?.status || "—", cls: "bg-zinc-500/15 text-zinc-400 border border-zinc-500/30" };
+      ? { label: "Active", cls: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" }
+      : { label: sub?.status || "—", cls: "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20" };
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -466,7 +466,7 @@ export default function BillingPage() {
         <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
 
           {/* ── Header Banner ── */}
-          <div className="rounded-2xl border border-border/30 bg-gradient-to-r from-indigo-950/60 via-card to-purple-950/40 p-5 md:p-6">
+          <div className="rounded-2xl border border-border/30 bg-card p-5 md:p-6 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -704,13 +704,12 @@ export default function BillingPage() {
                         <td className="px-3 py-3 text-foreground">{inv.plan_name}</td>
                         <td className="px-3 py-3 font-semibold text-foreground">{formatCurrency(inv.amount, inv.currency)}</td>
                         <td className="px-3 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
-                            inv.status === "paid" || inv.status === "free"
-                              ? "bg-emerald-500/10 text-emerald-400"
-                              : inv.status === "pending"
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${inv.status === "paid" || inv.status === "free"
+                            ? "bg-emerald-500/10 text-emerald-400"
+                            : inv.status === "pending"
                               ? "bg-amber-500/10 text-amber-400"
                               : "bg-red-500/10 text-red-400"
-                          }`}>
+                            }`}>
                             {inv.status}
                           </span>
                         </td>
