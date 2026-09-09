@@ -25,297 +25,479 @@ export const DEFAULT_BILLING_PLANS: BillingPlan[] = [
   {
     id: 'starter_za',
     name: 'Starter',
-    price: 0,
+    tier: 'starter',
+    tier_level: 0,
+    price: 1500,
     currency: 'ZAR',
     currency_symbol: 'R',
     country_code: 'ZA',
     country_name: 'South Africa',
     interval: 'month',
-    description: 'Essential CRM data enrichment and lead tracking for individual South African sales reps.',
+    email_limit: 1500,
+    description: 'Essential CRM data enrichment and outbound email outreach for solo reps and emerging consultants.',
     paypal_plan_id: 'P-STARTER-ZA',
     features: [
-      'Up to 100 lead lookups / month',
-      'Basic contact details & email status',
+      '1,500 Email dispatches / month',
+      '1,500 Lead lookups / month',
+      'Basic contact details & email validation',
       'Standard outreach activity logs',
-      'Community support',
+      '2 Team Seats',
+      'Community & email support',
     ],
+    limits: { email_sending: 1500, lead_lookups: 1500, team_seats: 2, campaigns: 5 },
   },
   {
     id: 'pro_za',
     name: 'Pro',
-    price: 899,
+    tier: 'pro',
+    tier_level: 1,
+    price: 4500,
     currency: 'ZAR',
     currency_symbol: 'R',
     country_code: 'ZA',
     country_name: 'South Africa',
     interval: 'month',
-    description: 'Advanced AI messaging, lead scoring, and automated follow-ups tailored for growing SA teams.',
+    email_limit: 5000,
+    description: 'Advanced AI messaging, lead scoring, and automated follow-ups tailored for fast-growing sales teams.',
     paypal_plan_id: 'P-PRO-ZA',
     features: [
-      'Up to 2,500 lead lookups / month',
+      '5,000 Email dispatches / month',
+      '5,000 Lead lookups / month',
       'AI email outreach suggestion engine',
       'Intent signal account detection',
       'Real-time team performance reporting',
+      '5 Team Seats',
       'Priority email & chat support',
     ],
+    limits: { email_sending: 5000, lead_lookups: 5000, team_seats: 5, campaigns: 20 },
+  },
+  {
+    id: 'business_za',
+    name: 'Business',
+    tier: 'business',
+    tier_level: 2,
+    price: 7500,
+    currency: 'ZAR',
+    currency_symbol: 'R',
+    country_code: 'ZA',
+    country_name: 'South Africa',
+    interval: 'month',
+    email_limit: 10000,
+    description: 'High-volume sales platform with multi-inbox rotation and deep pipeline acceleration tools.',
+    paypal_plan_id: 'P-BUSINESS-ZA',
+    features: [
+      '10,000 Email dispatches / month',
+      '10,000 Lead lookups / month',
+      'Multi-inbox sender rotation & warm-up',
+      'Custom AI prompt templates & sequence automation',
+      'CRM bi-directional sync & custom webhooks',
+      '15 Team Seats',
+      'Dedicated Slack & live chat support',
+    ],
+    limits: { email_sending: 10000, lead_lookups: 10000, team_seats: 15, campaigns: 50 },
   },
   {
     id: 'enterprise_za',
     name: 'Enterprise',
-    price: 3499,
+    tier: 'enterprise',
+    tier_level: 3,
+    price: 10000,
     currency: 'ZAR',
     currency_symbol: 'R',
     country_code: 'ZA',
     country_name: 'South Africa',
     interval: 'month',
-    description: 'Full-scale revenue operations platform with dedicated local support & custom integrations.',
+    email_limit: 15000,
+    description: 'Full-scale revenue operations platform with dedicated infrastructure, SLA governance, and enterprise integrations.',
     paypal_plan_id: 'P-ENTERPRISE-ZA',
     features: [
+      '15,000 Email dispatches / month',
       'Unlimited lead & decision maker lookups',
-      'Custom AI sales prompt templates & GenKit integration',
-      'Dedicated account manager & SLA governance',
+      'Dedicated IP & custom SMTP setup',
+      'Custom GenAI workflows & prompt engineering',
+      'Dedicated account manager & SLA guarantee',
       'Advanced role-based access control (RBAC)',
-      'Custom webhook & API data exports',
+      'Unlimited Team Seats',
+      'Full API data access & custom exports',
     ],
+    limits: { email_sending: 15000, lead_lookups: -1, team_seats: -1, campaigns: -1 },
   },
 
   // --- Lesotho (LS) ---
   {
     id: 'starter_ls',
     name: 'Starter',
-    price: 0,
+    tier: 'starter',
+    tier_level: 0,
+    price: 1500,
     currency: 'LSL',
     currency_symbol: 'L',
     country_code: 'LS',
     country_name: 'Lesotho',
     interval: 'month',
-    description: 'Essential CRM data enrichment and lead tracking for sales teams in Lesotho.',
+    email_limit: 1500,
+    description: 'Essential CRM data enrichment and outreach for sales teams in Lesotho.',
     paypal_plan_id: 'P-STARTER-LS',
-    features: [
-      'Up to 100 lead lookups / month',
-      'Basic contact details & email status',
-      'Standard outreach activity logs',
-      'Community support',
-    ],
+    features: ['1,500 Email dispatches / month', '1,500 Lead lookups / month', 'Standard outreach activity logs', '2 Team Seats'],
+    limits: { email_sending: 1500, lead_lookups: 1500, team_seats: 2 },
   },
   {
     id: 'pro_ls',
     name: 'Pro',
-    price: 899,
+    tier: 'pro',
+    tier_level: 1,
+    price: 4500,
     currency: 'LSL',
     currency_symbol: 'L',
     country_code: 'LS',
     country_name: 'Lesotho',
     interval: 'month',
-    description: 'Advanced AI messaging and automated follow-ups in Maloti (LSL) for Lesotho businesses.',
+    email_limit: 5000,
+    description: 'Advanced AI messaging and automated follow-ups in Maloti (LSL).',
     paypal_plan_id: 'P-PRO-LS',
-    features: [
-      'Up to 2,500 lead lookups / month',
-      'AI email outreach suggestion engine',
-      'Intent signal account detection',
-      'Real-time team performance reporting',
-      'Priority email & chat support',
-    ],
+    features: ['5,000 Email dispatches / month', '5,000 Lead lookups / month', 'AI email outreach engine', '5 Team Seats'],
+    limits: { email_sending: 5000, lead_lookups: 5000, team_seats: 5 },
+  },
+  {
+    id: 'business_ls',
+    name: 'Business',
+    tier: 'business',
+    tier_level: 2,
+    price: 7500,
+    currency: 'LSL',
+    currency_symbol: 'L',
+    country_code: 'LS',
+    country_name: 'Lesotho',
+    interval: 'month',
+    email_limit: 10000,
+    description: 'Scaling multi-channel outreach engine for Lesotho businesses.',
+    paypal_plan_id: 'P-BUSINESS-LS',
+    features: ['10,000 Email dispatches / month', '10,000 Lead lookups / month', 'Multi-inbox rotation', '15 Team Seats'],
+    limits: { email_sending: 10000, lead_lookups: 10000, team_seats: 15 },
   },
   {
     id: 'enterprise_ls',
     name: 'Enterprise',
-    price: 3499,
+    tier: 'enterprise',
+    tier_level: 3,
+    price: 10000,
     currency: 'LSL',
     currency_symbol: 'L',
     country_code: 'LS',
     country_name: 'Lesotho',
     interval: 'month',
+    email_limit: 15000,
     description: 'Enterprise revenue operations platform with custom integrations for Lesotho organizations.',
     paypal_plan_id: 'P-ENTERPRISE-LS',
-    features: [
-      'Unlimited lead & decision maker lookups',
-      'Custom AI sales prompt templates & GenKit integration',
-      'Dedicated account manager & SLA governance',
-      'Advanced role-based access control (RBAC)',
-      'Custom webhook & API data exports',
-    ],
+    features: ['15,000 Email dispatches / month', 'Unlimited lead lookups', 'Dedicated account manager', 'Unlimited Team Seats'],
+    limits: { email_sending: 15000, lead_lookups: -1, team_seats: -1 },
   },
 
   // --- Namibia (NA) ---
   {
     id: 'starter_na',
     name: 'Starter',
-    price: 0,
+    tier: 'starter',
+    tier_level: 0,
+    price: 1500,
     currency: 'NAD',
     currency_symbol: 'N$',
     country_code: 'NA',
     country_name: 'Namibia',
     interval: 'month',
+    email_limit: 1500,
     description: 'Essential CRM data enrichment for Namibian sales reps.',
     paypal_plan_id: 'P-STARTER-NA',
-    features: ['Up to 100 lead lookups / month', 'Basic contact details', 'Community support'],
+    features: ['1,500 Email dispatches / month', '1,500 Lead lookups / month', '2 Team Seats'],
+    limits: { email_sending: 1500, lead_lookups: 1500, team_seats: 2 },
   },
   {
     id: 'pro_na',
     name: 'Pro',
-    price: 899,
+    tier: 'pro',
+    tier_level: 1,
+    price: 4500,
     currency: 'NAD',
     currency_symbol: 'N$',
     country_code: 'NA',
     country_name: 'Namibia',
     interval: 'month',
+    email_limit: 5000,
     description: 'Growth AI outreach and lead management in Namibian Dollars (N$).',
     paypal_plan_id: 'P-PRO-NA',
-    features: ['Up to 2,500 lead lookups / month', 'AI email outreach engine', 'Priority support'],
+    features: ['5,000 Email dispatches / month', '5,000 Lead lookups / month', 'AI email outreach engine', '5 Team Seats'],
+    limits: { email_sending: 5000, lead_lookups: 5000, team_seats: 5 },
+  },
+  {
+    id: 'business_na',
+    name: 'Business',
+    tier: 'business',
+    tier_level: 2,
+    price: 7500,
+    currency: 'NAD',
+    currency_symbol: 'N$',
+    country_code: 'NA',
+    country_name: 'Namibia',
+    interval: 'month',
+    email_limit: 10000,
+    description: 'High-volume outbound automation for Namibian sales orgs.',
+    paypal_plan_id: 'P-BUSINESS-NA',
+    features: ['10,000 Email dispatches / month', '10,000 Lead lookups / month', '15 Team Seats'],
+    limits: { email_sending: 10000, lead_lookups: 10000, team_seats: 15 },
   },
   {
     id: 'enterprise_na',
     name: 'Enterprise',
-    price: 3499,
+    tier: 'enterprise',
+    tier_level: 3,
+    price: 10000,
     currency: 'NAD',
     currency_symbol: 'N$',
     country_code: 'NA',
     country_name: 'Namibia',
     interval: 'month',
+    email_limit: 15000,
     description: 'Enterprise revenue platform for Namibian businesses.',
     paypal_plan_id: 'P-ENTERPRISE-NA',
-    features: ['Unlimited lead lookups', 'Custom AI prompts', 'Dedicated SLA'],
+    features: ['15,000 Email dispatches / month', 'Unlimited lead lookups', 'Custom AI prompts', 'Dedicated SLA'],
+    limits: { email_sending: 15000, lead_lookups: -1, team_seats: -1 },
   },
 
   // --- Eswatini (SZ) ---
   {
     id: 'starter_sz',
     name: 'Starter',
-    price: 0,
+    tier: 'starter',
+    tier_level: 0,
+    price: 1500,
     currency: 'SZL',
     currency_symbol: 'E',
     country_code: 'SZ',
     country_name: 'Eswatini',
     interval: 'month',
-    description: 'Free starter tier for Eswatini sales representatives.',
+    email_limit: 1500,
+    description: 'Outbound sales tier for Eswatini sales representatives.',
     paypal_plan_id: 'P-STARTER-SZ',
-    features: ['Up to 100 lead lookups / month', 'Basic contact details', 'Community support'],
+    features: ['1,500 Email dispatches / month', '1,500 Lead lookups / month', '2 Team Seats'],
+    limits: { email_sending: 1500, lead_lookups: 1500, team_seats: 2 },
   },
   {
     id: 'pro_sz',
     name: 'Pro',
-    price: 899,
+    tier: 'pro',
+    tier_level: 1,
+    price: 4500,
     currency: 'SZL',
     currency_symbol: 'E',
     country_code: 'SZ',
     country_name: 'Eswatini',
     interval: 'month',
+    email_limit: 5000,
     description: 'AI sales automation and enrichment priced in Lilangeni (E).',
     paypal_plan_id: 'P-PRO-SZ',
-    features: ['Up to 2,500 lead lookups / month', 'AI email outreach engine', 'Priority support'],
+    features: ['5,000 Email dispatches / month', '5,000 Lead lookups / month', '5 Team Seats'],
+    limits: { email_sending: 5000, lead_lookups: 5000, team_seats: 5 },
+  },
+  {
+    id: 'business_sz',
+    name: 'Business',
+    tier: 'business',
+    tier_level: 2,
+    price: 7500,
+    currency: 'SZL',
+    currency_symbol: 'E',
+    country_code: 'SZ',
+    country_name: 'Eswatini',
+    interval: 'month',
+    email_limit: 10000,
+    description: 'Advanced sales acceleration for growing Eswatini enterprises.',
+    paypal_plan_id: 'P-BUSINESS-SZ',
+    features: ['10,000 Email dispatches / month', '10,000 Lead lookups / month', '15 Team Seats'],
+    limits: { email_sending: 10000, lead_lookups: 10000, team_seats: 15 },
   },
   {
     id: 'enterprise_sz',
     name: 'Enterprise',
-    price: 3499,
+    tier: 'enterprise',
+    tier_level: 3,
+    price: 10000,
     currency: 'SZL',
     currency_symbol: 'E',
     country_code: 'SZ',
     country_name: 'Eswatini',
     interval: 'month',
+    email_limit: 15000,
     description: 'Full-suite sales intelligence for organizations in Eswatini.',
     paypal_plan_id: 'P-ENTERPRISE-SZ',
-    features: ['Unlimited lead lookups', 'Custom AI prompts', 'Dedicated SLA'],
+    features: ['15,000 Email dispatches / month', 'Unlimited lead lookups', 'Custom AI prompts', 'Dedicated SLA'],
+    limits: { email_sending: 15000, lead_lookups: -1, team_seats: -1 },
   },
 
   // --- Botswana (BW) ---
   {
     id: 'starter_bw',
     name: 'Starter',
-    price: 0,
+    tier: 'starter',
+    tier_level: 0,
+    price: 1100,
     currency: 'BWP',
     currency_symbol: 'P',
     country_code: 'BW',
     country_name: 'Botswana',
     interval: 'month',
-    description: 'Free CRM data enrichment for Botswana sales reps.',
+    email_limit: 1500,
+    description: 'Outbound sales enrichment for Botswana sales reps in Pula (P).',
     paypal_plan_id: 'P-STARTER-BW',
-    features: ['Up to 100 lead lookups / month', 'Basic contact details', 'Community support'],
+    features: ['1,500 Email dispatches / month', '1,500 Lead lookups / month', '2 Team Seats'],
+    limits: { email_sending: 1500, lead_lookups: 1500, team_seats: 2 },
   },
   {
     id: 'pro_bw',
     name: 'Pro',
-    price: 650,
+    tier: 'pro',
+    tier_level: 1,
+    price: 3300,
     currency: 'BWP',
     currency_symbol: 'P',
     country_code: 'BW',
     country_name: 'Botswana',
     interval: 'month',
+    email_limit: 5000,
     description: 'AI sales acceleration in Botswana Pula (P).',
     paypal_plan_id: 'P-PRO-BW',
-    features: ['Up to 2,500 lead lookups / month', 'AI email outreach engine', 'Priority support'],
+    features: ['5,000 Email dispatches / month', '5,000 Lead lookups / month', '5 Team Seats'],
+    limits: { email_sending: 5000, lead_lookups: 5000, team_seats: 5 },
+  },
+  {
+    id: 'business_bw',
+    name: 'Business',
+    tier: 'business',
+    tier_level: 2,
+    price: 5500,
+    currency: 'BWP',
+    currency_symbol: 'P',
+    country_code: 'BW',
+    country_name: 'Botswana',
+    interval: 'month',
+    email_limit: 10000,
+    description: 'Multi-channel outbound engine for Botswana businesses.',
+    paypal_plan_id: 'P-BUSINESS-BW',
+    features: ['10,000 Email dispatches / month', '10,000 Lead lookups / month', '15 Team Seats'],
+    limits: { email_sending: 10000, lead_lookups: 10000, team_seats: 15 },
   },
   {
     id: 'enterprise_bw',
     name: 'Enterprise',
-    price: 2500,
+    tier: 'enterprise',
+    tier_level: 3,
+    price: 7500,
     currency: 'BWP',
     currency_symbol: 'P',
     country_code: 'BW',
     country_name: 'Botswana',
     interval: 'month',
+    email_limit: 15000,
     description: 'Enterprise revenue operations platform for Botswana businesses.',
     paypal_plan_id: 'P-ENTERPRISE-BW',
-    features: ['Unlimited lead lookups', 'Custom AI prompts', 'Dedicated SLA'],
+    features: ['15,000 Email dispatches / month', 'Unlimited lead lookups', 'Dedicated SLA'],
+    limits: { email_sending: 15000, lead_lookups: -1, team_seats: -1 },
   },
 
   // --- Global / Default (US & Others) ---
   {
     id: 'starter_us',
     name: 'Starter',
-    price: 0,
+    tier: 'starter',
+    tier_level: 0,
+    price: 79,
     currency: 'USD',
     currency_symbol: '$',
     country_code: 'US',
     country_name: 'United States (Global)',
     interval: 'month',
-    description: 'Essential CRM data enrichment and lead tracking for global reps.',
-    paypal_plan_id: 'P-STARTER-FREE',
+    email_limit: 1500,
+    description: 'Essential CRM data enrichment and outbound email outreach for global sales reps.',
+    paypal_plan_id: 'P-STARTER-GLOBAL',
     features: [
-      'Up to 100 lead lookups / month',
+      '1,500 Email dispatches / month',
+      '1,500 Lead lookups / month',
       'Basic contact details & email status',
-      'Standard outreach activity logs',
+      '2 Team Seats',
       'Community support',
     ],
+    limits: { email_sending: 1500, lead_lookups: 1500, team_seats: 2 },
   },
   {
     id: 'pro_us',
     name: 'Pro',
-    price: 49,
+    tier: 'pro',
+    tier_level: 1,
+    price: 249,
     currency: 'USD',
     currency_symbol: '$',
     country_code: 'US',
     country_name: 'United States (Global)',
     interval: 'month',
+    email_limit: 5000,
     description: 'Advanced AI messaging, lead scoring, and automated follow-ups for growing teams.',
-    paypal_plan_id: 'P-PRO-GROWTH',
+    paypal_plan_id: 'P-PRO-GLOBAL',
     features: [
-      'Up to 2,500 lead lookups / month',
+      '5,000 Email dispatches / month',
+      '5,000 Lead lookups / month',
       'AI email outreach suggestion engine',
       'Intent signal account detection',
-      'Real-time team performance reporting',
+      '5 Team Seats',
       'Priority email & chat support',
     ],
+    limits: { email_sending: 5000, lead_lookups: 5000, team_seats: 5 },
+  },
+  {
+    id: 'business_us',
+    name: 'Business',
+    tier: 'business',
+    tier_level: 2,
+    price: 419,
+    currency: 'USD',
+    currency_symbol: '$',
+    country_code: 'US',
+    country_name: 'United States (Global)',
+    interval: 'month',
+    email_limit: 10000,
+    description: 'High-volume sales acceleration platform with multi-inbox rotation and sequence tools.',
+    paypal_plan_id: 'P-BUSINESS-GLOBAL',
+    features: [
+      '10,000 Email dispatches / month',
+      '10,000 Lead lookups / month',
+      'Multi-inbox sender rotation',
+      'Custom prompt templates',
+      '15 Team Seats',
+      'Priority support',
+    ],
+    limits: { email_sending: 10000, lead_lookups: 10000, team_seats: 15 },
   },
   {
     id: 'enterprise_us',
     name: 'Enterprise',
-    price: 199,
+    tier: 'enterprise',
+    tier_level: 3,
+    price: 549,
     currency: 'USD',
     currency_symbol: '$',
     country_code: 'US',
     country_name: 'United States (Global)',
     interval: 'month',
+    email_limit: 15000,
     description: 'Full-scale revenue operations platform with custom integrations and dedicated support.',
-    paypal_plan_id: 'P-ENTERPRISE-UNLIMITED',
+    paypal_plan_id: 'P-ENTERPRISE-GLOBAL',
     features: [
+      '15,000 Email dispatches / month',
       'Unlimited lead & decision maker lookups',
-      'Custom AI sales prompt templates & GenKit integration',
+      'Dedicated IP & custom SMTP setup',
       'Dedicated account manager & SLA governance',
-      'Advanced role-based access control (RBAC)',
+      'Unlimited Team Seats',
       'Custom webhook & API data exports',
     ],
+    limits: { email_sending: 15000, lead_lookups: -1, team_seats: -1 },
   },
 ];
 
@@ -331,6 +513,10 @@ const BILLING_PLAN_FIELDS = `
   description
   paypal_plan_id
   features
+  email_limit
+  tier
+  tier_level
+  limits
   active
   created_at
   updated_at
@@ -338,6 +524,22 @@ const BILLING_PLAN_FIELDS = `
 
 function mapDbBillingPlan(p: any): BillingPlan | null {
   if (!p) return null;
+  const tierName = (p.name || 'Plan').toLowerCase();
+  const defaultCap = tierName.includes('enterprise')
+    ? 15000
+    : tierName.includes('business')
+    ? 10000
+    : tierName.includes('pro')
+    ? 5000
+    : 1500;
+  const defaultTierLevel = tierName.includes('enterprise')
+    ? 3
+    : tierName.includes('business')
+    ? 2
+    : tierName.includes('pro')
+    ? 1
+    : 0;
+
   return {
     id: String(p.id),
     name: p.name || 'Plan',
@@ -350,6 +552,10 @@ function mapDbBillingPlan(p: any): BillingPlan | null {
     description: p.description || '',
     paypal_plan_id: p.paypal_plan_id || '',
     features: Array.isArray(p.features) ? p.features : typeof p.features === 'string' ? JSON.parse(p.features) : [],
+    email_limit: p.email_limit !== undefined && p.email_limit !== null ? Number(p.email_limit) : defaultCap,
+    tier: p.tier || tierName,
+    tier_level: p.tier_level !== undefined && p.tier_level !== null ? Number(p.tier_level) : defaultTierLevel,
+    limits: typeof p.limits === 'object' && p.limits !== null ? p.limits : {},
   };
 }
 
@@ -364,7 +570,7 @@ export async function seedBillingPlans(): Promise<boolean> {
           objects: $objects,
           on_conflict: {
             constraint: aa_s_billing_plans_pkey,
-            update_columns: [name, price, currency, currency_symbol, country_code, country_name, interval, description, paypal_plan_id, features]
+            update_columns: [name, price, currency, currency_symbol, country_code, country_name, interval, description, paypal_plan_id, features, email_limit, tier, tier_level, limits]
           }
         ) {
           affected_rows
@@ -384,6 +590,10 @@ export async function seedBillingPlans(): Promise<boolean> {
       description: plan.description,
       paypal_plan_id: plan.paypal_plan_id,
       features: plan.features,
+      email_limit: plan.email_limit || 1500,
+      tier: plan.tier || plan.name.toLowerCase(),
+      tier_level: plan.tier_level ?? 0,
+      limits: plan.limits || {},
     }));
 
     const res = await insertGraphQL({
@@ -601,6 +811,7 @@ export interface BillingUsage {
   ai_credits_used: number;
   ai_credits_limit: number;
   emails_sent: number;
+  emails_limit: number;
   team_seats_used: number;
   team_seats_limit: number;
 }
@@ -662,7 +873,7 @@ export async function getBillingOverviewActionByToken(
       plan_tier: 'starter',
       billing_cycle: 'monthly',
       status: 'active',
-      price_paid: 0,
+      price_paid: Number(starterPlan?.price) || 1500,
       currency: starterPlan?.currency || 'ZAR',
       current_period_start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(),
       current_period_end: new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString(),
@@ -692,6 +903,18 @@ export async function getBillingOverviewActionByToken(
     // table not yet migrated
   }
 
+  // Determine limits based on active plan tier
+  const emailCapsByTier: Record<string, number> = {
+    starter: 1500,
+    pro: 5000,
+    business: 10000,
+    enterprise: 15000,
+  };
+  const activePlanTier = (subscription?.plan_tier || 'starter').toLowerCase();
+  const tierEmailCap = emailCapsByTier[activePlanTier] || subscription?.plan?.email_limit || 1500;
+  const tierLeadLimit = activePlanTier === 'enterprise' ? -1 : activePlanTier === 'business' ? 10000 : activePlanTier === 'pro' ? 5000 : 1500;
+  const tierSeatLimit = activePlanTier === 'enterprise' ? -1 : activePlanTier === 'business' ? 15 : activePlanTier === 'pro' ? 5 : 2;
+
   // --- Usage ---
   let usage: BillingUsage | null = null;
   try {
@@ -708,12 +931,27 @@ export async function getBillingOverviewActionByToken(
           period_year period_month
           lead_lookups_used lead_lookups_limit
           ai_credits_used ai_credits_limit
-          emails_sent team_seats_used team_seats_limit
+          emails_sent emails_limit
+          team_seats_used team_seats_limit
         }
       }
     `;
     const usageRes = await listGraphQL({ query: usageQuery, variables: { companyId, year: periodYear, month: periodMonth }, operationName: 'GetBillingUsage' });
-    if (Array.isArray(usageRes) && usageRes.length > 0) usage = usageRes[0];
+    if (Array.isArray(usageRes) && usageRes.length > 0) {
+      const rec = usageRes[0];
+      usage = {
+        period_year: rec.period_year,
+        period_month: rec.period_month,
+        lead_lookups_used: rec.lead_lookups_used || 0,
+        lead_lookups_limit: rec.lead_lookups_limit !== undefined && rec.lead_lookups_limit !== 100 ? rec.lead_lookups_limit : tierLeadLimit,
+        ai_credits_used: rec.ai_credits_used || 0,
+        ai_credits_limit: rec.ai_credits_limit || 500,
+        emails_sent: rec.emails_sent || 0,
+        emails_limit: rec.emails_limit || tierEmailCap,
+        team_seats_used: rec.team_seats_used || 1,
+        team_seats_limit: rec.team_seats_limit !== undefined && rec.team_seats_limit !== 1 ? rec.team_seats_limit : tierSeatLimit,
+      };
+    }
   } catch {
     // table not yet migrated
   }
@@ -722,12 +960,13 @@ export async function getBillingOverviewActionByToken(
       period_year: periodYear,
       period_month: periodMonth,
       lead_lookups_used: 0,
-      lead_lookups_limit: 100,
+      lead_lookups_limit: tierLeadLimit,
       ai_credits_used: 0,
       ai_credits_limit: 500,
       emails_sent: 0,
+      emails_limit: tierEmailCap,
       team_seats_used: 1,
-      team_seats_limit: 1,
+      team_seats_limit: tierSeatLimit,
     };
   }
 
@@ -893,4 +1132,141 @@ export async function resumeSubscriptionActionByToken(
   }
 
   return { success: true, message: 'Subscription resumed successfully. Your plan will continue as normal.' };
+}
+
+/**
+ * Checks email quota usage for the user's company in the current month.
+ */
+export async function getCompanyEmailQuotaUsageActionByToken(
+  token: string
+): Promise<{ emailsSent: number; emailsLimit: number; allowed: boolean; planTier: string }> {
+  const { getAccountCompanyIdFromClaims } = await import('@/lib/auth-utils');
+  const companyId = await getAccountCompanyIdFromClaims(token);
+  if (!companyId) throw new Error('Unauthorized');
+
+  const now = new Date();
+  const periodYear = now.getFullYear();
+  const periodMonth = now.getMonth() + 1;
+
+  let planTier = 'starter';
+  try {
+    const subRes = await listGraphQL({
+      query: `
+        query GetSubTier($companyId: Int!) {
+          aa_s_subscriptions(where: { account_company_id: { _eq: $companyId } }, limit: 1) {
+            plan_tier
+          }
+        }
+      `,
+      variables: { companyId },
+      operationName: 'GetSubTier',
+    });
+    if (Array.isArray(subRes) && subRes[0]?.plan_tier) {
+      planTier = subRes[0].plan_tier.toLowerCase();
+    }
+  } catch {
+    // fallback
+  }
+
+  const emailCapsByTier: Record<string, number> = {
+    starter: 1500,
+    pro: 5000,
+    business: 10000,
+    enterprise: 15000,
+  };
+  const emailsLimit = emailCapsByTier[planTier] || 1500;
+
+  let emailsSent = 0;
+  try {
+    const usageRes = await listGraphQL({
+      query: `
+        query GetSentUsage($companyId: Int!, $year: Int!, $month: Int!) {
+          aa_s_usage_records(
+            where: {
+              account_company_id: { _eq: $companyId }
+              period_year: { _eq: $year }
+              period_month: { _eq: $month }
+            }
+            limit: 1
+          ) {
+            emails_sent
+          }
+        }
+      `,
+      variables: { companyId, year: periodYear, month: periodMonth },
+      operationName: 'GetSentUsage',
+    });
+    if (Array.isArray(usageRes) && usageRes[0]?.emails_sent !== undefined) {
+      emailsSent = Number(usageRes[0].emails_sent);
+    }
+  } catch {
+    // fallback
+  }
+
+  return {
+    emailsSent,
+    emailsLimit,
+    allowed: emailsSent < emailsLimit,
+    planTier,
+  };
+}
+
+/**
+ * Atomically increments emails_sent for the current month usage record.
+ */
+export async function incrementCompanyEmailSentActionByToken(
+  token: string
+): Promise<void> {
+  const { getAccountCompanyIdFromClaims } = await import('@/lib/auth-utils');
+  const companyId = await getAccountCompanyIdFromClaims(token);
+  if (!companyId) return;
+
+  const now = new Date();
+  const periodYear = now.getFullYear();
+  const periodMonth = now.getMonth() + 1;
+
+  try {
+    const updateMutation = `
+      mutation IncUsage($companyId: Int!, $year: Int!, $month: Int!) {
+        update_aa_s_usage_records(
+          where: {
+            account_company_id: { _eq: $companyId }
+            period_year: { _eq: $year }
+            period_month: { _eq: $month }
+          }
+          _inc: { emails_sent: 1 }
+        ) { affected_rows }
+      }
+    `;
+    const res: any = await updateGraphQL({
+      mutation: updateMutation,
+      operationName: 'IncUsage',
+      attrs: {},
+      id: companyId,
+    }).catch(() => null);
+
+    if (!res || res.affected_rows === 0) {
+      // Create the record if it didn't exist yet
+      await insertGraphQL({
+        mutation: `
+          mutation CreateUsageRecord($object: aa_s_usage_records_insert_input!) {
+            insert_aa_s_usage_records_one(object: $object) { id }
+          }
+        `,
+        operationName: 'CreateUsageRecord',
+        input: {
+          object: {
+            account_company_id: companyId,
+            period_year: periodYear,
+            period_month: periodMonth,
+            emails_sent: 1,
+            lead_lookups_used: 0,
+            ai_credits_used: 0,
+          },
+        },
+      }).catch(() => null);
+    }
+  } catch (err) {
+    console.warn('[billing] Increment email sent failed:', err);
+  }
 }

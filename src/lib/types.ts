@@ -19,6 +19,10 @@ export interface BillingPlan {
   description?: string;
   paypal_plan_id?: string;
   features?: any[];
+  email_limit?: number;
+  tier?: string;
+  tier_level?: number;
+  limits?: Record<string, any>;
   active?: boolean;
   created_at?: string;
   updated_at?: string;

@@ -7,6 +7,10 @@ import {
   incrementAccountSentCount,
 } from './connectedAccountsService';
 import { logOutreachActionByToken } from './outreachServices';
+import {
+  getCompanyEmailQuotaUsageActionByToken,
+  incrementCompanyEmailSentActionByToken,
+} from './billingService';
 import { injectTrackingToEmailHtml } from '@/lib/tracking-utils';
 import type {
   SendEmailPayload,
@@ -21,6 +25,23 @@ export async function sendEmailOutreachActionByToken(
   const companyId = await getAccountCompanyIdFromClaims(token);
   if (!companyId) {
     throw new Error('Unauthorized: Account company ID missing from token claims');
+  }
+
+  // Verify monthly email sending cap
+  try {
+    const quota = await getCompanyEmailQuotaUsageActionByToken(token);
+    if (!quota.allowed) {
+      return {
+        success: false,
+        channel: 'Email',
+        recipient: payload.to || 'Unknown',
+        status: 'Failed',
+        error: `Monthly email sending cap reached (${quota.emailsSent}/${quota.emailsLimit.toLocaleString()} emails for ${quota.planTier.toUpperCase()} tier). Please upgrade your tier in Billing to increase your sending limit.`,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  } catch (quotaErr) {
+    console.warn('[dispatch] Quota check notice:', quotaErr);
   }
 
   if (!payload.to || !payload.to.includes('@')) {
@@ -129,6 +150,9 @@ export async function sendEmailOutreachActionByToken(
 
     // Increment sender account volume
     await incrementAccountSentCount(companyId, account.id);
+
+    // Increment company monthly email usage records
+    await incrementCompanyEmailSentActionByToken(token).catch(() => null);
 
     return {
       success: true,

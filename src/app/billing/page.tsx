@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   CreditCard, CheckCircle2, Zap, Building2, Star, ChevronDown,
   ArrowUpCircle, ArrowDownCircle, XCircle, RefreshCcw, Download,
-  Shield, Users, Cpu, TrendingUp, Globe, AlertTriangle,
+  Shield, Users, Cpu, TrendingUp, Globe, AlertTriangle, Mail,
 } from "lucide-react";
 import { SalesProSidebar } from "@/components/layout/salespro-sidebar";
 import { SalesProHeader } from "@/components/layout/salespro-header";
@@ -63,24 +63,34 @@ function usageColor(p: number) {
 // ---------------------------------------------------------------------------
 // Tier meta
 // ---------------------------------------------------------------------------
-const TIER_META: Record<string, { icon: React.ReactNode; gradient: string; badge: string; tagline: string }> = {
+const TIER_META: Record<string, { icon: React.ReactNode; gradient: string; badge: string; tagline: string; emailCap: string }> = {
   starter: {
-    icon: <CheckCircle2 className="h-6 w-6 text-zinc-400" />,
-    gradient: "from-zinc-900 to-zinc-800",
-    badge: "bg-zinc-700 text-zinc-300",
-    tagline: "Free forever",
+    icon: <CheckCircle2 className="h-6 w-6 text-emerald-400" />,
+    gradient: "from-emerald-950/40 via-zinc-900 to-zinc-900",
+    badge: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30",
+    tagline: "Essential Outreach",
+    emailCap: "1,500 Emails / mo",
   },
   pro: {
     icon: <Star className="h-6 w-6 text-indigo-400" />,
-    gradient: "from-indigo-950 to-indigo-900",
+    gradient: "from-indigo-950 via-zinc-900 to-zinc-900",
     badge: "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30",
-    tagline: "Most popular",
+    tagline: "Most Popular",
+    emailCap: "5,000 Emails / mo",
+  },
+  business: {
+    icon: <Zap className="h-6 w-6 text-amber-400" />,
+    gradient: "from-amber-950/40 via-zinc-900 to-zinc-900",
+    badge: "bg-amber-500/20 text-amber-300 border border-amber-500/30",
+    tagline: "High Volume",
+    emailCap: "10,000 Emails / mo",
   },
   enterprise: {
     icon: <Building2 className="h-6 w-6 text-purple-400" />,
-    gradient: "from-purple-950 to-purple-900",
+    gradient: "from-purple-950 via-zinc-900 to-zinc-900",
     badge: "bg-purple-500/20 text-purple-300 border border-purple-500/30",
-    tagline: "Full power",
+    tagline: "Unlimited Scale",
+    emailCap: "15,000 Emails / mo",
   },
 };
 
@@ -102,14 +112,17 @@ function PlanCard({
   onSelect: (plan: BillingPlan) => void;
   loading: boolean;
 }) {
-  const tier = plan.name.toLowerCase() as "starter" | "pro" | "enterprise";
+  const tier = plan.name.toLowerCase() as "starter" | "pro" | "business" | "enterprise";
   const meta = TIER_META[tier] || TIER_META.starter;
   const rawPrice = Number(plan.price) || 0;
   const price = billingCycle === "annual" ? Math.round(rawPrice * 0.85) : rawPrice;
-  const tierLevel = tier === "starter" ? 0 : tier === "pro" ? 1 : 2;
+  const tierLevel = plan.tier_level !== undefined
+    ? plan.tier_level
+    : tier === "starter" ? 0 : tier === "pro" ? 1 : tier === "business" ? 2 : 3;
   const isUpgrade = tierLevel > activeTierLevel;
   const isDowngrade = tierLevel < activeTierLevel;
   const features: string[] = Array.isArray(plan.features) ? plan.features : [];
+  const emailSendingCap = plan.email_limit || (tier === "enterprise" ? 15000 : tier === "business" ? 10000 : tier === "pro" ? 5000 : 1500);
 
   return (
     <div
@@ -141,6 +154,13 @@ function PlanCard({
             </span>
           )}
         </div>
+
+        {/* Email Sending Cap Chip */}
+        <div className="mb-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-background/70 border border-border/40 text-xs font-semibold text-foreground w-fit">
+          <Mail className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+          <span>{emailSendingCap.toLocaleString()} emails/mo cap</span>
+        </div>
+
         <div className="flex items-baseline gap-1">
           {price === 0 ? (
             <span className="text-3xl font-extrabold text-foreground">Free</span>
@@ -329,7 +349,11 @@ export default function BillingPage() {
 
   // --- Change plan ---
   const handlePlanSelect = (plan: BillingPlan) => {
-    const isUpgrade = (plan.name.toLowerCase() === "pro" || plan.name.toLowerCase() === "enterprise");
+    const targetTier = plan.name.toLowerCase();
+    const targetLevel = plan.tier_level !== undefined
+      ? plan.tier_level
+      : targetTier === "enterprise" ? 3 : targetTier === "business" ? 2 : targetTier === "pro" ? 1 : 0;
+    const isUpgrade = targetLevel > activeTierLevel;
     const planPrice = Number(plan.price) || 0;
     const planCurrency = plan.currency || 'ZAR';
     const priceLabel = billingCycle === "annual"
@@ -340,8 +364,8 @@ export default function BillingPage() {
       open: true,
       title: isUpgrade ? `Upgrade to ${plan.name}` : `Downgrade to ${plan.name}`,
       description: isUpgrade
-        ? `You'll be switched to the ${plan.name} plan at ${priceLabel}. Your access to all new features will be activated immediately.`
-        : `You'll be downgraded to ${plan.name}. Some features will be disabled at the end of your current billing period.`,
+        ? `You'll be switched to the ${plan.name} plan at ${priceLabel}. Your access to all new features and increased email sending limits will be activated immediately.`
+        : `You'll be downgraded to ${plan.name}. New tier limits will apply at the start of your next billing period.`,
       confirmLabel: isUpgrade ? `Upgrade to ${plan.name}` : `Downgrade to ${plan.name}`,
       onConfirm: async () => {
         setActionLoading(true);
@@ -364,13 +388,13 @@ export default function BillingPage() {
     });
   };
 
-  // --- Cancel ---
+  // --- Cancel subscription ---
   const handleCancel = () => {
     setConfirmModal({
       open: true,
-      title: "Cancel Subscription",
-      description: "Your subscription will remain active until the end of the current billing period. After that, you'll be downgraded to Starter (free). Are you sure?",
-      confirmLabel: "Cancel Subscription",
+      title: "Cancel subscription?",
+      description: `Your subscription will remain active until ${formatDate(sub?.current_period_end)}. After that, your account will lose access to premium tier limits. You can resume at any time.`,
+      confirmLabel: "Yes, cancel subscription",
       confirmVariant: "destructive",
       onConfirm: async () => {
         setActionLoading(true);
@@ -378,7 +402,7 @@ export default function BillingPage() {
           const token = await user!.getIdToken(true);
           const res = await cancelSubscriptionActionByToken(token);
           if (res.success) {
-            toast({ title: "Cancellation scheduled", description: res.message });
+            toast({ title: "Subscription canceled", description: res.message });
             await load();
           } else {
             toast({ title: "Error", description: res.message, variant: "destructive" });
@@ -417,7 +441,13 @@ export default function BillingPage() {
   const invoices = data?.invoices || [];
   const usage = data?.usage;
 
-  const activeTierLevel = sub?.plan_tier === "enterprise" ? 2 : sub?.plan_tier === "pro" ? 1 : 0;
+  const activeTierLevel = sub?.plan_tier === "enterprise"
+    ? 3
+    : sub?.plan_tier === "business"
+    ? 2
+    : sub?.plan_tier === "pro"
+    ? 1
+    : 0;
   const country = SOUTHERN_AFRICAN_COUNTRIES.find((c) => c.code === selectedCountry);
 
   const statusBadge = sub?.cancel_at_period_end
@@ -522,15 +552,15 @@ export default function BillingPage() {
             </div>
           )}
 
-          {/* ── Pricing Cards ── */}
+          {/* ── Pricing Cards (4 Tiers) ── */}
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="rounded-2xl border border-border/20 bg-card h-72 animate-pulse" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="rounded-2xl border border-border/20 bg-card h-80 animate-pulse" />
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mt-2">
               {plans.map((plan) => (
                 <PlanCard
                   key={plan.id}
@@ -559,6 +589,12 @@ export default function BillingPage() {
                 </div>
                 {usage ? (
                   <div className="space-y-4">
+                    <UsageBar
+                      label="Monthly Email Cap"
+                      used={usage.emails_sent}
+                      limit={usage.emails_limit}
+                      icon={<Mail className="h-3.5 w-3.5 text-indigo-400" />}
+                    />
                     <UsageBar
                       label="Lead Lookups"
                       used={usage.lead_lookups_used}
@@ -606,7 +642,7 @@ export default function BillingPage() {
                     <span className="text-foreground font-medium">{formatDate(sub?.current_period_end)}</span>
                   </div>
                 </div>
-                {sub && !sub.cancel_at_period_end && sub.plan_tier !== "starter" && (
+                {sub && !sub.cancel_at_period_end && (
                   <button
                     onClick={handleCancel}
                     disabled={actionLoading}
